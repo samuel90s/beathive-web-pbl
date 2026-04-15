@@ -1,0 +1,190 @@
+// src/subscriptions/subscriptions.service.ts
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../prisma/prisma.service';
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const midtransClient = require('midtrans-client');
+
+@Injectable()
+export class SubscriptionsService {
+  private coreApi: any;
+
+  constructor(
+    private prisma: PrismaService,
+    private config: ConfigService,
+  ) {
+    this.coreApi = new midtransClient.CoreApi({
+      isProduction: config.get('MIDTRANS_IS_PRODUCTION') === 'true',
+      serverKey: config.get('MIDTRANS_SERVER_KEY'),
+    });
+  }
+
+  // ─── Status subscription user ───────────────────────────
+
+  async getMySubscription(userId: string) {
+    const sub = await this.prisma.subscription.findUnique({
+      where: { userId },
+      include: { plan: true },
+    });
+
+    if (!sub) throw new NotFoundException('Subscription tidak ditemukan');
+
+    // Hitung sisa kuota download bulan ini
+    const thisMonth = new Date();
+    thisMonth.setDate(1);
+    thisMonth.setHours(0, 0, 0, 0);
+
+    const downloadsThisMonth = await this.prisma.download.count({
+      where: {
+        userId,
+        source: 'subscription',
+        downloadedAt: { gte: thisMonth },
+      },
+    });
+
+    return {
+      ...sub,
+      usage: {
+        downloadsThisMonth,
+        downloadLimit: sub.plan.downloadLimit,
+        remaining: sub.plan.unlimited
+          ? null
+          : Math.max(0, sub.plan.downloadLimit - downloadsThisMonth),
+        unlimited: sub.plan.unlimited,
+      },
+    };
+  }
+
+  // ─── Upgrade / ganti plan ───────────────────────────────
+
+  async upgradePlan(
+    userId: string,
+    planSlug: string,
+    billingCycle: 'monthly' | 'yearly',
+  ) {
+    const plan = await this.prisma.plan.findUnique({ where: { slug: planSlug } });
+    if (!plan) throw new NotFoundException('Plan tidak ditemukan');
+
+    if (plan.slug === 'free') {
+      throw new BadRequestException('Tidak bisa upgrade ke free plan');
+    }
+
+    const price =
+      billingCycle === 'yearly' ? plan.priceYearly : plan.priceMonthly;
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
+    // Buat Midtrans Snap untuk pembayaran upgrade
+    const snap = new midtransClient.Snap({
+      isProduction: this.config.get('MIDTRANS_IS_PRODUCTION') === 'true',
+      serverKey: this.config.get('MIDTRANS_SERVER_KEY'),
+      clientKey: this.config.get('MIDTRANS_CLIENT_KEY'),
+    });
+
+    const orderId = `SUB-${userId}-${Date.now()}`;
+
+    const transaction = await snap.createTransaction({
+      transaction_details: {
+        order_id: orderId,
+        gross_amount: price,
+      },
+      item_details: [{
+        id: plan.id,
+        price,
+        quantity: 1,
+        name: `Plan ${plan.name} - ${billingCycle === 'yearly' ? 'Tahunan' : 'Bulanan'}`,
+      }],
+      customer_details: {
+        first_name: user!.name,
+        email: user!.email,
+      },
+    });
+
+    // Simpan pending subscription upgrade (akan diaktifkan via webhook)
+    // Di production: simpan intent ke Redis atau tabel khusus
+    return {
+      snapToken: transaction.token,
+      orderId,
+      plan: plan.name,
+      price,
+      billingCycle,
+    };
+  }
+
+  // ─── Aktifkan subscription setelah bayar ────────────────
+  // Dipanggil dari WebhookService setelah konfirmasi Midtrans
+
+  async activateSubscription(
+    userId: string,
+    planSlug: string,
+    billingCycle: 'monthly' | 'yearly',
+    gatewaySubId: string,
+  ) {
+    const plan = await this.prisma.plan.findUnique({ where: { slug: planSlug } });
+    if (!plan) return;
+
+    const now = new Date();
+    const periodEnd = new Date(now);
+    if (billingCycle === 'yearly') {
+      periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    } else {
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+    }
+
+    await this.prisma.subscription.upsert({
+      where: { userId },
+      update: {
+        planId: plan.id,
+        status: 'ACTIVE',
+        billingCycle: billingCycle === 'yearly' ? 'YEARLY' : 'MONTHLY',
+        gatewaySubId,
+        currentPeriodEnd: periodEnd,
+        cancelledAt: null,
+      },
+      create: {
+        userId,
+        planId: plan.id,
+        status: 'ACTIVE',
+        billingCycle: billingCycle === 'yearly' ? 'YEARLY' : 'MONTHLY',
+        gatewaySubId,
+        currentPeriodEnd: periodEnd,
+      },
+    });
+  }
+
+  // ─── Cancel subscription ────────────────────────────────
+
+  async cancelSubscription(userId: string) {
+    const sub = await this.prisma.subscription.findUnique({
+      where: { userId },
+      include: { plan: true },
+    });
+
+    if (!sub || sub.status !== 'ACTIVE') {
+      throw new BadRequestException('Tidak ada subscription aktif');
+    }
+
+    if (sub.plan.slug === 'free') {
+      throw new BadRequestException('Free plan tidak bisa di-cancel');
+    }
+
+    // Set cancelled — akses tetap aktif sampai currentPeriodEnd
+    await this.prisma.subscription.update({
+      where: { userId },
+      data: {
+        status: 'CANCELLED',
+        cancelledAt: new Date(),
+      },
+    });
+
+    return {
+      message: 'Subscription berhasil di-cancel',
+      accessUntil: sub.currentPeriodEnd,
+    };
+  }
+}

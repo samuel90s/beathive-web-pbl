@@ -1,0 +1,238 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users ───────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String?  // null kalau login via OAuth
+  avatarUrl    String?
+  provider     String   @default("email") // "email" | "google"
+  providerId   String?  // ID dari Google OAuth
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  subscription Subscription?
+  orders       Order[]
+  downloads    Download[]
+  wishlists    Wishlist[]
+
+  @@map("users")
+}
+
+// ─── Plans ───────────────────────────────────────────────
+
+model Plan {
+  id               String   @id @default(uuid())
+  name             String   // "Free", "Pro", "Business"
+  slug             String   @unique // "free", "pro", "business"
+  priceMonthly     Int      @default(0) // dalam Rupiah
+  priceYearly      Int      @default(0)
+  downloadLimit    Int      @default(5)  // -1 = unlimited
+  commercialLicense Boolean @default(false)
+  unlimited        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+// ─── Subscriptions ───────────────────────────────────────
+
+model Subscription {
+  id               String             @id @default(uuid())
+  userId           String             @unique
+  planId           String
+  status           SubscriptionStatus @default(ACTIVE)
+  billingCycle     BillingCycle       @default(MONTHLY)
+  gatewaySubId     String?            // ID subscription di Midtrans/Xendit
+  currentPeriodEnd DateTime
+  cancelledAt      DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  user   User @relation(fields: [userId], references: [id])
+  plan   Plan @relation(fields: [planId], references: [id])
+
+  @@map("subscriptions")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE    // gagal bayar, masih grace period
+  SUSPENDED   // sudah di-suspend
+  CANCELLED
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+// ─── Categories & Tags ───────────────────────────────────
+
+model Category {
+  id           String        @id @default(uuid())
+  name         String
+  slug         String        @unique
+  icon         String?
+  soundEffects SoundEffect[]
+
+  @@map("categories")
+}
+
+model Tag {
+  id           String              @id @default(uuid())
+  name         String
+  slug         String              @unique
+  soundEffects SoundEffectOnTag[]
+
+  @@map("tags")
+}
+
+// ─── Sound Effects ───────────────────────────────────────
+
+model SoundEffect {
+  id           String      @id @default(uuid())
+  categoryId   String
+  title        String
+  slug         String      @unique
+  description  String?
+  fileUrl      String      // path di S3 (private)
+  previewUrl   String      // path preview 30s di S3 (public via CDN)
+  waveformData Json        // array of bar heights untuk visualizer
+  durationMs   Int
+  fileSize     Int         // bytes
+  format       String      @default("wav") // "wav" | "mp3"
+  price        Int         @default(0)     // 0 = gratis, dalam Rupiah
+  accessLevel  AccessLevel @default(FREE)  // siapa yang bisa download
+  licenseType  String      @default("personal") // "personal" | "commercial" | "both"
+  isPublished  Boolean     @default(false)
+  publishedAt  DateTime?
+  playCount    Int         @default(0)
+  downloadCount Int        @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  category   Category           @relation(fields: [categoryId], references: [id])
+  tags       SoundEffectOnTag[]
+  orderItems OrderItem[]
+  downloads  Download[]
+  wishlists  Wishlist[]
+
+  @@map("sound_effects")
+}
+
+enum AccessLevel {
+  FREE       // semua bisa download
+  PRO        // butuh plan Pro ke atas
+  BUSINESS   // butuh plan Business
+  PURCHASE   // hanya bisa dibeli satuan
+}
+
+model SoundEffectOnTag {
+  soundEffectId String
+  tagId         String
+
+  soundEffect SoundEffect @relation(fields: [soundEffectId], references: [id])
+  tag         Tag         @relation(fields: [tagId], references: [id])
+
+  @@id([soundEffectId, tagId])
+  @@map("sound_effect_tags")
+}
+
+// ─── Orders ──────────────────────────────────────────────
+
+model Order {
+  id             String      @id @default(uuid())
+  userId         String
+  totalAmount    Int         // total dalam Rupiah
+  status         OrderStatus @default(PENDING)
+  gatewayOrderId String?     // ID order di Midtrans/Xendit
+  paidAt         DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  user      User        @relation(fields: [userId], references: [id])
+  items     OrderItem[]
+  invoice   Invoice?
+
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model OrderItem {
+  id            String @id @default(uuid())
+  orderId       String
+  soundEffectId String
+  priceSnapshot Int    // harga saat transaksi — tidak berubah walau harga SFX diupdate
+  licenseType   String // "personal" | "commercial"
+  licensePdfUrl String? // URL PDF lisensi setelah generated
+
+  order       Order       @relation(fields: [orderId], references: [id])
+  soundEffect SoundEffect @relation(fields: [soundEffectId], references: [id])
+
+  @@map("order_items")
+}
+
+// ─── Invoices ────────────────────────────────────────────
+
+model Invoice {
+  id            String   @id @default(uuid())
+  orderId       String   @unique
+  invoiceNumber String   @unique // e.g. "INV-2024-00001"
+  pdfUrl        String?
+  issuedAt      DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("invoices")
+}
+
+// ─── Downloads ───────────────────────────────────────────
+
+model Download {
+  id            String   @id @default(uuid())
+  userId        String
+  soundEffectId String
+  source        String   // "subscription" | "purchase"
+  signedUrl     String?  // signed URL sementara (expire 24 jam)
+  expiresAt     DateTime?
+  downloadedAt  DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id])
+  soundEffect SoundEffect @relation(fields: [soundEffectId], references: [id])
+
+  @@map("downloads")
+}
+
+// ─── Wishlists ───────────────────────────────────────────
+
+model Wishlist {
+  id            String   @id @default(uuid())
+  userId        String
+  soundEffectId String
+  createdAt     DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id])
+  soundEffect SoundEffect @relation(fields: [soundEffectId], references: [id])
+
+  @@unique([userId, soundEffectId])
+  @@map("wishlists")
+}
