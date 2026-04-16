@@ -60,6 +60,7 @@ export interface SoundEffect {
   format: string;
   price: number;
   isFree: boolean;
+  isLiked?: boolean;
   accessLevel: 'FREE' | 'PRO' | 'BUSINESS' | 'PURCHASE';
   licenseType: string;
   playCount: number;
@@ -67,6 +68,18 @@ export interface SoundEffect {
   category: Category;
   tags: Tag[];
   publishedAt: string;
+}
+
+export interface DownloadResult {
+  downloadUrl: string;
+  requiresAuth: boolean;
+  expiresAt: string;
+  fileName: string;
+}
+
+export interface WishlistToggleResult {
+  liked: boolean;
+  message: string;
 }
 
 export interface Order {

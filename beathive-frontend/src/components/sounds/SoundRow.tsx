@@ -1,8 +1,10 @@
 // src/components/sounds/SoundRow.tsx
 'use client';
+import { useState } from 'react';
 import { usePlayerStore } from '@/lib/store/player.store';
 import { useCartStore } from '@/lib/store/cart.store';
 import { useDownload } from '@/lib/hooks/useDownload';
+import { useWishlist } from '@/lib/hooks/useWishlist';
 import { formatDuration } from '@/lib/utils';
 import type { SoundEffect } from '@/types';
 import WaveformBar from './WaveformBar';
@@ -16,10 +18,14 @@ export default function SoundRow({ sound }: Props) {
   const { currentTrack, isPlaying, play, pause } = usePlayerStore();
   const { addItem, removeItem, hasItem } = useCartStore();
   const { download, downloading } = useDownload();
+  const { toggle: toggleWishlist, loadingId } = useWishlist();
+
+  const [liked, setLiked] = useState<boolean>(sound.isLiked ?? false);
 
   const isActive = currentTrack?.id === sound.id;
   const isCurrentlyPlaying = isActive && isPlaying;
   const inCart = hasItem(sound.id);
+  const wishlistLoading = loadingId === sound.id;
 
   const togglePlay = () => {
     if (isActive) {
@@ -37,7 +43,12 @@ export default function SoundRow({ sound }: Props) {
 
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation();
-    download(sound.id);
+    download(sound.id, sound.slug, sound.format);
+  };
+
+  const handleWishlist = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await toggleWishlist(sound.id, liked, (newLiked) => setLiked(newLiked));
   };
 
   const accessBadge = {
@@ -106,6 +117,33 @@ export default function SoundRow({ sound }: Props) {
       <span className="text-xs text-gray-400 w-10 text-right flex-shrink-0 tabular-nums">
         {formatDuration(sound.durationMs)}
       </span>
+
+      {/* Wishlist button */}
+      <button
+        onClick={handleWishlist}
+        disabled={wishlistLoading}
+        title={liked ? 'Hapus dari wishlist' : 'Tambah ke wishlist'}
+        className={clsx(
+          'flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-colors',
+          liked
+            ? 'text-rose-500 hover:text-rose-400'
+            : 'text-gray-300 hover:text-rose-400',
+          wishlistLoading && 'opacity-50 cursor-not-allowed',
+        )}
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill={liked ? 'currentColor' : 'none'}
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+      </button>
 
       {/* Price / Action */}
       <div className="flex items-center gap-2 flex-shrink-0 w-32 justify-end">
