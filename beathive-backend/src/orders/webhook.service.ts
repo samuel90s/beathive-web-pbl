@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { LicenseService } from '../common/license/license.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 @Injectable()
 export class WebhookService {
@@ -13,6 +14,7 @@ export class WebhookService {
     private prisma: PrismaService,
     private config: ConfigService,
     private licenseService: LicenseService,
+    private subscriptionsService: SubscriptionsService,
   ) {}
 
   // ─── Verifikasi signature dari Midtrans ─────────────────
@@ -68,17 +70,63 @@ export class WebhookService {
 
     const isFraud = fraud_status === 'challenge';
 
-    if (isSuccess && !isFraud) {
-      await this.handlePaymentSuccess(order_id);
-    } else if (isFailed) {
-      await this.handlePaymentFailed(order_id);
+    // 3. Route berdasarkan tipe order
+    const isSubscriptionOrder = order_id.startsWith('SUB-');
+
+    if (isSubscriptionOrder) {
+      if (isSuccess && !isFraud) {
+        await this.handleSubscriptionSuccess(order_id);
+      } else if (isFailed) {
+        await this.handleSubscriptionFailed(order_id);
+      }
+    } else {
+      if (isSuccess && !isFraud) {
+        await this.handlePaymentSuccess(order_id);
+      } else if (isFailed) {
+        await this.handlePaymentFailed(order_id);
+      }
     }
 
     this.logger.log(`Webhook processed: ${order_id} → ${transaction_status}`);
     return { received: true };
   }
 
-  // ─── Pembayaran berhasil ─────────────────────────────────
+  // ─── Subscription berhasil dibayar ──────────────────────
+
+  private async handleSubscriptionSuccess(orderId: string) {
+    const intent = await this.prisma.subscriptionIntent.findUnique({
+      where: { orderId },
+    });
+
+    if (!intent) {
+      this.logger.warn(`Subscription intent tidak ditemukan: ${orderId}`);
+      return;
+    }
+
+    await this.subscriptionsService.activateSubscription(
+      intent.userId,
+      intent.planSlug,
+      intent.billingCycle as 'monthly' | 'yearly',
+      orderId,
+    );
+
+    // Hapus intent setelah berhasil diproses
+    await this.prisma.subscriptionIntent.delete({ where: { orderId } });
+
+    this.logger.log(
+      `Subscription aktif: userId=${intent.userId} plan=${intent.planSlug} cycle=${intent.billingCycle}`,
+    );
+  }
+
+  // ─── Subscription gagal ──────────────────────────────────
+
+  private async handleSubscriptionFailed(orderId: string) {
+    // Hapus intent agar bisa coba lagi
+    await this.prisma.subscriptionIntent.deleteMany({ where: { orderId } });
+    this.logger.log(`Subscription payment gagal: ${orderId}`);
+  }
+
+  // ─── Pembayaran order (per-item purchase) berhasil ──────
 
   private async handlePaymentSuccess(gatewayOrderId: string) {
     const order = await this.prisma.order.findFirst({

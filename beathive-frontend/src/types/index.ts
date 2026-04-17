@@ -5,6 +5,8 @@ export interface User {
   name: string;
   email: string;
   avatarUrl?: string;
+  bio?: string;
+  role: 'USER' | 'AUTHOR' | 'ADMIN';
   provider: string;
   createdAt: string;
   subscription?: Subscription;
@@ -49,6 +51,13 @@ export interface Tag {
   slug: string;
 }
 
+export interface Author {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+  bio?: string;
+}
+
 export interface SoundEffect {
   id: string;
   title: string;
@@ -57,6 +66,7 @@ export interface SoundEffect {
   previewUrl: string;
   waveformData: number[];
   durationMs: number;
+  fileSize?: number;
   format: string;
   price: number;
   isFree: boolean;
@@ -67,7 +77,9 @@ export interface SoundEffect {
   downloadCount: number;
   category: Category;
   tags: Tag[];
+  author?: Author;
   publishedAt: string;
+  createdAt?: string;
 }
 
 export interface DownloadResult {
@@ -121,9 +133,10 @@ export interface SoundFilters {
   search?: string;
   categorySlug?: string;
   isFree?: boolean;
+  accessLevel?: 'FREE' | 'PRO' | 'BUSINESS' | 'PURCHASE';
   minDuration?: number;
   maxDuration?: number;
-  sortBy?: 'newest' | 'popular' | 'price_asc' | 'price_desc';
+  sortBy?: 'newest' | 'oldest' | 'popular' | 'mostplayed' | 'price_asc' | 'price_desc';
   page?: number;
   limit?: number;
 }

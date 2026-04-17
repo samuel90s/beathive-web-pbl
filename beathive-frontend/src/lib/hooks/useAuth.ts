@@ -24,8 +24,8 @@ export function useAuth() {
     return result;
   };
 
-  const register = async (name: string, email: string, password: string) => {
-    const result = await authApi.register(name, email, password);
+  const register = async (name: string, email: string, password: string, role?: string) => {
+    const result = await authApi.register(name, email, password, role);
     store.setAuth(result.user, result.accessToken, result.refreshToken);
     return result;
   };

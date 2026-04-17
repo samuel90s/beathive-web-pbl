@@ -5,9 +5,10 @@ import { OrdersController } from './orders.controller';
 import { WebhookService } from './webhook.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { LicenseModule } from '../common/license/license.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 @Module({
-  imports: [LicenseModule],
+  imports: [LicenseModule, SubscriptionsModule],
   controllers: [OrdersController],
   providers: [OrdersService, WebhookService, PrismaService],
 })

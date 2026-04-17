@@ -16,15 +16,18 @@ model User {
   email        String   @unique
   passwordHash String?  // null kalau login via OAuth
   avatarUrl    String?
+  bio          String?  // bio singkat untuk author
+  role         String   @default("USER") // "USER" | "AUTHOR" | "ADMIN"
   provider     String   @default("email") // "email" | "google"
   providerId   String?  // ID dari Google OAuth
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  subscription Subscription?
-  orders       Order[]
-  downloads    Download[]
-  wishlists    Wishlist[]
+  subscription  Subscription?
+  orders        Order[]
+  downloads     Download[]
+  wishlists     Wishlist[]
+  uploadedSounds SoundEffect[] @relation("AuthorSounds")
 
   @@map("users")
 }
@@ -105,6 +108,7 @@ model Tag {
 model SoundEffect {
   id           String      @id @default(uuid())
   categoryId   String
+  authorId     String?     // null = upload oleh admin, ada = upload oleh author
   title        String
   slug         String      @unique
   description  String?
@@ -113,7 +117,7 @@ model SoundEffect {
   waveformData Json        // array of bar heights untuk visualizer
   durationMs   Int
   fileSize     Int         // bytes
-  format       String      @default("wav") // "wav" | "mp3"
+  format       String      @default("wav") // "wav" | "mp3" | "ogg" | "flac"
   price        Int         @default(0)     // 0 = gratis, dalam Rupiah
   accessLevel  AccessLevel @default(FREE)  // siapa yang bisa download
   licenseType  String      @default("personal") // "personal" | "commercial" | "both"
@@ -125,6 +129,7 @@ model SoundEffect {
   updatedAt    DateTime    @updatedAt
 
   category   Category           @relation(fields: [categoryId], references: [id])
+  author     User?              @relation("AuthorSounds", fields: [authorId], references: [id])
   tags       SoundEffectOnTag[]
   orderItems OrderItem[]
   downloads  Download[]
@@ -220,6 +225,20 @@ model Download {
   soundEffect SoundEffect @relation(fields: [soundEffectId], references: [id])
 
   @@map("downloads")
+}
+
+// ─── Subscription Intents ────────────────────────────────
+// Stores pending subscription payment info keyed by Midtrans orderId
+
+model SubscriptionIntent {
+  id           String   @id @default(uuid())
+  orderId      String   @unique // Midtrans order_id (SUB-xxxxx format)
+  userId       String
+  planSlug     String
+  billingCycle String   // "monthly" | "yearly"
+  createdAt    DateTime @default(now())
+
+  @@map("subscription_intents")
 }
 
 // ─── Wishlists ───────────────────────────────────────────

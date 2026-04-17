@@ -1,6 +1,7 @@
 // src/app/browse/page.tsx
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useSounds } from '@/lib/hooks/useSounds';
 import SoundRow from '@/components/sounds/SoundRow';
 import type { SoundFilters } from '@/types';
@@ -20,19 +21,38 @@ const CATEGORIES = [
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Terbaru' },
-  { value: 'popular', label: 'Populer' },
+  { value: 'popular', label: 'Paling Banyak Download' },
+  { value: 'mostplayed', label: 'Paling Sering Diputar' },
   { value: 'price_asc', label: 'Harga Terendah' },
   { value: 'price_desc', label: 'Harga Tertinggi' },
 ];
 
+const ACCESS_OPTIONS = [
+  { value: '', label: 'Semua' },
+  { value: 'FREE', label: 'Gratis' },
+  { value: 'PRO', label: 'Pro' },
+  { value: 'BUSINESS', label: 'Business' },
+  { value: 'PURCHASE', label: 'Beli Satuan' },
+];
+
 export default function BrowsePage() {
+  const searchParams = useSearchParams();
+
   const [filters, setFilters] = useState<SoundFilters>({
-    sortBy: 'popular',
+    sortBy: 'newest',
     page: 1,
     limit: 30,
   });
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearch = useDebounce(searchInput, 400);
+
+  // Baca URL params saat pertama kali (dari link di halaman lain)
+  useEffect(() => {
+    const category = searchParams.get('categorySlug');
+    const search = searchParams.get('search');
+    if (category) setFilters((f) => ({ ...f, categorySlug: category }));
+    if (search) setSearchInput(search);
+  }, []);
 
   const activeFilters: SoundFilters = { ...filters, search: debouncedSearch || undefined };
   const { data, isLoading, isError } = useSounds(activeFilters);
@@ -41,8 +61,13 @@ export default function BrowsePage() {
     setFilters((f) => ({ ...f, categorySlug: slug || undefined, page: 1 }));
   }, []);
 
-  const toggleFree = useCallback(() => {
-    setFilters((f) => ({ ...f, isFree: f.isFree ? undefined : true, page: 1 }));
+  const setAccess = useCallback((value: string) => {
+    setFilters((f) => ({
+      ...f,
+      accessLevel: (value || undefined) as SoundFilters['accessLevel'],
+      isFree: undefined,
+      page: 1,
+    }));
   }, []);
 
   return (
@@ -89,14 +114,21 @@ export default function BrowsePage() {
 
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Akses</p>
-              <button
-                onClick={toggleFree}
-                className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                  filters.isFree ? 'bg-teal-50 text-teal-700 font-medium' : 'text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                Gratis saja
-              </button>
+              <div className="space-y-0.5">
+                {ACCESS_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setAccess(opt.value)}
+                    className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                      (filters.accessLevel ?? '') === opt.value
+                        ? 'bg-violet-50 text-violet-700 font-medium'
+                        : 'text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div>

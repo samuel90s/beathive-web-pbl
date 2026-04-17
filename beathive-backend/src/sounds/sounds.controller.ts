@@ -78,11 +78,12 @@ export class SoundsController {
   async uploadSound(
     @UploadedFile() file: Express.Multer.File,
     @Body() dto: UploadSoundDto,
+    @CurrentUser() uploaderId: string,
   ) {
     if (!file) {
       return { success: false, message: 'File audio wajib diupload' };
     }
-    return this.soundsService.uploadSound(file, dto);
+    return this.soundsService.uploadSound(file, dto, uploaderId);
   }
 
   // ─── GET /sounds/:slug ────────────────────────────────────

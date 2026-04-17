@@ -86,7 +86,16 @@ export class SubscriptionsService {
       clientKey: this.config.get('MIDTRANS_CLIENT_KEY'),
     });
 
-    const orderId = `SUB-${userId}-${Date.now()}`;
+    // Generate short orderId ≤ 36 chars (Midtrans limit)
+    // Format: SUB-{base36timestamp}-{random6}
+    const ts = Date.now().toString(36).toUpperCase();
+    const rnd = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const orderId = `SUB-${ts}-${rnd}`;
+
+    // Simpan intent ke DB agar webhook bisa memproses aktivasi
+    await this.prisma.subscriptionIntent.create({
+      data: { orderId, userId, planSlug, billingCycle },
+    });
 
     const transaction = await snap.createTransaction({
       transaction_details: {
@@ -105,8 +114,6 @@ export class SubscriptionsService {
       },
     });
 
-    // Simpan pending subscription upgrade (akan diaktifkan via webhook)
-    // Di production: simpan intent ke Redis atau tabel khusus
     return {
       snapToken: transaction.token,
       orderId,

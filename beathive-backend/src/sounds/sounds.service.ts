@@ -7,8 +7,16 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import {
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsBoolean,
+  Min,
+  Max,
+} from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../common/storage/storage.service';
 import { AudioService } from '../common/audio/audio.service';
@@ -17,13 +25,55 @@ import { v4 as uuidv4 } from 'uuid';
 // ─── DTOs ─────────────────────────────────────────────────
 
 export class SoundFilterDto {
+  @IsOptional()
+  @IsString()
   search?: string;
+
+  @IsOptional()
+  @IsString()
   categorySlug?: string;
+
+  /** Filter hanya sound gratis (price = 0) */
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return undefined;
+  })
+  @IsBoolean()
   isFree?: boolean;
+
+  /** Filter berdasarkan level akses: FREE | PRO | BUSINESS | PURCHASE */
+  @IsOptional()
+  @IsEnum(['FREE', 'PRO', 'BUSINESS', 'PURCHASE'])
+  accessLevel?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
   minDuration?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
   maxDuration?: number;
+
+  @IsOptional()
+  @IsString()
   sortBy?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
   page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(100)
   limit?: number;
 }
 
@@ -31,8 +81,13 @@ export class UploadSoundDto {
   @IsString()
   title: string;
 
+  @IsOptional()
   @IsString()
-  categoryId: string;
+  categoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  categorySlug?: string;
 
   @IsOptional()
   @IsString()
@@ -81,6 +136,7 @@ export class SoundsService {
       search,
       categorySlug,
       isFree,
+      accessLevel,
       page = 1,
       limit = 20,
       sortBy = 'newest',
@@ -98,13 +154,24 @@ export class SoundsService {
     if (categorySlug) where.category = { slug: categorySlug };
 
     if (isFree !== undefined) {
-      where.price = String(isFree) === 'true' ? 0 : { gt: 0 };
+      where.price = String(isFree) === 'true' || isFree === true ? 0 : { gt: 0 };
+    }
+
+    if (accessLevel) where.accessLevel = accessLevel;
+
+    if (filters.minDuration !== undefined) {
+      where.durationMs = { ...(where.durationMs ?? {}), gte: filters.minDuration };
+    }
+    if (filters.maxDuration !== undefined) {
+      where.durationMs = { ...(where.durationMs ?? {}), lte: filters.maxDuration };
     }
 
     const orderBy: any =
       {
         newest: { createdAt: 'desc' },
+        oldest: { createdAt: 'asc' },
         popular: { downloadCount: 'desc' },
+        mostplayed: { playCount: 'desc' },
         price_asc: { price: 'asc' },
         price_desc: { price: 'desc' },
       }[sortBy] ?? { createdAt: 'desc' };
@@ -118,6 +185,7 @@ export class SoundsService {
         include: {
           category: true,
           tags: { include: { tag: true } },
+          author: { select: { id: true, name: true, avatarUrl: true } },
           wishlists: userId ? { where: { userId } } : false,
         },
         orderBy,
@@ -145,6 +213,7 @@ export class SoundsService {
       include: {
         category: true,
         tags: { include: { tag: true } },
+        author: { select: { id: true, name: true, avatarUrl: true, bio: true } },
         wishlists: userId ? { where: { userId } } : false,
       },
     });
@@ -171,6 +240,15 @@ export class SoundsService {
     return this.storage.getLocalFilePath(previewUrl);
   }
 
+  // ─── Increment play count ────────────────────────────────
+
+  async incrementPlayCount(id: string) {
+    await this.prisma.soundEffect.update({
+      where: { id },
+      data: { playCount: { increment: 1 } },
+    });
+  }
+
   // ─── Request download ─────────────────────────────────────
 
   async requestDownload(soundId: string, userId: string) {
@@ -181,7 +259,8 @@ export class SoundsService {
       throw new NotFoundException('Sound effect tidak ditemukan');
     }
 
-    // Cek apakah sudah dibeli
+    // ── Cek akses ───────────────────────────────────────────
+
     const alreadyPurchased = await this.prisma.orderItem.findFirst({
       where: {
         soundEffectId: soundId,
@@ -195,12 +274,7 @@ export class SoundsService {
         include: { plan: true },
       });
 
-      if (!subscription || subscription.status !== 'ACTIVE') {
-        throw new ForbiddenException('Butuh subscription aktif');
-      }
-
       const planHierarchy = ['free', 'pro', 'business'];
-      const userLevel = planHierarchy.indexOf(subscription.plan.slug);
       const accessReq: Record<string, number> = {
         FREE: 0,
         PRO: 1,
@@ -210,40 +284,55 @@ export class SoundsService {
       const required = accessReq[sound.accessLevel] ?? 999;
 
       if (required === 999) {
-        throw new ForbiddenException('Sound ini harus dibeli satuan');
-      }
-      if (userLevel < required) {
-        throw new ForbiddenException('Upgrade plan untuk download ini');
+        throw new ForbiddenException('Sound ini harus dibeli satuan terlebih dahulu');
       }
 
-      if (!subscription.plan.unlimited) {
-        const thisMonth = new Date();
-        thisMonth.setDate(1);
-        thisMonth.setHours(0, 0, 0, 0);
-        const downloadsThisMonth = await this.prisma.download.count({
-          where: {
-            userId,
-            source: 'subscription',
-            downloadedAt: { gte: thisMonth },
-          },
-        });
-        if (downloadsThisMonth >= subscription.plan.downloadLimit) {
-          throw new ForbiddenException('Kuota download bulan ini habis');
+      // FREE sounds: izinkan jika user login, bahkan tanpa subscription aktif
+      if (required > 0) {
+        if (!subscription || subscription.status !== 'ACTIVE') {
+          throw new ForbiddenException(
+            'Butuh subscription aktif untuk download sound ini. Upgrade plan kamu.',
+          );
+        }
+
+        const userLevel = planHierarchy.indexOf(subscription.plan.slug);
+        if (userLevel < required) {
+          throw new ForbiddenException(
+            `Sound ini butuh plan ${planHierarchy[required]} ke atas`,
+          );
+        }
+
+        // Cek kuota bulanan
+        if (!subscription.plan.unlimited) {
+          const thisMonth = new Date();
+          thisMonth.setDate(1);
+          thisMonth.setHours(0, 0, 0, 0);
+          const downloadsThisMonth = await this.prisma.download.count({
+            where: {
+              userId,
+              source: 'subscription',
+              downloadedAt: { gte: thisMonth },
+            },
+          });
+          if (downloadsThisMonth >= subscription.plan.downloadLimit) {
+            throw new ForbiddenException(
+              `Kuota download bulan ini sudah habis (${subscription.plan.downloadLimit}x). Tunggu bulan depan atau upgrade plan.`,
+            );
+          }
         }
       }
     }
 
-    // Tentukan download URL
+    // ── Tentukan download URL ────────────────────────────────
+
     let downloadUrl: string;
     let requiresAuth = false;
 
     if (this.storage.isLocal) {
-      // Local dev: stream melalui backend dengan auth
       const appUrl = this.config.get<string>('APP_URL', 'http://localhost:3000');
       downloadUrl = `${appUrl}/api/v1/sounds/${soundId}/download-stream`;
       requiresAuth = true;
     } else {
-      // Production: signed URL S3 (24 jam)
       const signed = await this.storage.generateSignedUrl(sound.fileUrl, 86400);
       downloadUrl = signed ?? sound.previewUrl;
     }
@@ -280,12 +369,26 @@ export class SoundsService {
     return this.storage.getLocalFilePath(fileUrl);
   }
 
-  // ─── Upload SFX baru (admin) ──────────────────────────────
+  // ─── Upload SFX baru (author / admin) ────────────────────
 
   async uploadSound(
     file: Express.Multer.File,
     dto: UploadSoundDto,
+    uploaderId: string,
   ) {
+    // Cek role
+    const uploader = await this.prisma.user.findUnique({
+      where: { id: uploaderId },
+    });
+    if (
+      !uploader ||
+      (uploader.role !== 'AUTHOR' && uploader.role !== 'ADMIN')
+    ) {
+      throw new ForbiddenException(
+        'Hanya Author atau Admin yang dapat mengupload SFX',
+      );
+    }
+
     // Validasi format
     const ext = (file.originalname.split('.').pop() ?? 'wav').toLowerCase();
     const validFormats = ['wav', 'mp3', 'ogg', 'flac'];
@@ -295,26 +398,25 @@ export class SoundsService {
       );
     }
 
-    // Validasi MIME type
-    const validMimes = [
-      'audio/wav', 'audio/x-wav', 'audio/wave',
-      'audio/mpeg', 'audio/mp3',
-      'audio/ogg', 'audio/vorbis',
-      'audio/flac', 'audio/x-flac',
-    ];
-    if (!validMimes.includes(file.mimetype)) {
-      this.logger.warn(`MIME type tidak dikenal: ${file.mimetype}, tetap diproses`);
+    // Resolve categoryId dari slug jika diperlukan
+    let categoryId = dto.categoryId;
+    if (!categoryId && dto.categorySlug) {
+      const cat = await this.prisma.category.findUnique({
+        where: { slug: dto.categorySlug },
+      });
+      if (!cat) throw new BadRequestException(`Kategori '${dto.categorySlug}' tidak ditemukan`);
+      categoryId = cat.id;
     }
+    if (!categoryId) throw new BadRequestException('categoryId atau categorySlug harus diisi');
 
     // Generate slug unik
     const slug = dto.slug
       ? await this.ensureUniqueSlug(this.toSlug(dto.slug))
       : await this.ensureUniqueSlug(this.toSlug(dto.title));
 
-    // Pre-generate UUID agar bisa dipakai untuk nama file preview
     const soundId = uuidv4();
 
-    // Proses audio dengan FFmpeg (opsional)
+    // Proses audio
     let previewBuffer: Buffer = file.buffer;
     let waveformData: number[] = this.generateDefaultWaveform();
     let durationMs = 0;
@@ -326,22 +428,20 @@ export class SoundsService {
         this.audio.getDuration(file.buffer, ext),
       ]);
       previewBuffer = preview;
-      waveformData  = waveform;
-      durationMs    = duration;
-    } catch (err) {
+      waveformData = waveform;
+      durationMs = duration;
+    } catch (err: any) {
       this.logger.warn(
         `Audio processing (FFmpeg) gagal — pakai fallback. Error: ${err?.message}`,
       );
     }
 
-    // Simpan file audio full-res
+    // Simpan file
     const fileUrl = await this.storage.uploadAudioFile(
       file.buffer,
       file.originalname,
       file.mimetype,
     );
-
-    // Simpan preview (gunakan soundId sebagai nama)
     const previewUrl = await this.storage.uploadPreviewFile(
       previewBuffer,
       soundId,
@@ -351,7 +451,8 @@ export class SoundsService {
     const sound = await this.prisma.soundEffect.create({
       data: {
         id: soundId,
-        categoryId: dto.categoryId,
+        categoryId: categoryId!,
+        authorId: uploader.role === 'AUTHOR' ? uploaderId : null,
         title: dto.title,
         slug,
         description: dto.description ?? null,
@@ -370,10 +471,11 @@ export class SoundsService {
       include: {
         category: true,
         tags: { include: { tag: true } },
+        author: { select: { id: true, name: true, avatarUrl: true } },
       },
     });
 
-    // Tambahkan tags jika ada
+    // Tags
     if (dto.tags) {
       const tagNames = dto.tags.split(',').map((t) => t.trim()).filter(Boolean);
       for (const name of tagNames) {
@@ -384,14 +486,16 @@ export class SoundsService {
           create: { name, slug: tagSlug },
         });
         await this.prisma.soundEffectOnTag.upsert({
-          where: { soundEffectId_tagId: { soundEffectId: soundId, tagId: tag.id } },
+          where: {
+            soundEffectId_tagId: { soundEffectId: soundId, tagId: tag.id },
+          },
           update: {},
           create: { soundEffectId: soundId, tagId: tag.id },
         });
       }
     }
 
-    return this.formatSound(sound);
+    return this.formatSound(sound, uploaderId);
   }
 
   // ─── Wishlist ─────────────────────────────────────────────
@@ -431,6 +535,7 @@ export class SoundsService {
             include: {
               category: true,
               tags: { include: { tag: true } },
+              author: { select: { id: true, name: true, avatarUrl: true } },
             },
           },
         },
@@ -442,6 +547,35 @@ export class SoundsService {
 
     return {
       items: items.map((w) => this.formatSound(w.soundEffect, userId, true)),
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+    };
+  }
+
+  // ─── Author's sounds ──────────────────────────────────────
+
+  async getAuthorSounds(authorId: string, page = 1, limit = 20) {
+    const skip = (Number(page) - 1) * Number(limit);
+    const [total, items] = await Promise.all([
+      this.prisma.soundEffect.count({ where: { authorId } }),
+      this.prisma.soundEffect.findMany({
+        where: { authorId },
+        include: {
+          category: true,
+          tags: { include: { tag: true } },
+          author: { select: { id: true, name: true, avatarUrl: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: Number(limit),
+      }),
+    ]);
+    return {
+      items: items.map((s) => this.formatSound(s)),
       pagination: {
         total,
         page: Number(page),
@@ -467,6 +601,7 @@ export class SoundsService {
       waveformData: sound.waveformData,
       durationMs: sound.durationMs,
       format: sound.format,
+      fileSize: sound.fileSize,
       price: sound.price,
       isFree: sound.price === 0,
       accessLevel: sound.accessLevel,
@@ -476,7 +611,9 @@ export class SoundsService {
       downloadCount: sound.downloadCount,
       category: sound.category,
       tags: sound.tags?.map((t: any) => t.tag) ?? [],
+      author: sound.author ?? null,
       publishedAt: sound.publishedAt,
+      createdAt: sound.createdAt,
     };
   }
 

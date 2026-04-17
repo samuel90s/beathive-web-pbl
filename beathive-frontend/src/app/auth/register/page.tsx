@@ -5,8 +5,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 
+type Role = 'USER' | 'AUTHOR';
+
 export default function RegisterPage() {
   const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [role, setRole] = useState<Role>('USER');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { register } = useAuth();
@@ -18,8 +21,8 @@ export default function RegisterPage() {
     setLoading(true);
     setError(null);
     try {
-      await register(form.name, form.email, form.password);
-      router.push('/browse');
+      await register(form.name, form.email, form.password, role);
+      router.push(role === 'AUTHOR' ? '/studio' : '/browse');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Gagal mendaftar');
     } finally {
@@ -39,6 +42,33 @@ export default function RegisterPage() {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
+          {/* Role Selection */}
+          <div className="mb-5">
+            <label className="block text-xs font-medium text-gray-600 mb-2">Daftar sebagai</label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { value: 'USER', label: 'Pendengar', desc: 'Download & nikmati sound' },
+                { value: 'AUTHOR', label: 'Author', desc: 'Upload & jual sound kamu' },
+              ] as { value: Role; label: string; desc: string }[]).map(({ value, label, desc }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setRole(value)}
+                  className={`p-3 rounded-xl border-2 text-left transition-colors ${
+                    role === value
+                      ? 'border-violet-500 bg-violet-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <p className={`text-sm font-medium ${role === value ? 'text-violet-700' : 'text-gray-700'}`}>
+                    {label}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-3">
             {[
               { key: 'name', label: 'Nama lengkap', type: 'text', placeholder: 'Budi Santoso' },

@@ -1,6 +1,7 @@
 // src/components/sounds/SoundRow.tsx
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { usePlayerStore } from '@/lib/store/player.store';
 import { useCartStore } from '@/lib/store/cart.store';
 import { useDownload } from '@/lib/hooks/useDownload';
@@ -21,6 +22,7 @@ export default function SoundRow({ sound }: Props) {
   const { toggle: toggleWishlist, loadingId } = useWishlist();
 
   const [liked, setLiked] = useState<boolean>(sound.isLiked ?? false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const isActive = currentTrack?.id === sound.id;
   const isCurrentlyPlaying = isActive && isPlaying;
@@ -41,9 +43,14 @@ export default function SoundRow({ sound }: Props) {
     else addItem(sound, 'personal');
   };
 
-  const handleDownload = (e: React.MouseEvent) => {
+  const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    download(sound.id, sound.slug, sound.format);
+    setDownloadError(null);
+    try {
+      await download(sound.id, sound.slug, sound.format);
+    } catch (err: any) {
+      setDownloadError(err.message || 'Gagal download');
+    }
   };
 
   const handleWishlist = async (e: React.MouseEvent) => {
@@ -91,7 +98,13 @@ export default function SoundRow({ sound }: Props) {
       {/* Info */}
       <div className="min-w-0 w-52 flex-shrink-0">
         <div className="flex items-center gap-1.5">
-          <p className="text-sm font-medium text-gray-900 truncate">{sound.title}</p>
+          <Link
+            href={`/sounds/${sound.slug}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-sm font-medium text-gray-900 truncate hover:text-violet-600 transition-colors"
+          >
+            {sound.title}
+          </Link>
           {accessBadge && (
             <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${accessBadge.cls}`}>
               {accessBadge.label}
@@ -102,6 +115,9 @@ export default function SoundRow({ sound }: Props) {
           {sound.category.name}
           {sound.tags.slice(0, 2).map((t) => ` · ${t.name}`)}
         </p>
+        {downloadError && (
+          <p className="text-xs text-red-500 mt-0.5 truncate">{downloadError}</p>
+        )}
       </div>
 
       {/* Waveform */}
