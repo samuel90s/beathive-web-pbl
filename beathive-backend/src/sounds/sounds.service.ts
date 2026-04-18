@@ -343,14 +343,10 @@ export class SoundsService {
     let downloadUrl: string;
     let requiresAuth = false;
 
-    if (this.storage.isLocal) {
-      const appUrl = this.config.get<string>('APP_URL', 'http://localhost:3000');
-      downloadUrl = `${appUrl}/api/v1/sounds/${soundId}/download-stream`;
-      requiresAuth = true;
-    } else {
-      const signed = await this.storage.generateSignedUrl(sound.fileUrl, 86400);
-      downloadUrl = signed ?? sound.previewUrl;
-    }
+    // Always use the ZIP stream endpoint so download includes license.txt
+    const appUrl = this.config.get<string>('APP_URL', 'http://localhost:3000');
+    downloadUrl = `${appUrl}/api/v1/sounds/${soundId}/download-stream`;
+    requiresAuth = true;
 
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
@@ -377,7 +373,7 @@ export class SoundsService {
       downloadUrl,
       requiresAuth,
       expiresAt,
-      fileName: `${sound.slug}.${sound.format}`,
+      fileName: `${sound.slug}-beathive.zip`,
     };
   }
 

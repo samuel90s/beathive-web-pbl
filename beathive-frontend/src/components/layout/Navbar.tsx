@@ -2,8 +2,10 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useCartStore } from '@/lib/store/cart.store';
+import { subscriptionsApi } from '@/lib/api/subscriptions';
 import clsx from 'clsx';
 
 export default function Navbar() {
@@ -11,9 +13,18 @@ export default function Navbar() {
   const cartCount = useCartStore((s) => s.items.length);
   const pathname = usePathname();
 
+  const { data: subscription } = useQuery({
+    queryKey: ['subscription'],
+    queryFn: subscriptionsApi.getMy,
+    enabled: isAuthenticated,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const isPaidPlan = subscription?.plan?.slug && subscription.plan.slug !== 'free';
+
   const navLinks = [
     { href: '/browse', label: 'Browse' },
-    { href: '/pricing', label: 'Pricing' },
+    ...(!isPaidPlan ? [{ href: '/pricing', label: 'Pricing' }] : []),
   ];
 
   return (
@@ -126,21 +137,37 @@ export default function Navbar() {
 
           {isAuthenticated ? (
             <div className="flex items-center gap-2">
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
-              >
-                <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 text-xs font-medium">
-                  {user?.name?.[0]?.toUpperCase()}
-                </div>
-                <span className="hidden md:block">{user?.name?.split(' ')[0]}</span>
-              </Link>
-              <button
-                onClick={logout}
-                className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                Keluar
-              </button>
+              <div className="flex items-center gap-1">
+                <Link
+                  href="/dashboard"
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+                >
+                  <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 text-xs font-medium overflow-hidden">
+                    {user?.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `http://localhost:3000${user.avatarUrl}`} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      user?.name?.[0]?.toUpperCase()
+                    )}
+                  </div>
+                  <span className="hidden md:block">{user?.name?.split(' ')[0]}</span>
+                </Link>
+                <Link
+                  href="/profile"
+                  title="Edit Profile"
+                  className={clsx('p-1.5 rounded-lg transition-colors', pathname === '/profile' ? 'text-violet-600 bg-violet-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50')}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </Link>
+                <button
+                  onClick={logout}
+                  className="text-sm text-gray-400 hover:text-gray-600 transition-colors px-1"
+                >
+                  Logout
+                </button>
+              </div>
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -148,13 +175,13 @@ export default function Navbar() {
                 href="/auth/login"
                 className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 transition-colors"
               >
-                Masuk
+                Login
               </Link>
               <Link
                 href="/auth/register"
                 className="px-3 py-1.5 text-sm font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
               >
-                Daftar
+                Sign Up
               </Link>
             </div>
           )}

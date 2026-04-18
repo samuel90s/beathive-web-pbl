@@ -3,13 +3,18 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
   Req,
   Res,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
@@ -50,6 +55,46 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async getMe(@CurrentUser() userId: string) {
     return this.authService.getMe(userId);
+  }
+
+  // PATCH /auth/profile — update name & bio
+  @Patch('profile')
+  @UseGuards(JwtAuthGuard)
+  async updateProfile(
+    @CurrentUser() userId: string,
+    @Body() body: { name?: string; bio?: string },
+  ) {
+    return this.authService.updateProfile(userId, body);
+  }
+
+  // POST /auth/avatar — upload avatar image
+  @Post('avatar')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('avatar', {
+    storage: memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) cb(null, true);
+      else cb(new Error('Only image files are allowed'), false);
+    },
+  }))
+  async uploadAvatar(
+    @CurrentUser() userId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new Error('No file uploaded');
+    return this.authService.updateAvatar(userId, file);
+  }
+
+  // POST /auth/change-password
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @CurrentUser() userId: string,
+    @Body() body: { currentPassword: string; newPassword: string },
+  ) {
+    return this.authService.changePassword(userId, body.currentPassword, body.newPassword);
   }
 
   // GET /auth/google  — redirect ke Google

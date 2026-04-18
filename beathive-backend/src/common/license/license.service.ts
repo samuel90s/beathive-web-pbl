@@ -1,6 +1,7 @@
 // src/common/license/license.service.ts
 import { Injectable } from '@nestjs/common';
-import * as PDFDocument from 'pdfkit';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const PDFDocument = require('pdfkit');
 import { StorageService } from '../storage/storage.service';
 
 interface LicenseData {

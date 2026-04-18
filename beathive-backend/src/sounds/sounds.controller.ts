@@ -22,9 +22,9 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { Response } from 'express';
 import * as fs from 'fs';
-import * as archiver from 'archiver';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const archiver = require('archiver');
 import { SoundsService, SoundFilterDto, UploadSoundDto } from './sounds.service';
-import { LicenseService } from '../common/license/license.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -33,7 +33,6 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 export class SoundsController {
   constructor(
     private soundsService: SoundsService,
-    private licenseService: LicenseService,
     private prisma: PrismaService,
   ) {}
 
@@ -175,7 +174,7 @@ export class SoundsController {
   }
 
   // ─── GET /sounds/:id/download-stream  (butuh JWT) ────────
-  // Returns ZIP: audio file + license.pdf + terms.txt
+  // Returns ZIP: audio file + license.txt
   @Get(':id/download-stream')
   @UseGuards(JwtAuthGuard)
   async streamDownload(
@@ -185,31 +184,26 @@ export class SoundsController {
   ) {
     const sound = await this.soundsService.findById(id);
     if (!sound) {
-      return res.status(HttpStatus.NOT_FOUND).json({ message: 'Sound tidak ditemukan' });
+      return res.status(HttpStatus.NOT_FOUND).json({ message: 'Sound not found' });
     }
 
     const filePath = this.soundsService.getLocalDownloadPath(sound.fileUrl);
     if (!filePath || !fs.existsSync(filePath)) {
-      return res.status(HttpStatus.NOT_FOUND).json({ message: 'File audio tidak tersedia' });
+      return res.status(HttpStatus.NOT_FOUND).json({ message: 'Audio file not available' });
     }
 
-    // Ambil info user + download terakhir untuk tentukan tipe lisensi
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const lastDownload = await this.prisma.download.findFirst({
       where: { userId, soundEffectId: id },
       orderBy: { downloadedAt: 'desc' },
     });
 
-    // Tentukan license type berdasarkan sumber download
     let licenseType = 'free';
     let invoiceNumber = `DL-${Date.now()}`;
 
     if (lastDownload?.source === 'purchase') {
       const orderItem = await this.prisma.orderItem.findFirst({
-        where: {
-          soundEffectId: id,
-          order: { userId, status: 'PAID' },
-        },
+        where: { soundEffectId: id, order: { userId, status: 'PAID' } },
         include: { order: { include: { invoice: true } } },
         orderBy: { order: { paidAt: 'desc' } },
       });
@@ -219,22 +213,15 @@ export class SoundsController {
       licenseType = sound.accessLevel === 'FREE' ? 'free' : 'subscription';
     }
 
-    // Generate license PDF
-    const licenseBuffer = await this.licenseService.generateLicenseBuffer({
+    const licenseText = this.buildLicenseText({
       buyerName: user?.name ?? 'User',
       buyerEmail: user?.email ?? '',
       soundTitle: sound.title,
       soundId: sound.id,
       licenseType,
-      orderId: lastDownload?.id ?? sound.id,
       invoiceNumber,
-      purchaseDate: new Date(),
     });
 
-    // Terms & conditions text
-    const termsText = this.buildTermsText(licenseType, sound.title);
-
-    // Buat ZIP dan stream ke response
     const zipName = `${sound.slug}-beathive.zip`;
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
@@ -242,25 +229,97 @@ export class SoundsController {
     const archive = archiver('zip', { zlib: { level: 6 } });
     archive.pipe(res);
     archive.file(filePath, { name: `${sound.slug}.${sound.format}` });
-    archive.append(licenseBuffer, { name: 'license.pdf' });
-    archive.append(termsText, { name: 'terms.txt' });
+    archive.append(Buffer.from(licenseText, 'utf8'), { name: 'license.txt' });
     await archive.finalize();
   }
 
-  private buildTermsText(licenseType: string, soundTitle: string): string {
-    const base = `BeatHive — Syarat Penggunaan\n${'='.repeat(40)}\nSound: ${soundTitle}\nDiunduh: ${new Date().toLocaleDateString('id-ID')}\n\n`;
+  private buildLicenseText(data: {
+    buyerName: string;
+    buyerEmail: string;
+    soundTitle: string;
+    soundId: string;
+    licenseType: string;
+    invoiceNumber: string;
+  }): string {
+    const date = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+    const sep = '='.repeat(50);
 
-    if (licenseType === 'free') {
-      return base + `LISENSI GRATIS\n\nKamu BOLEH:\n- Menggunakan dalam proyek personal non-komersial\n- Menggunakan dalam video YouTube/media sosial\n\nKamu TIDAK BOLEH:\n- Menggunakan dalam proyek komersial atau berbayar\n- Menjual atau mendistribusikan ulang file ini\n- Mengklaim sebagai karya sendiri\n\nAtribusi kepada BeatHive sangat diapresiasi.`;
-    }
-    if (licenseType === 'subscription') {
-      return base + `LISENSI SUBSCRIPTION\n\nKamu BOLEH:\n- Menggunakan dalam proyek komersial\n- Menggunakan dalam iklan, film, podcast, game\n- Memodifikasi sesuai kebutuhan\n\nKamu TIDAK BOLEH:\n- Menjual atau mendistribusikan ulang file ini\n- Mengklaim sebagai karya sendiri\n\nLisensi ini berlaku selama subscription aktif.`;
-    }
-    if (licenseType === 'commercial') {
-      return base + `LISENSI KOMERSIAL (PEMBELIAN SATUAN)\n\nKamu BOLEH:\n- Menggunakan dalam proyek komersial tanpa batas waktu\n- Menggunakan dalam iklan, film, produk berbayar\n- Memodifikasi sesuai kebutuhan\n\nKamu TIDAK BOLEH:\n- Menjual atau mendistribusikan ulang file ini\n- Mengklaim sebagai karya sendiri\n\nLisensi ini berlaku seumur hidup (perpetual).`;
-    }
-    // personal purchase
-    return base + `LISENSI PERSONAL (PEMBELIAN SATUAN)\n\nKamu BOLEH:\n- Menggunakan dalam proyek personal non-komersial\n- Menggunakan dalam video YouTube/media sosial non-monetisasi\n\nKamu TIDAK BOLEH:\n- Menggunakan dalam proyek komersial\n- Menjual atau mendistribusikan ulang file ini\n\nLisensi ini berlaku seumur hidup (perpetual).`;
+    const header = [
+      'BEATHIVE — LICENSE CERTIFICATE',
+      sep,
+      `Sound       : ${data.soundTitle}`,
+      `Sound ID    : ${data.soundId}`,
+      `Licensee    : ${data.buyerName} <${data.buyerEmail}>`,
+      `Invoice     : ${data.invoiceNumber}`,
+      `Date        : ${date}`,
+      sep,
+      '',
+    ].join('\n');
+
+    const bodies: Record<string, string> = {
+      free: [
+        'LICENSE TYPE: FREE',
+        '',
+        'YOU MAY:',
+        '  + Use in personal, non-commercial projects',
+        '  + Use in YouTube / social media (non-monetized)',
+        '',
+        'YOU MAY NOT:',
+        '  - Use in commercial or paid projects',
+        '  - Resell or redistribute this file',
+        '  - Claim as your own original work',
+        '',
+        'Attribution to BeatHive is appreciated.',
+      ].join('\n'),
+
+      subscription: [
+        'LICENSE TYPE: SUBSCRIPTION',
+        '',
+        'YOU MAY:',
+        '  + Use in commercial projects',
+        '  + Use in ads, films, podcasts, and games',
+        '  + Modify and adapt as needed',
+        '',
+        'YOU MAY NOT:',
+        '  - Resell or redistribute this file',
+        '  - Claim as your own original work',
+        '',
+        'This license is valid while your BeatHive subscription is active.',
+      ].join('\n'),
+
+      commercial: [
+        'LICENSE TYPE: COMMERCIAL (SINGLE PURCHASE)',
+        '',
+        'YOU MAY:',
+        '  + Use in commercial projects with no time limit',
+        '  + Use in ads, films, and paid products',
+        '  + Modify and adapt as needed',
+        '',
+        'YOU MAY NOT:',
+        '  - Resell or redistribute this file',
+        '  - Claim as your own original work',
+        '',
+        'This license is perpetual (lifetime).',
+      ].join('\n'),
+
+      personal: [
+        'LICENSE TYPE: PERSONAL (SINGLE PURCHASE)',
+        '',
+        'YOU MAY:',
+        '  + Use in personal, non-commercial projects',
+        '  + Use in YouTube / social media (non-monetized)',
+        '',
+        'YOU MAY NOT:',
+        '  - Use in commercial or paid projects',
+        '  - Resell or redistribute this file',
+        '  - Claim as your own original work',
+        '',
+        'This license is perpetual (lifetime).',
+      ].join('\n'),
+    };
+
+    const body = bodies[data.licenseType] ?? bodies.personal;
+    return header + body + '\n\n' + sep + '\nGenerated by BeatHive. beathive.com\n';
   }
 
   // ─── POST /sounds/:id/recalculate-duration  (admin/author only) ──

@@ -8,6 +8,8 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import * as fs from 'fs';
+import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -171,6 +173,61 @@ export class AuthService {
 
     if (!user) throw new UnauthorizedException();
     return this.sanitizeUser(user);
+  }
+
+  // ─── Update profile (name + bio) ───────────────────────
+
+  async updateProfile(userId: string, dto: { name?: string; bio?: string }) {
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(dto.name?.trim() && { name: dto.name.trim() }),
+        ...(dto.bio !== undefined && { bio: dto.bio }),
+      },
+    });
+    return this.sanitizeUser(updated);
+  }
+
+  // ─── Upload avatar ──────────────────────────────────────
+
+  async updateAvatar(userId: string, file: Express.Multer.File) {
+    const avatarsDir = path.join(process.cwd(), 'uploads', 'avatars');
+    if (!fs.existsSync(avatarsDir)) fs.mkdirSync(avatarsDir, { recursive: true });
+
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    const filename = `${userId}${ext}`;
+    const filepath = path.join(avatarsDir, filename);
+
+    fs.writeFileSync(filepath, file.buffer);
+
+    const avatarUrl = `/uploads/avatars/${filename}`;
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl },
+    });
+    return { avatarUrl, user: this.sanitizeUser(updated) };
+  }
+
+  // ─── Change password ────────────────────────────────────
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException();
+
+    if (!user.passwordHash) {
+      throw new BadRequestException('This account uses Google login — password change not available');
+    }
+
+    const match = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!match) throw new BadRequestException('Current password is incorrect');
+
+    if (newPassword.length < 8) {
+      throw new BadRequestException('New password must be at least 8 characters');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+    return { message: 'Password updated successfully' };
   }
 
   // ─── Helpers ────────────────────────────────────────────

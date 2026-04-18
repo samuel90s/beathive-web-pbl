@@ -162,33 +162,50 @@ export default function SoundRow({ sound }: Props) {
       </button>
 
       {/* Price / Action */}
-      <div className="flex items-center gap-2 flex-shrink-0 w-32 justify-end">
+      <div className="flex items-center gap-2 flex-shrink-0 w-28 justify-end">
         {sound.isFree ? (
           <>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium">Gratis</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium">Free</span>
             <button
               onClick={handleDownload}
               disabled={downloading === sound.id}
-              className="text-xs px-3 py-1.5 rounded-lg border border-teal-200 text-teal-700 hover:bg-teal-50 transition-colors disabled:opacity-50"
+              title="Download"
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-teal-200 text-teal-700 hover:bg-teal-50 transition-colors disabled:opacity-50"
             >
-              {downloading === sound.id ? '...' : 'Download'}
+              {downloading === sound.id ? (
+                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" /></svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              )}
             </button>
           </>
         ) : (
           <>
             <span className="text-xs text-gray-500 font-medium">
-              Rp {(sound.price / 1000).toFixed(0)}rb
+              Rp {(sound.price / 1000).toFixed(0)}k
             </span>
             <button
               onClick={handleBuy}
+              title={inCart ? 'Remove from cart' : 'Add to cart'}
               className={clsx(
-                'text-xs px-3 py-1.5 rounded-lg transition-colors',
+                'w-8 h-8 flex items-center justify-center rounded-lg transition-colors',
                 inCart
                   ? 'bg-violet-100 text-violet-700 hover:bg-violet-200'
                   : 'bg-violet-600 text-white hover:bg-violet-700',
               )}
             >
-              {inCart ? 'Hapus' : 'Beli'}
+              {inCart ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                </svg>
+              )}
             </button>
           </>
         )}

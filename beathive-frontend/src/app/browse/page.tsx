@@ -8,31 +8,31 @@ import type { SoundFilters } from '@/types';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 
 const CATEGORIES = [
-  { slug: '', label: 'Semua' },
-  { slug: 'aksi', label: 'Aksi' },
-  { slug: 'alam', label: 'Alam' },
+  { slug: '', label: 'All' },
+  { slug: 'aksi', label: 'Action' },
+  { slug: 'alam', label: 'Nature' },
   { slug: 'ui-game', label: 'UI / Game' },
-  { slug: 'suasana', label: 'Suasana' },
-  { slug: 'manusia', label: 'Manusia' },
-  { slug: 'kendaraan', label: 'Kendaraan' },
-  { slug: 'hewan', label: 'Hewan' },
-  { slug: 'elektronik', label: 'Elektronik' },
+  { slug: 'suasana', label: 'Ambient' },
+  { slug: 'manusia', label: 'Human' },
+  { slug: 'kendaraan', label: 'Vehicles' },
+  { slug: 'hewan', label: 'Animals' },
+  { slug: 'elektronik', label: 'Electronic' },
 ];
 
 const SORT_OPTIONS = [
-  { value: 'newest', label: 'Terbaru' },
-  { value: 'popular', label: 'Paling Banyak Download' },
-  { value: 'mostplayed', label: 'Paling Sering Diputar' },
-  { value: 'price_asc', label: 'Harga Terendah' },
-  { value: 'price_desc', label: 'Harga Tertinggi' },
+  { value: 'newest', label: 'Newest' },
+  { value: 'popular', label: 'Most Downloaded' },
+  { value: 'mostplayed', label: 'Most Played' },
+  { value: 'price_asc', label: 'Price: Low to High' },
+  { value: 'price_desc', label: 'Price: High to Low' },
 ];
 
 const ACCESS_OPTIONS = [
-  { value: '', label: 'Semua' },
-  { value: 'FREE', label: 'Gratis' },
+  { value: '', label: 'All' },
+  { value: 'FREE', label: 'Free' },
   { value: 'PRO', label: 'Pro' },
   { value: 'BUSINESS', label: 'Business' },
-  { value: 'PURCHASE', label: 'Beli Satuan' },
+  { value: 'PURCHASE', label: 'Buy Single' },
 ];
 
 export default function BrowsePage() {
@@ -80,7 +80,7 @@ export default function BrowsePage() {
         </svg>
         <input
           type="text"
-          placeholder="Cari sound effect... (explosion, rain, footstep...)"
+          placeholder="Search sound effects... (explosion, rain, footstep...)"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
@@ -94,7 +94,7 @@ export default function BrowsePage() {
           <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-5">
 
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Kategori</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Category</p>
               <div className="space-y-0.5">
                 {CATEGORIES.map((cat) => (
                   <button
@@ -113,7 +113,7 @@ export default function BrowsePage() {
             </div>
 
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Akses</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Access</p>
               <div className="space-y-0.5">
                 {ACCESS_OPTIONS.map((opt) => (
                   <button
@@ -132,7 +132,7 @@ export default function BrowsePage() {
             </div>
 
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Urutkan</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Sort By</p>
               <div className="space-y-0.5">
                 {SORT_OPTIONS.map((opt) => (
                   <button
@@ -158,7 +158,7 @@ export default function BrowsePage() {
           {/* Results count */}
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm text-gray-400">
-              {isLoading ? 'Memuat...' : `${data?.pagination.total ?? 0} sound effect`}
+              {isLoading ? 'Loading...' : `${data?.pagination.total ?? 0} sound effects`}
             </p>
           </div>
 
@@ -173,8 +173,8 @@ export default function BrowsePage() {
 
           {isError && (
             <div className="text-center py-16 text-gray-400">
-              <p className="text-lg">Gagal memuat data</p>
-              <p className="text-sm mt-1">Periksa koneksi dan coba lagi</p>
+              <p className="text-lg">Failed to load sounds</p>
+              <p className="text-sm mt-1">Check your connection and try again</p>
             </div>
           )}
 
@@ -182,8 +182,8 @@ export default function BrowsePage() {
             <>
               {data?.items.length === 0 ? (
                 <div className="text-center py-16 text-gray-400">
-                  <p className="text-lg">Tidak ada hasil</p>
-                  <p className="text-sm mt-1">Coba kata kunci atau filter lain</p>
+                  <p className="text-lg">No results found</p>
+                  <p className="text-sm mt-1">Try different keywords or filters</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -201,17 +201,17 @@ export default function BrowsePage() {
                     onClick={() => setFilters((f) => ({ ...f, page: (f.page ?? 1) - 1 }))}
                     className="px-4 py-2 text-sm rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition-colors"
                   >
-                    Sebelumnya
+                    Previous
                   </button>
                   <span className="px-4 py-2 text-sm text-gray-500">
-                    Halaman {filters.page} dari {data?.pagination.totalPages}
+                    Page {filters.page} of {data?.pagination.totalPages}
                   </span>
                   <button
                     disabled={filters.page === data?.pagination.totalPages}
                     onClick={() => setFilters((f) => ({ ...f, page: (f.page ?? 1) + 1 }))}
                     className="px-4 py-2 text-sm rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition-colors"
                   >
-                    Berikutnya
+                    Next
                   </button>
                 </div>
               )}

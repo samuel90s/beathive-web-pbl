@@ -3,7 +3,24 @@
     "allow": [
       "Bash(node -e ' *)",
       "Bash(npm install *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(where pg_dump)",
+      "Read(//c/Program Files/PostgreSQL/**)",
+      "Bash(PGPASSWORD=admin \"C:/Program Files/PostgreSQL/18/bin/pg_dump.exe\" -U postgres -h localhost -p 5432 -d beathive_db -F c -f \"d:/project/beathive/beathive_db_$\\(date +%Y%m%d_%H%M%S\\).dump\")",
+      "Bash(node -e \"const p = require\\('pdfkit'\\); console.log\\(typeof p, typeof p.default\\);\")",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(npx nest *)",
+      "Bash(npm run *)",
+      "Read(//tmp/**)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill /PID 32724 /F)",
+      "Bash(cmd /c \"taskkill /PID 32724 /F\")",
+      "Bash(powershell -Command \"Stop-Process -Id 32724 -Force\")",
+      "Bash(powershell -Command \"Get-Process -Id 18504 | Select-Object Name, StartTime, CommandLine\")",
+      "Bash(curl -s -X PATCH http://localhost:3000/api/v1/auth/profile -H \"Content-Type: application/json\" -d '{\"name\":\"test\"}')",
+      "Bash(powershell -Command \"Stop-Process -Id 18504 -Force\")",
+      "Bash(awk '{print $5}')",
+      "Bash(xargs -I{} powershell -Command \"Stop-Process -Id {} -Force\")"
     ]
   }
 }

@@ -1,10 +1,13 @@
 // src/main.ts
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
+import { join } from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
 
   // Global validation pipe — validasi semua DTO otomatis
   app.useGlobalPipes(
@@ -15,13 +18,10 @@ async function bootstrap() {
     }),
   );
 
-  // CORS — izinkan request dari frontend & admin panel
+  // CORS — izinkan request dari frontend
   const allowedOrigins = [
     process.env.FRONTEND_URL || 'http://localhost:3001',
-    process.env.ADMIN_URL    || 'http://localhost:3002',
     'http://localhost:3001',
-    'http://localhost:3002',
-    'http://localhost:3003',
   ];
 
   app.enableCors({
