@@ -218,7 +218,20 @@ export class SoundsService {
       },
     });
     if (!sound) throw new NotFoundException('Sound effect tidak ditemukan');
-    return this.formatSound(sound, userId);
+
+    // Cek apakah user sudah membeli sound ini (untuk PURCHASE access level)
+    let isPurchased = false;
+    if (userId && sound.accessLevel === 'PURCHASE') {
+      const purchase = await this.prisma.orderItem.findFirst({
+        where: {
+          soundEffectId: sound.id,
+          order: { userId, status: 'PAID' },
+        },
+      });
+      isPurchased = !!purchase;
+    }
+
+    return { ...this.formatSound(sound, userId), isPurchased };
   }
 
   // ─── Find by ID (internal) ────────────────────────────────
@@ -369,6 +382,32 @@ export class SoundsService {
     return this.storage.getLocalFilePath(fileUrl);
   }
 
+  // ─── Recalculate duration for sounds with durationMs = 0 ──
+
+  async recalculateDuration(soundId: string): Promise<{ durationMs: number }> {
+    const sound = await this.prisma.soundEffect.findUnique({ where: { id: soundId } });
+    if (!sound) throw new NotFoundException('Sound tidak ditemukan');
+
+    // Baca file dari local storage
+    const filePath = this.storage.getLocalFilePath(sound.fileUrl);
+    if (!filePath) throw new BadRequestException('File tidak tersedia di lokal');
+
+    const fs = await import('fs');
+    const buffer = fs.readFileSync(filePath);
+    const ext = (sound.format || 'wav').toLowerCase();
+
+    const durationMs = await this.audio.getDuration(buffer, ext);
+
+    if (durationMs > 0) {
+      await this.prisma.soundEffect.update({
+        where: { id: soundId },
+        data: { durationMs },
+      });
+    }
+
+    return { durationMs };
+  }
+
   // ─── Upload SFX baru (author / admin) ────────────────────
 
   async uploadSound(
@@ -421,18 +460,25 @@ export class SoundsService {
     let waveformData: number[] = this.generateDefaultWaveform();
     let durationMs = 0;
 
+    // ── 1. Durasi: selalu dari header parser (tidak butuh FFmpeg) ─
+    // Dijalankan TERPISAH dari FFmpeg agar tidak ikut gagal jika FFmpeg error
     try {
-      const [preview, waveform, duration] = await Promise.all([
+      durationMs = await this.audio.getDuration(file.buffer, ext);
+    } catch {
+      durationMs = 0;
+    }
+
+    // ── 2. Preview + Waveform: pakai FFmpeg (opsional) ─────────
+    try {
+      const [preview, waveform] = await Promise.all([
         this.audio.generatePreview(file.buffer, ext),
         this.audio.generateWaveform(file.buffer, ext),
-        this.audio.getDuration(file.buffer, ext),
       ]);
       previewBuffer = preview;
       waveformData = waveform;
-      durationMs = duration;
     } catch (err: any) {
       this.logger.warn(
-        `Audio processing (FFmpeg) gagal — pakai fallback. Error: ${err?.message}`,
+        `FFmpeg tidak tersedia — preview pakai file asli, waveform pakai fallback. Error: ${err?.message}`,
       );
     }
 
@@ -607,6 +653,7 @@ export class SoundsService {
       accessLevel: sound.accessLevel,
       licenseType: sound.licenseType,
       isLiked,
+      isPublished: sound.isPublished,
       playCount: sound.playCount,
       downloadCount: sound.downloadCount,
       category: sound.category,

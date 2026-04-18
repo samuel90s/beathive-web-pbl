@@ -181,6 +181,18 @@ export class WebhookService {
     // TODO: kirim email konfirmasi + lisensi ke user
   }
 
+  // ─── DEV ONLY: Simulate payment berhasil (bypass signature) ─
+
+  async devSimulatePayment(orderId: string) {
+    if (orderId.startsWith('SUB-')) {
+      await this.handleSubscriptionSuccess(orderId);
+      return { ok: true, type: 'subscription', orderId };
+    } else {
+      await this.handlePaymentSuccess(orderId);
+      return { ok: true, type: 'order', orderId };
+    }
+  }
+
   // ─── Pembayaran gagal ────────────────────────────────────
 
   private async handlePaymentFailed(gatewayOrderId: string) {

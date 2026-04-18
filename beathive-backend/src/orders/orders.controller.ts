@@ -9,7 +9,9 @@ import {
   Req,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { OrdersService, CreateOrderDto } from './orders.service';
 import { WebhookService } from './webhook.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -20,6 +22,7 @@ export class OrdersController {
   constructor(
     private ordersService: OrdersService,
     private webhookService: WebhookService,
+    private config: ConfigService,
   ) {}
 
   // POST /orders  — buat order baru
@@ -46,5 +49,19 @@ export class OrdersController {
   @HttpCode(HttpStatus.OK)
   async midtransWebhook(@Body() payload: any) {
     return this.webhookService.handleMidtransWebhook(payload);
+  }
+
+  // ─── DEV ONLY: Simulate payment success ──────────────────
+  // POST /orders/dev/simulate-payment
+  // Body: { orderId: "SUB-xxx-xxx" } or { orderId: "regular-order-id" }
+  // Hanya bisa digunakan di NODE_ENV !== production
+  @Post('dev/simulate-payment')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async devSimulatePayment(@Body() body: { orderId: string }) {
+    if (this.config.get('NODE_ENV') === 'production') {
+      throw new ForbiddenException('Endpoint ini tidak tersedia di production');
+    }
+    return this.webhookService.devSimulatePayment(body.orderId);
   }
 }

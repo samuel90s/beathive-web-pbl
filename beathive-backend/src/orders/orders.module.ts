@@ -1,5 +1,6 @@
 // src/orders/orders.module.ts
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
 import { WebhookService } from './webhook.service';
@@ -8,7 +9,7 @@ import { LicenseModule } from '../common/license/license.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 @Module({
-  imports: [LicenseModule, SubscriptionsModule],
+  imports: [ConfigModule, LicenseModule, SubscriptionsModule],
   controllers: [OrdersController],
   providers: [OrdersService, WebhookService, PrismaService],
 })

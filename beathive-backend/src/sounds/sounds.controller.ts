@@ -52,6 +52,17 @@ export class SoundsController {
     return this.soundsService.getUserWishlist(userId, page, limit);
   }
 
+  // ─── GET /sounds/mine  (author's own uploads) ────────────
+  @Get('mine')
+  @UseGuards(JwtAuthGuard)
+  async getMySounds(
+    @CurrentUser() userId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+  ) {
+    return this.soundsService.getAuthorSounds(userId, page, limit);
+  }
+
   // ─── POST /admin/sounds/upload ────────────────────────────
   @Post('upload')
   @UseGuards(JwtAuthGuard)
@@ -195,6 +206,21 @@ export class SoundsController {
       'Accept-Ranges': 'bytes',
     });
     fs.createReadStream(filePath).pipe(res);
+  }
+
+  // ─── POST /sounds/:id/recalculate-duration  (admin/author only) ──
+  @Post(':id/recalculate-duration')
+  @UseGuards(JwtAuthGuard)
+  async recalculateDuration(@Param('id') id: string) {
+    return this.soundsService.recalculateDuration(id);
+  }
+
+  // ─── POST /sounds/:id/play  (increment play count, no auth) ─
+  @Post(':id/play')
+  @HttpCode(HttpStatus.OK)
+  async incrementPlay(@Param('id') id: string) {
+    await this.soundsService.incrementPlayCount(id);
+    return { ok: true };
   }
 
   // ─── POST /sounds/:id/download  (butuh JWT) ──────────────
