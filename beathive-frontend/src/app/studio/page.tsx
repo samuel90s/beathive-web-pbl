@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth.store';
-import { soundsApi } from '@/lib/api/sounds';
+import { formatDuration } from '@/lib/utils';
+import type { SoundEffect } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
@@ -23,12 +24,14 @@ export default function StudioPage() {
   const { user, isAuthenticated, accessToken } = useAuthStore();
   const router = useRouter();
 
-  const [uploads, setUploads] = useState<any[]>([]);
+  const [sounds, setSounds] = useState<SoundEffect[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [fixingId, setFixingId] = useState<string | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
@@ -46,8 +49,45 @@ export default function StudioPage() {
     if (!isAuthenticated) { router.push('/auth/login'); return; }
     if (user && user.role !== 'AUTHOR' && user.role !== 'ADMIN') {
       router.push('/browse');
+      return;
     }
+    fetchMySounds();
   }, [isAuthenticated, user]);
+
+  const fetchMySounds = async () => {
+    setLoadingList(true);
+    try {
+      const token = accessToken || localStorage.getItem('accessToken');
+      const res = await fetch(`${API_URL}/sounds/mine`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSounds(data.items || []);
+      }
+    } catch { /* ignore */ }
+    finally { setLoadingList(false); }
+  };
+
+  const fixDuration = async (sound: SoundEffect) => {
+    setFixingId(sound.id);
+    try {
+      const token = accessToken || localStorage.getItem('accessToken');
+      const res = await fetch(`${API_URL}/sounds/${sound.id}/recalculate-duration`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.durationMs > 0) {
+          setSounds((prev) =>
+            prev.map((s) => s.id === sound.id ? { ...s, durationMs: data.durationMs } : s)
+          );
+        }
+      }
+    } catch { /* ignore */ }
+    finally { setFixingId(null); }
+  };
 
   const set = (key: string) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -90,9 +130,10 @@ export default function StudioPage() {
         formData.append('tags', form.tags.trim());
       }
 
+      const token = accessToken || localStorage.getItem('accessToken');
       const res = await fetch(`${API_URL}/sounds/upload`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
@@ -102,11 +143,12 @@ export default function StudioPage() {
       }
 
       const data = await res.json();
-      setUploads((prev) => [data, ...prev]);
+      setSounds((prev) => [data, ...prev]);
       setUploadSuccess(true);
       setShowModal(false);
       setForm({ title: '', categorySlug: '', description: '', price: '0', accessLevel: 'FREE', licenseType: 'personal', tags: '' });
       setSelectedFile(null);
+      setTimeout(() => setUploadSuccess(false), 4000);
     } catch (err: any) {
       setUploadError(err.message || 'Upload gagal');
     } finally {
@@ -144,7 +186,11 @@ export default function StudioPage() {
         </div>
       )}
 
-      {uploads.length === 0 ? (
+      {loadingList ? (
+        <div className="flex justify-center py-12">
+          <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : sounds.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
           <div className="w-12 h-12 rounded-full bg-violet-50 flex items-center justify-center mx-auto mb-3">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -162,14 +208,28 @@ export default function StudioPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {uploads.map((sound) => (
+          {sounds.map((sound) => (
             <div key={sound.id} className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">{sound.title}</p>
-                <p className="text-xs text-gray-400">{sound.category?.name} · {sound.format?.toUpperCase()}</p>
+                <p className="text-xs text-gray-400">
+                  {sound.category?.name} · {sound.format?.toUpperCase()} · {formatDuration(sound.durationMs)}
+                  {' · '}{sound.playCount}x diputar · {sound.downloadCount}x diunduh
+                </p>
               </div>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${
-                sound.isPublished ? 'bg-teal-50 text-teal-700' : 'bg-amber-50 text-amber-700'
+              {/* Fix duration button — always shown so authors can recalculate */}
+              <button
+                onClick={() => fixDuration(sound)}
+                disabled={fixingId === sound.id}
+                title="Kalkulasi ulang durasi dari file"
+                className="text-xs px-2 py-1 text-amber-600 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-50 flex-shrink-0"
+              >
+                {fixingId === sound.id ? '...' : 'Fix Durasi'}
+              </button>
+              <span className={`text-xs px-2 py-0.5 rounded-full border flex-shrink-0 font-medium ${
+                sound.isPublished
+                  ? 'bg-teal-50 text-teal-700 border-teal-200'
+                  : 'bg-amber-50 text-amber-700 border-amber-200'
               }`}>
                 {sound.isPublished ? 'Published' : 'Draft'}
               </span>

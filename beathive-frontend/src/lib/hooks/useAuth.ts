@@ -3,10 +3,12 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { useCartStore } from '@/lib/store/cart.store';
 import { authApi } from '@/lib/api/auth';
 
 export function useAuth() {
   const store = useAuthStore();
+  const cart = useCartStore();
   const router = useRouter();
 
   // Fetch user data saat mount jika ada token
@@ -19,18 +21,22 @@ export function useAuth() {
   }, []);
 
   const login = async (email: string, password: string) => {
+    // Clear previous user's cart before logging in as new user
+    cart.clearCart();
     const result = await authApi.login(email, password);
     store.setAuth(result.user, result.accessToken, result.refreshToken);
     return result;
   };
 
   const register = async (name: string, email: string, password: string, role?: string) => {
+    cart.clearCart();
     const result = await authApi.register(name, email, password, role);
     store.setAuth(result.user, result.accessToken, result.refreshToken);
     return result;
   };
 
   const logout = () => {
+    cart.clearCart(); // Clear cart on logout so next user starts fresh
     store.logout();
     router.push('/');
   };

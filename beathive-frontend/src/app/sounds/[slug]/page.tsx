@@ -223,51 +223,25 @@ export default function SoundDetailPage() {
 
         {/* Download error */}
         {downloadError && (
-          <div className="mb-4 px-3 py-2 bg-red-50 text-red-600 text-sm rounded-lg">
+          <div className="mb-4 px-3 py-2 bg-red-50 text-red-700 text-sm rounded-lg flex items-start gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
             {downloadError}
           </div>
         )}
 
         {/* CTA */}
-        <div className="flex items-center gap-3">
-          {sound.isFree ? (
-            <>
-              <button
-                onClick={handleDownload}
-                disabled={downloading === sound.id}
-                className="flex-1 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {downloading === sound.id ? (
-                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Mengunduh...</>
-                ) : (
-                  <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Gratis</>
-                )}
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="text-center px-4">
-                <p className="text-lg font-bold text-gray-900">
-                  Rp {(sound.price / 1000).toFixed(0)}rb
-                </p>
-                <p className="text-xs text-gray-400">{sound.licenseType}</p>
-              </div>
-              <button
-                onClick={() => {
-                  if (inCart) removeItem(sound.id);
-                  else addItem(sound, 'personal');
-                }}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                  inCart
-                    ? 'bg-violet-100 text-violet-700 hover:bg-violet-200'
-                    : 'bg-violet-600 text-white hover:bg-violet-700'
-                }`}
-              >
-                {inCart ? 'Hapus dari Keranjang' : 'Tambah ke Keranjang'}
-              </button>
-            </>
-          )}
-        </div>
+        <DownloadCTA
+          sound={sound}
+          inCart={inCart}
+          isAuthenticated={isAuthenticated}
+          downloading={downloading}
+          onDownload={handleDownload}
+          onAddCart={() => addItem(sound, 'personal')}
+          onRemoveCart={() => removeItem(sound.id)}
+          onLogin={() => router.push('/auth/login')}
+        />
       </div>
 
       {/* Author card */}
@@ -289,4 +263,89 @@ export default function SoundDetailPage() {
       )}
     </div>
   );
+}
+
+// ─── CTA component — handles all access levels ────────────
+
+interface CTAProps {
+  sound: SoundEffect;
+  inCart: boolean;
+  isAuthenticated: boolean;
+  downloading: string | null;
+  onDownload: () => void;
+  onAddCart: () => void;
+  onRemoveCart: () => void;
+  onLogin: () => void;
+}
+
+function DownloadCTA({ sound, inCart, isAuthenticated, downloading, onDownload, onAddCart, onRemoveCart, onLogin }: CTAProps) {
+  const DownloadBtn = ({ label = 'Download' }: { label?: string }) => (
+    <button
+      onClick={isAuthenticated ? onDownload : onLogin}
+      disabled={downloading === sound.id}
+      className="flex-1 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+    >
+      {downloading === sound.id ? (
+        <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Mengunduh...</>
+      ) : (
+        <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> {label}</>
+      )}
+    </button>
+  );
+
+  // FREE: langsung download
+  if (sound.accessLevel === 'FREE') {
+    return (
+      <div className="flex gap-3">
+        <DownloadBtn label="Download Gratis" />
+      </div>
+    );
+  }
+
+  // PRO / BUSINESS: download dengan subscription
+  if (sound.accessLevel === 'PRO' || sound.accessLevel === 'BUSINESS') {
+    return (
+      <div className="flex items-center gap-3">
+        <div className="text-center px-2">
+          <p className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded-lg">
+            {sound.accessLevel === 'PRO' ? 'Butuh Plan Pro' : 'Butuh Plan Business'}
+          </p>
+        </div>
+        <DownloadBtn label={`Download (${sound.accessLevel})`} />
+      </div>
+    );
+  }
+
+  // PURCHASE: sudah dibeli → download; belum → keranjang
+  if (sound.accessLevel === 'PURCHASE') {
+    if (sound.isPurchased) {
+      return (
+        <div className="flex gap-3">
+          <DownloadBtn label="Download (Sudah Dibeli)" />
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-center gap-3">
+        <div className="text-center px-2 flex-shrink-0">
+          <p className="text-lg font-bold text-gray-900">
+            Rp {(sound.price / 1000).toFixed(0)}rb
+          </p>
+          <p className="text-xs text-gray-400">{sound.licenseType}</p>
+        </div>
+        <button
+          onClick={inCart ? onRemoveCart : onAddCart}
+          className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+            inCart
+              ? 'bg-violet-100 text-violet-700 hover:bg-violet-200'
+              : 'bg-violet-600 text-white hover:bg-violet-700'
+          }`}
+        >
+          {inCart ? 'Hapus dari Keranjang' : 'Tambah ke Keranjang'}
+        </button>
+      </div>
+    );
+  }
+
+  return null;
 }

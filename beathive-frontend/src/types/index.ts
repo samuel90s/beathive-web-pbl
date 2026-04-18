@@ -71,6 +71,8 @@ export interface SoundEffect {
   price: number;
   isFree: boolean;
   isLiked?: boolean;
+  isPurchased?: boolean;
+  isPublished?: boolean;
   accessLevel: 'FREE' | 'PRO' | 'BUSINESS' | 'PURCHASE';
   licenseType: string;
   playCount: number;

@@ -42,7 +42,8 @@ export default function GlobalPlayer() {
       audio.play().catch(() => {});
     }
     // Increment play count (fire-and-forget)
-    // (bisa ditambahkan endpoint terpisah jika diperlukan)
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+    fetch(`${API_URL}/sounds/${currentTrack.id}/play`, { method: 'POST' }).catch(() => {});
   }, [currentTrack?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Play / pause
@@ -199,7 +200,13 @@ export default function GlobalPlayer() {
         <div className="flex items-center gap-2 flex-shrink-0">
           {currentTrack.isFree ? (
             <button
-              onClick={() => download(currentTrack.id, currentTrack.slug, currentTrack.format)}
+              onClick={async () => {
+                try {
+                  await download(currentTrack.id, currentTrack.slug, currentTrack.format);
+                } catch (err: any) {
+                  setAudioError(err.message || 'Download gagal');
+                }
+              }}
               disabled={downloading === currentTrack.id}
               className="px-3 py-1.5 text-xs font-medium rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors disabled:opacity-50"
             >
