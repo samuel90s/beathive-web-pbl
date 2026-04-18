@@ -137,6 +137,45 @@ export class OrdersService {
     });
   }
 
+  // ─── Verify payment & aktifkan order ────────────────────
+  // Dipanggil frontend di onSuccess sebagai backup dari webhook
+
+  async verifyAndActivateOrder(userId: string, orderId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { gatewayOrderId: orderId, userId },
+    });
+
+    if (!order) throw new NotFoundException('Order tidak ditemukan');
+    if (order.status === 'PAID') return { activated: true, alreadyActive: true };
+
+    // Cek status ke Midtrans
+    const coreApi = new midtransClient.CoreApi({
+      isProduction: this.config.get('MIDTRANS_IS_PRODUCTION') === 'true',
+      serverKey: this.config.get('MIDTRANS_SERVER_KEY'),
+    });
+
+    let midtransStatus: string;
+    try {
+      const result = await coreApi.transaction.status(orderId);
+      midtransStatus = result.transaction_status;
+    } catch {
+      throw new BadRequestException('Gagal verifikasi status ke Midtrans');
+    }
+
+    const isPaid = midtransStatus === 'settlement' || midtransStatus === 'capture';
+    if (!isPaid) {
+      throw new BadRequestException(`Pembayaran belum selesai (status: ${midtransStatus})`);
+    }
+
+    // Aktifkan via webhook service logic — update order jadi PAID
+    await this.prisma.order.update({
+      where: { id: order.id },
+      data: { status: 'PAID', paidAt: new Date() },
+    });
+
+    return { activated: true };
+  }
+
   // ─── Buat Midtrans Snap token ───────────────────────────
 
   private async createMidtransToken(order: any, user: any, items: any[]) {

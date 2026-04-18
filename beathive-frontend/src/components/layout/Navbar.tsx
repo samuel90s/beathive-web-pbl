@@ -42,8 +42,8 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
-          {/* Studio — tampil hanya untuk AUTHOR dan ADMIN */}
-          {isAuthenticated && (user?.role === 'AUTHOR' || user?.role === 'ADMIN') && (
+          {/* Studio — tampil untuk semua user yang login */}
+          {isAuthenticated && (
             <Link
               href="/studio"
               className={clsx(
@@ -57,6 +57,20 @@ export default function Navbar() {
                 <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
               </svg>
               Studio
+            </Link>
+          )}
+          {/* Admin — hanya untuk ADMIN */}
+          {isAuthenticated && user?.role === 'ADMIN' && (
+            <Link
+              href="/admin"
+              className={clsx(
+                'px-3 py-1.5 text-sm rounded-lg transition-colors',
+                pathname.startsWith('/admin')
+                  ? 'bg-red-50 text-red-700 font-medium'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50',
+              )}
+            >
+              Admin
             </Link>
           )}
         </div>

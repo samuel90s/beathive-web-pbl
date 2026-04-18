@@ -25,7 +25,10 @@ export default function CheckoutPage() {
       // Buka Midtrans Snap popup
       if (typeof window !== 'undefined' && (window as any).snap) {
         (window as any).snap.pay(result.snapToken, {
-          onSuccess: () => {
+          onSuccess: async () => {
+            try {
+              await ordersApi.verifyPayment(result.orderId);
+            } catch { /* webhook mungkin sudah proses duluan */ }
             clearCart();
             router.push(`/dashboard?order=${result.orderId}&status=success`);
           },
@@ -98,6 +101,12 @@ export default function CheckoutPage() {
                       </button>
                     ))}
                   </div>
+                  {/* Keterangan lisensi */}
+                  <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
+                    {item.licenseType === 'personal'
+                      ? 'Personal: YouTube, media sosial, proyek non-komersial. Tidak boleh untuk iklan atau produk dijual.'
+                      : 'Komersial: Iklan, film, game, produk berbayar. Lisensi perpetual (seumur hidup).'}
+                  </p>
                 </div>
 
                 <div className="flex items-center gap-3 flex-shrink-0">

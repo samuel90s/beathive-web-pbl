@@ -42,6 +42,17 @@ export class OrdersController {
     return this.ordersService.getMyOrders(userId);
   }
 
+  // POST /orders/verify-payment  — frontend panggil di onSuccess snap
+  @Post('verify-payment')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async verifyPayment(
+    @CurrentUser() userId: string,
+    @Body() body: { orderId: string },
+  ) {
+    return this.ordersService.verifyAndActivateOrder(userId, body.orderId);
+  }
+
   // POST /orders/webhook/midtrans  — callback dari Midtrans
   // Endpoint ini TIDAK pakai JWT — Midtrans yang panggil
   // Verifikasi dilakukan via signature di WebhookService

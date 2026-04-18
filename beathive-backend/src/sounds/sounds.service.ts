@@ -20,6 +20,7 @@ import { Transform, Type } from 'class-transformer';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../common/storage/storage.service';
 import { AudioService } from '../common/audio/audio.service';
+import { EarningsService } from '../earnings/earnings.service';
 import { v4 as uuidv4 } from 'uuid';
 
 // ─── DTOs ─────────────────────────────────────────────────
@@ -127,6 +128,7 @@ export class SoundsService {
     private storage: StorageService,
     private audio: AudioService,
     private config: ConfigService,
+    private earnings: EarningsService,
   ) {}
 
   // ─── List sounds ─────────────────────────────────────────
@@ -352,7 +354,7 @@ export class SoundsService {
 
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    await this.prisma.$transaction([
+    const [downloadRecord] = await this.prisma.$transaction([
       this.prisma.download.create({
         data: {
           userId,
@@ -367,6 +369,9 @@ export class SoundsService {
         data: { downloadCount: { increment: 1 } },
       }),
     ]);
+
+    // Fire-and-forget: catat earning untuk creator (hanya PRO sound)
+    this.earnings.recordEarning(soundId, downloadRecord.id).catch(() => {});
 
     return {
       downloadUrl,
@@ -415,18 +420,10 @@ export class SoundsService {
     dto: UploadSoundDto,
     uploaderId: string,
   ) {
-    // Cek role
     const uploader = await this.prisma.user.findUnique({
       where: { id: uploaderId },
     });
-    if (
-      !uploader ||
-      (uploader.role !== 'AUTHOR' && uploader.role !== 'ADMIN')
-    ) {
-      throw new ForbiddenException(
-        'Hanya Author atau Admin yang dapat mengupload SFX',
-      );
-    }
+    if (!uploader) throw new ForbiddenException('User tidak ditemukan');
 
     // Validasi format
     const ext = (file.originalname.split('.').pop() ?? 'wav').toLowerCase();
@@ -498,7 +495,7 @@ export class SoundsService {
       data: {
         id: soundId,
         categoryId: categoryId!,
-        authorId: uploader.role === 'AUTHOR' ? uploaderId : null,
+        authorId: uploader.role !== 'ADMIN' ? uploaderId : null,
         title: dto.title,
         slug,
         description: dto.description ?? null,
@@ -511,8 +508,8 @@ export class SoundsService {
         price: dto.price ?? 0,
         accessLevel: (dto.accessLevel ?? 'FREE') as any,
         licenseType: dto.licenseType ?? 'personal',
-        isPublished: true,
-        publishedAt: new Date(),
+        isPublished: false,
+        reviewStatus: 'PENDING',
       },
       include: {
         category: true,
@@ -654,6 +651,8 @@ export class SoundsService {
       licenseType: sound.licenseType,
       isLiked,
       isPublished: sound.isPublished,
+      reviewStatus: sound.reviewStatus,
+      reviewNote: sound.reviewNote,
       playCount: sound.playCount,
       downloadCount: sound.downloadCount,
       category: sound.category,

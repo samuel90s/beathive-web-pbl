@@ -31,6 +31,11 @@ export class LicenseService {
     return key;
   }
 
+  // Generate PDF as Buffer — untuk ZIP download (tidak upload ke S3)
+  async generateLicenseBuffer(data: LicenseData): Promise<Buffer> {
+    return this.buildPdf(data);
+  }
+
   private buildPdf(data: LicenseData): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 60, size: 'A4' });

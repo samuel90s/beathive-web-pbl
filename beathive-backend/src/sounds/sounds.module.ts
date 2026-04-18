@@ -5,10 +5,12 @@ import { SoundsController } from './sounds.controller';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageModule } from '../common/storage/storage.module';
 import { AudioService } from '../common/audio/audio.service';
+import { LicenseModule } from '../common/license/license.module';
+import { EarningsModule } from '../earnings/earnings.module';
 import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [StorageModule, ConfigModule],
+  imports: [StorageModule, ConfigModule, LicenseModule, EarningsModule],
   controllers: [SoundsController],
   providers: [SoundsService, PrismaService, AudioService],
   exports: [SoundsService],

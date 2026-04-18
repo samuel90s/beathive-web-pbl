@@ -71,7 +71,12 @@ export default function PricingPage() {
       const result = await subscriptionsApi.upgrade(planSlug, cycle);
       if ((window as any).snap) {
         (window as any).snap.pay(result.snapToken, {
-          onSuccess: () => router.push('/dashboard?upgrade=success'),
+          onSuccess: async () => {
+            try {
+              await subscriptionsApi.verifyPayment(result.orderId);
+            } catch { /* webhook mungkin sudah proses duluan */ }
+            router.push('/dashboard?upgrade=success');
+          },
           onError: () => setLoading(null),
           onClose: () => setLoading(null),
         });

@@ -36,6 +36,17 @@ export class SubscriptionsController {
     );
   }
 
+  // POST /subscriptions/verify-payment
+  // Dipanggil dari frontend di onSuccess Snap — cek status ke Midtrans lalu aktifkan
+  @Post('verify-payment')
+  @UseGuards(JwtAuthGuard)
+  async verifyPayment(
+    @CurrentUser() userId: string,
+    @Body() body: { orderId: string },
+  ) {
+    return this.subscriptionsService.verifyAndActivate(userId, body.orderId);
+  }
+
   // DELETE /subscriptions/me  — cancel subscription
   @Delete('me')
   @UseGuards(JwtAuthGuard)

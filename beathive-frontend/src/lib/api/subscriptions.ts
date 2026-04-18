@@ -16,6 +16,11 @@ export const subscriptionsApi = {
     return data as { snapToken: string; orderId: string; price: number };
   },
 
+  verifyPayment: async (orderId: string) => {
+    const { data } = await apiClient.post('/subscriptions/verify-payment', { orderId });
+    return data as { activated: boolean; alreadyActive?: boolean };
+  },
+
   cancel: async () => {
     const { data } = await apiClient.delete('/subscriptions/me');
     return data as { message: string; accessUntil: string };

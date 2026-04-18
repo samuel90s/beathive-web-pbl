@@ -13,6 +13,11 @@ export const ordersApi = {
     return data as { orderId: string; totalAmount: number; snapToken: string };
   },
 
+  verifyPayment: async (orderId: string) => {
+    const { data } = await apiClient.post('/orders/verify-payment', { orderId });
+    return data as { activated: boolean };
+  },
+
   getMyOrders: async (): Promise<Order[]> => {
     const { data } = await apiClient.get('/orders/me');
     return data;

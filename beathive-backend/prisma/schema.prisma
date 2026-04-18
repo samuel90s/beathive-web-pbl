@@ -28,6 +28,7 @@ model User {
   downloads     Download[]
   wishlists     Wishlist[]
   uploadedSounds SoundEffect[] @relation("AuthorSounds")
+  wallet        CreatorWallet?
 
   @@map("users")
 }
@@ -121,9 +122,13 @@ model SoundEffect {
   price        Int         @default(0)     // 0 = gratis, dalam Rupiah
   accessLevel  AccessLevel @default(FREE)  // siapa yang bisa download
   licenseType  String      @default("personal") // "personal" | "commercial" | "both"
-  isPublished  Boolean     @default(false)
-  publishedAt  DateTime?
-  playCount    Int         @default(0)
+  isPublished   Boolean     @default(false)
+  publishedAt   DateTime?
+  reviewStatus  String      @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
+  reviewNote    String?     // alasan reject dari admin
+  reviewedAt    DateTime?
+  reviewedById  String?     // admin user ID
+  playCount     Int         @default(0)
   downloadCount Int        @default(0)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
@@ -239,6 +244,52 @@ model SubscriptionIntent {
   createdAt    DateTime @default(now())
 
   @@map("subscription_intents")
+}
+
+// ─── Creator Wallet & Earnings ───────────────────────────
+
+model CreatorWallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  balance   Int      @default(0) // saldo dalam Rupiah (belum dicairkan)
+  totalEarned Int    @default(0) // total lifetime earning
+  updatedAt DateTime @updatedAt
+
+  user     User              @relation(fields: [userId], references: [id])
+  earnings CreatorEarning[]
+  withdrawals WithdrawalRequest[]
+
+  @@map("creator_wallets")
+}
+
+model CreatorEarning {
+  id           String   @id @default(uuid())
+  walletId     String
+  soundId      String
+  downloadId   String?  // Download record yang trigger earning ini
+  amountRp     Int      // nominal Rupiah yang didapat
+  poolPercent  Int      @default(25) // % pool yang dipakai saat itu
+  earnedAt     DateTime @default(now())
+
+  wallet CreatorWallet @relation(fields: [walletId], references: [id])
+
+  @@map("creator_earnings")
+}
+
+model WithdrawalRequest {
+  id        String   @id @default(uuid())
+  walletId  String
+  amountRp  Int
+  status    String   @default("PENDING") // "PENDING" | "PAID" | "REJECTED"
+  bankName  String?
+  accountNo String?
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  wallet CreatorWallet @relation(fields: [walletId], references: [id])
+
+  @@map("withdrawal_requests")
 }
 
 // ─── Wishlists ───────────────────────────────────────────

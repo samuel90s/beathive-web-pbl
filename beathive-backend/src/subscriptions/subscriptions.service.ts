@@ -164,6 +164,62 @@ export class SubscriptionsService {
     });
   }
 
+  // ─── Verify payment & aktifkan subscription ─────────────
+  // Dipanggil frontend di onSuccess Snap sebagai backup dari webhook
+
+  async verifyAndActivate(userId: string, orderId: string) {
+    // Cari intent
+    const intent = await this.prisma.subscriptionIntent.findUnique({
+      where: { orderId },
+    });
+
+    if (!intent) {
+      // Mungkin sudah diproses webhook duluan — cek subscription aktif
+      const sub = await this.prisma.subscription.findUnique({
+        where: { userId },
+        include: { plan: true },
+      });
+      if (sub?.status === 'ACTIVE') return { activated: true, alreadyActive: true };
+      throw new BadRequestException('Intent pembayaran tidak ditemukan');
+    }
+
+    if (intent.userId !== userId) {
+      throw new BadRequestException('Order bukan milik user ini');
+    }
+
+    // Cek status transaksi langsung ke Midtrans
+    let midtransStatus: string;
+    try {
+      const result = await this.coreApi.transaction.status(orderId);
+      midtransStatus = result.transaction_status;
+    } catch {
+      throw new BadRequestException('Gagal verifikasi status pembayaran ke Midtrans');
+    }
+
+    const isPaid = midtransStatus === 'settlement' || midtransStatus === 'capture';
+    if (!isPaid) {
+      throw new BadRequestException(`Pembayaran belum selesai (status: ${midtransStatus})`);
+    }
+
+    // Aktifkan subscription
+    await this.activateSubscription(
+      intent.userId,
+      intent.planSlug,
+      intent.billingCycle as 'monthly' | 'yearly',
+      orderId,
+    );
+
+    // Hapus intent
+    await this.prisma.subscriptionIntent.delete({ where: { orderId } });
+
+    const sub = await this.prisma.subscription.findUnique({
+      where: { userId },
+      include: { plan: true },
+    });
+
+    return { activated: true, subscription: sub };
+  }
+
   // ─── Cancel subscription ────────────────────────────────
 
   async cancelSubscription(userId: string) {

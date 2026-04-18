@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(npx prisma *)",
+      "Bash(npx ts-node -e ' *)",
+      "Bash(curl -s \"http://localhost:5555/api/model/SubscriptionIntent/findMany\")"
     ]
   }
 }

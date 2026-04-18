@@ -22,13 +22,20 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { Response } from 'express';
 import * as fs from 'fs';
+import * as archiver from 'archiver';
 import { SoundsService, SoundFilterDto, UploadSoundDto } from './sounds.service';
+import { LicenseService } from '../common/license/license.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('sounds')
 export class SoundsController {
-  constructor(private soundsService: SoundsService) {}
+  constructor(
+    private soundsService: SoundsService,
+    private licenseService: LicenseService,
+    private prisma: PrismaService,
+  ) {}
 
   // ─── GET /sounds ──────────────────────────────────────────
   @Get()
@@ -168,12 +175,12 @@ export class SoundsController {
   }
 
   // ─── GET /sounds/:id/download-stream  (butuh JWT) ────────
+  // Returns ZIP: audio file + license.pdf + terms.txt
   @Get(':id/download-stream')
   @UseGuards(JwtAuthGuard)
   async streamDownload(
     @Param('id') id: string,
     @CurrentUser() userId: string,
-    @Req() req: any,
     @Res() res: Response,
   ) {
     const sound = await this.soundsService.findById(id);
@@ -181,31 +188,79 @@ export class SoundsController {
       return res.status(HttpStatus.NOT_FOUND).json({ message: 'Sound tidak ditemukan' });
     }
 
-    // Hanya izinkan jika user punya akses (cek via requestDownload — tapi kita skip
-    // double-check di sini karena user sudah klik "Download" lewat requestDownload dulu)
     const filePath = this.soundsService.getLocalDownloadPath(sound.fileUrl);
-    if (!filePath) {
-      return res
-        .status(HttpStatus.NOT_FOUND)
-        .json({ message: 'File audio tidak tersedia di server' });
+    if (!filePath || !fs.existsSync(filePath)) {
+      return res.status(HttpStatus.NOT_FOUND).json({ message: 'File audio tidak tersedia' });
     }
 
-    const stat = fs.statSync(filePath);
-    const fileSize = stat.size;
-    const ext = (filePath.split('.').pop() ?? 'wav').toLowerCase();
-    const mimeMap: Record<string, string> = {
-      wav: 'audio/wav', mp3: 'audio/mpeg', ogg: 'audio/ogg', flac: 'audio/flac',
-    };
-    const contentType = mimeMap[ext] ?? 'application/octet-stream';
-    const fileName = `${sound.slug}.${sound.format}`;
-
-    res.writeHead(200, {
-      'Content-Length': fileSize,
-      'Content-Type': contentType,
-      'Content-Disposition': `attachment; filename="${fileName}"`,
-      'Accept-Ranges': 'bytes',
+    // Ambil info user + download terakhir untuk tentukan tipe lisensi
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const lastDownload = await this.prisma.download.findFirst({
+      where: { userId, soundEffectId: id },
+      orderBy: { downloadedAt: 'desc' },
     });
-    fs.createReadStream(filePath).pipe(res);
+
+    // Tentukan license type berdasarkan sumber download
+    let licenseType = 'free';
+    let invoiceNumber = `DL-${Date.now()}`;
+
+    if (lastDownload?.source === 'purchase') {
+      const orderItem = await this.prisma.orderItem.findFirst({
+        where: {
+          soundEffectId: id,
+          order: { userId, status: 'PAID' },
+        },
+        include: { order: { include: { invoice: true } } },
+        orderBy: { order: { paidAt: 'desc' } },
+      });
+      licenseType = orderItem?.licenseType ?? 'personal';
+      invoiceNumber = orderItem?.order?.invoice?.invoiceNumber ?? invoiceNumber;
+    } else if (lastDownload?.source === 'subscription') {
+      licenseType = sound.accessLevel === 'FREE' ? 'free' : 'subscription';
+    }
+
+    // Generate license PDF
+    const licenseBuffer = await this.licenseService.generateLicenseBuffer({
+      buyerName: user?.name ?? 'User',
+      buyerEmail: user?.email ?? '',
+      soundTitle: sound.title,
+      soundId: sound.id,
+      licenseType,
+      orderId: lastDownload?.id ?? sound.id,
+      invoiceNumber,
+      purchaseDate: new Date(),
+    });
+
+    // Terms & conditions text
+    const termsText = this.buildTermsText(licenseType, sound.title);
+
+    // Buat ZIP dan stream ke response
+    const zipName = `${sound.slug}-beathive.zip`;
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
+
+    const archive = archiver('zip', { zlib: { level: 6 } });
+    archive.pipe(res);
+    archive.file(filePath, { name: `${sound.slug}.${sound.format}` });
+    archive.append(licenseBuffer, { name: 'license.pdf' });
+    archive.append(termsText, { name: 'terms.txt' });
+    await archive.finalize();
+  }
+
+  private buildTermsText(licenseType: string, soundTitle: string): string {
+    const base = `BeatHive — Syarat Penggunaan\n${'='.repeat(40)}\nSound: ${soundTitle}\nDiunduh: ${new Date().toLocaleDateString('id-ID')}\n\n`;
+
+    if (licenseType === 'free') {
+      return base + `LISENSI GRATIS\n\nKamu BOLEH:\n- Menggunakan dalam proyek personal non-komersial\n- Menggunakan dalam video YouTube/media sosial\n\nKamu TIDAK BOLEH:\n- Menggunakan dalam proyek komersial atau berbayar\n- Menjual atau mendistribusikan ulang file ini\n- Mengklaim sebagai karya sendiri\n\nAtribusi kepada BeatHive sangat diapresiasi.`;
+    }
+    if (licenseType === 'subscription') {
+      return base + `LISENSI SUBSCRIPTION\n\nKamu BOLEH:\n- Menggunakan dalam proyek komersial\n- Menggunakan dalam iklan, film, podcast, game\n- Memodifikasi sesuai kebutuhan\n\nKamu TIDAK BOLEH:\n- Menjual atau mendistribusikan ulang file ini\n- Mengklaim sebagai karya sendiri\n\nLisensi ini berlaku selama subscription aktif.`;
+    }
+    if (licenseType === 'commercial') {
+      return base + `LISENSI KOMERSIAL (PEMBELIAN SATUAN)\n\nKamu BOLEH:\n- Menggunakan dalam proyek komersial tanpa batas waktu\n- Menggunakan dalam iklan, film, produk berbayar\n- Memodifikasi sesuai kebutuhan\n\nKamu TIDAK BOLEH:\n- Menjual atau mendistribusikan ulang file ini\n- Mengklaim sebagai karya sendiri\n\nLisensi ini berlaku seumur hidup (perpetual).`;
+    }
+    // personal purchase
+    return base + `LISENSI PERSONAL (PEMBELIAN SATUAN)\n\nKamu BOLEH:\n- Menggunakan dalam proyek personal non-komersial\n- Menggunakan dalam video YouTube/media sosial non-monetisasi\n\nKamu TIDAK BOLEH:\n- Menggunakan dalam proyek komersial\n- Menjual atau mendistribusikan ulang file ini\n\nLisensi ini berlaku seumur hidup (perpetual).`;
   }
 
   // ─── POST /sounds/:id/recalculate-duration  (admin/author only) ──

@@ -73,6 +73,8 @@ export interface SoundEffect {
   isLiked?: boolean;
   isPurchased?: boolean;
   isPublished?: boolean;
+  reviewStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reviewNote?: string;
   accessLevel: 'FREE' | 'PRO' | 'BUSINESS' | 'PURCHASE';
   licenseType: string;
   playCount: number;
