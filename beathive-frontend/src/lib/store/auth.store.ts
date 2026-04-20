@@ -7,6 +7,8 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  _hasHydrated: boolean;
+  setHasHydrated: (v: boolean) => void;
   setAuth: (user: User, accessToken: string, refreshToken: string) => void;
   setUser: (user: User) => void;
   logout: () => void;
@@ -19,11 +21,13 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
+      _hasHydrated: false,
+      setHasHydrated: (v) => set({ _hasHydrated: v }),
 
       setAuth: (user, accessToken, refreshToken) => {
         if (typeof window !== 'undefined') {
-          localStorage.setItem('accessToken', accessToken);
-          localStorage.setItem('refreshToken', refreshToken);
+          sessionStorage.setItem('accessToken', accessToken);
+          sessionStorage.setItem('refreshToken', refreshToken);
         }
         set({ user, accessToken, refreshToken, isAuthenticated: true });
       },
@@ -32,22 +36,24 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
+          sessionStorage.removeItem('accessToken');
+          sessionStorage.removeItem('refreshToken');
         }
         set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
       },
     }),
     {
       name: 'beathive-auth',
-      storage: createJSONStorage(() => localStorage),
-      // Persist semua field termasuk user dan isAuthenticated
+      storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     },
   ),
 );

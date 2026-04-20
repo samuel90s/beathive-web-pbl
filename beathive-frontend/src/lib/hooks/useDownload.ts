@@ -14,7 +14,7 @@ function extractMessage(err: any): string {
   }
   // Regular Error
   if (err?.message) return String(err.message);
-  return 'Gagal mendownload file';
+  return 'Download failed';
 }
 
 export function useDownload() {
@@ -47,7 +47,16 @@ export function useDownload() {
 
       if (result.requiresAuth) {
         // Local dev: stream via backend dengan Authorization header
-        const token = accessToken || localStorage.getItem('accessToken');
+        let token = accessToken;
+        if (!token) {
+          token = sessionStorage.getItem('accessToken');
+          if (!token) {
+            try {
+              const raw = sessionStorage.getItem('beathive-auth');
+              if (raw) token = JSON.parse(raw)?.state?.accessToken ?? null;
+            } catch { /* ignore */ }
+          }
+        }
 
         let response: Response;
         try {
@@ -55,7 +64,7 @@ export function useDownload() {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
           });
         } catch {
-          throw new Error('Koneksi ke server gagal');
+          throw new Error('Failed to connect to server');
         }
 
         if (!response.ok) {

@@ -22,25 +22,24 @@ export default function CheckoutPage() {
     try {
       const result = await ordersApi.create(items);
 
-      // Buka Midtrans Snap popup
       if (typeof window !== 'undefined' && (window as any).snap) {
         (window as any).snap.pay(result.snapToken, {
           onSuccess: async () => {
             try {
               await ordersApi.verifyPayment(result.orderId);
-            } catch { /* webhook mungkin sudah proses duluan */ }
+            } catch { /* webhook may have already processed it */ }
             clearCart();
             router.push(`/dashboard?order=${result.orderId}&status=success`);
           },
           onPending: () => {
             router.push(`/dashboard?order=${result.orderId}&status=pending`);
           },
-          onError: () => setError('Pembayaran gagal. Silakan coba lagi.'),
+          onError: () => setError('Payment failed. Please try again.'),
           onClose: () => setLoading(false),
         });
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Gagal membuat order');
+      setError(err.response?.data?.message || 'Failed to create order');
       setLoading(false);
     }
   };
@@ -48,8 +47,8 @@ export default function CheckoutPage() {
   if (items.length === 0) {
     return (
       <div className="max-w-lg mx-auto px-4 py-20 text-center">
-        <p className="text-xl font-medium text-gray-900 mb-2">Keranjang kosong</p>
-        <p className="text-gray-400 mb-6">Tambahkan sound effect dari halaman browse</p>
+        <p className="text-xl font-medium text-gray-900 mb-2">Your cart is empty</p>
+        <p className="text-gray-400 mb-6">Add sound effects from the browse page</p>
         <button
           onClick={() => router.push('/browse')}
           className="px-5 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors"
@@ -62,7 +61,7 @@ export default function CheckoutPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-semibold text-gray-900 mb-6">Keranjang</h1>
+      <h1 className="text-2xl font-semibold text-gray-900 mb-6">Cart</h1>
 
       {/* Items */}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-4">
@@ -85,7 +84,7 @@ export default function CheckoutPage() {
                   <p className="text-sm font-medium text-gray-900">{item.sound.title}</p>
                   <p className="text-xs text-gray-400 mt-0.5">{item.sound.category.name}</p>
 
-                  {/* Pilih lisensi */}
+                  {/* License selector */}
                   <div className="flex gap-2 mt-2">
                     {(['personal', 'commercial'] as const).map((type) => (
                       <button
@@ -97,15 +96,15 @@ export default function CheckoutPage() {
                             : 'border-gray-200 text-gray-500 hover:border-gray-300'
                         }`}
                       >
-                        {type === 'personal' ? 'Personal' : 'Komersial (2×)'}
+                        {type === 'personal' ? 'Personal' : 'Commercial (2×)'}
                       </button>
                     ))}
                   </div>
-                  {/* Keterangan lisensi */}
+                  {/* License description */}
                   <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
                     {item.licenseType === 'personal'
-                      ? 'Personal: YouTube, media sosial, proyek non-komersial. Tidak boleh untuk iklan atau produk dijual.'
-                      : 'Komersial: Iklan, film, game, produk berbayar. Lisensi perpetual (seumur hidup).'}
+                      ? 'Personal: YouTube, social media, non-commercial projects. Not for ads or paid products.'
+                      : 'Commercial: Ads, films, games, paid products. Perpetual (lifetime) license.'}
                   </p>
                 </div>
 
@@ -144,11 +143,11 @@ export default function CheckoutPage() {
           disabled={loading}
           className="w-full py-3 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? 'Memproses...' : 'Bayar Sekarang'}
+          {loading ? 'Processing...' : 'Pay Now'}
         </button>
 
         <p className="text-xs text-center text-gray-400 mt-3">
-          Pembayaran aman via Midtrans · QRIS · Transfer · Kartu Kredit
+          Secure payment via Midtrans · QRIS · Bank Transfer · Credit Card
         </p>
       </div>
 

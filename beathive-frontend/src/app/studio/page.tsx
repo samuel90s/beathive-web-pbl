@@ -25,14 +25,14 @@ interface Withdrawal { id: string; amountRp: number; status: string; bankName: s
 interface WalletData { balance: number; totalEarned: number; earnings: Earning[]; withdrawals: Withdrawal[]; }
 
 export default function StudioPage() {
-  const { user, isAuthenticated, accessToken } = useAuthStore();
+  const { user, isAuthenticated, accessToken, _hasHydrated } = useAuthStore();
   const router = useRouter();
 
-  const [tab, setTab] = useState<'sounds' | 'earnings'>('sounds');
+  const [tab, setTab] = useState<'sounds' | 'earnings' | 'analytics'>('sounds');
   const [sounds, setSounds] = useState<SoundEffect[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [wallet, setWallet] = useState<WalletData | null>(null);
-  const [withdrawForm, setWithdrawForm] = useState({ amount: '', bankName: '', accountNo: '' });
+  const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawMsg, setWithdrawMsg] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -55,13 +55,14 @@ export default function StudioPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   useEffect(() => {
+    if (!_hasHydrated) return;
     if (!isAuthenticated) { router.push('/auth/login'); return; }
     fetchMySounds();
     fetchWallet();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, _hasHydrated]);
 
   const fetchWallet = async () => {
-    const token = accessToken || localStorage.getItem('accessToken');
+    const token = accessToken || sessionStorage.getItem('accessToken');
     const res = await fetch(`${API_URL}/earnings/wallet`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -73,20 +74,16 @@ export default function StudioPage() {
     setWithdrawing(true);
     setWithdrawMsg(null);
     try {
-      const token = accessToken || localStorage.getItem('accessToken');
+      const token = accessToken || sessionStorage.getItem('accessToken');
       const res = await fetch(`${API_URL}/earnings/withdraw`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amountRp: Number(withdrawForm.amount),
-          bankName: withdrawForm.bankName,
-          accountNo: withdrawForm.accountNo,
-        }),
+        body: JSON.stringify({ amountRp: Number(withdrawAmount) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Gagal');
-      setWithdrawMsg('Request withdrawal berhasil! Admin akan memproses dalam 1-3 hari kerja.');
-      setWithdrawForm({ amount: '', bankName: '', accountNo: '' });
+      setWithdrawMsg('success:Withdrawal request submitted! Admin will process within 1–3 business days.');
+      setWithdrawAmount('');
       fetchWallet();
     } catch (err: any) {
       setWithdrawMsg(err.message);
@@ -98,7 +95,7 @@ export default function StudioPage() {
   const fetchMySounds = async () => {
     setLoadingList(true);
     try {
-      const token = accessToken || localStorage.getItem('accessToken');
+      const token = accessToken || sessionStorage.getItem('accessToken');
       const res = await fetch(`${API_URL}/sounds/mine`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -113,7 +110,7 @@ export default function StudioPage() {
   const fixDuration = async (sound: SoundEffect) => {
     setFixingId(sound.id);
     try {
-      const token = accessToken || localStorage.getItem('accessToken');
+      const token = accessToken || sessionStorage.getItem('accessToken');
       const res = await fetch(`${API_URL}/sounds/${sound.id}/recalculate-duration`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
@@ -171,7 +168,7 @@ export default function StudioPage() {
         formData.append('tags', form.tags.trim());
       }
 
-      const token = accessToken || localStorage.getItem('accessToken');
+      const token = accessToken || sessionStorage.getItem('accessToken');
       const res = await fetch(`${API_URL}/sounds/upload`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
@@ -222,95 +219,111 @@ export default function StudioPage() {
 
       {/* Tab switcher */}
       <div className="flex gap-1 mb-5 bg-gray-100 p-1 rounded-xl w-fit">
-        {(['sounds', 'earnings'] as const).map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t === 'sounds' ? 'Sound Saya' : `Earnings${wallet ? ` · Rp ${(wallet.balance / 1000).toFixed(0)}rb` : ''}`}
-          </button>
-        ))}
+        <button
+          onClick={() => setTab('sounds')}
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'sounds' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          My Sounds
+        </button>
+        <button
+          onClick={() => setTab('earnings')}
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${tab === 'earnings' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          Earnings
+          {wallet && wallet.balance > 0 && (
+            <span className="text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full font-semibold">
+              Rp {wallet.balance.toLocaleString('id-ID')}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setTab('analytics')}
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'analytics' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          Analytics
+        </button>
       </div>
 
       {tab === 'earnings' && (
         <div className="space-y-4">
-          {/* Saldo cards */}
+          {/* Balance cards */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <p className="text-xs text-gray-400 mb-1">Saldo Tersedia</p>
+              <p className="text-xs text-gray-400 mb-1">Available Balance</p>
               <p className="text-2xl font-bold text-violet-600">
-                Rp {((wallet?.balance ?? 0) / 1000).toFixed(0)}rb
+                Rp {(wallet?.balance ?? 0).toLocaleString('id-ID')}
               </p>
-              <p className="text-xs text-gray-400 mt-1">Min. withdraw Rp 50rb</p>
+              <p className="text-xs text-gray-400 mt-1">Min. withdrawal Rp 50.000</p>
             </div>
             <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <p className="text-xs text-gray-400 mb-1">Total Earned</p>
+              <p className="text-xs text-gray-400 mb-1">Total Earned (All Time)</p>
               <p className="text-2xl font-bold text-gray-800">
-                Rp {((wallet?.totalEarned ?? 0) / 1000).toFixed(0)}rb
+                Rp {(wallet?.totalEarned ?? 0).toLocaleString('id-ID')}
               </p>
-              <p className="text-xs text-gray-400 mt-1">25% pool subscription</p>
+              <p className="text-xs text-gray-400 mt-1">Per-item: 70% · PRO pool: 25%</p>
             </div>
           </div>
 
           {/* Withdraw form */}
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <h3 className="text-sm font-semibold text-gray-800 mb-4">Request Withdrawal</h3>
-            <form onSubmit={handleWithdraw} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+            <h3 className="text-sm font-semibold text-gray-800 mb-1">Request Withdrawal</h3>
+
+            {!user.bankName || !user.bankAccount ? (
+              <div className="mt-3 flex items-start gap-2.5 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                <svg className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Jumlah (Rp)</label>
-                  <input
-                    type="number" min="50000" step="10000"
-                    value={withdrawForm.amount}
-                    onChange={e => setWithdrawForm(f => ({ ...f, amount: e.target.value }))}
-                    placeholder="50000"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Nama Bank</label>
-                  <input
-                    type="text" value={withdrawForm.bankName}
-                    onChange={e => setWithdrawForm(f => ({ ...f, bankName: e.target.value }))}
-                    placeholder="BCA / BRI / Mandiri / dll"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    required
-                  />
+                  <p className="text-sm text-amber-700 font-medium">Bank account not set</p>
+                  <p className="text-xs text-amber-600 mt-0.5">
+                    Add your bank account in{' '}
+                    <a href="/profile" className="underline font-medium">Profile Settings</a>
+                    {' '}before requesting a withdrawal.
+                  </p>
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Nomor Rekening</label>
-                <input
-                  type="text" value={withdrawForm.accountNo}
-                  onChange={e => setWithdrawForm(f => ({ ...f, accountNo: e.target.value }))}
-                  placeholder="1234567890"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  required
-                />
-              </div>
-              {withdrawMsg && (
-                <p className={`text-xs px-3 py-2 rounded-lg ${withdrawMsg.includes('berhasil') ? 'bg-teal-50 text-teal-700' : 'bg-red-50 text-red-600'}`}>
-                  {withdrawMsg}
-                </p>
-              )}
-              <button
-                type="submit" disabled={withdrawing || (wallet?.balance ?? 0) < 50000}
-                className="w-full py-2.5 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 disabled:opacity-50 transition-colors"
-              >
-                {withdrawing ? 'Memproses...' : 'Request Withdrawal'}
-              </button>
-            </form>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mt-2 mb-4 px-3 py-2 bg-gray-50 rounded-xl">
+                  <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+                  </svg>
+                  <span className="text-sm text-gray-600">{user.bankName} · {user.bankAccount}</span>
+                  <a href="/profile" className="ml-auto text-xs text-violet-600 hover:underline">Change</a>
+                </div>
+                <form onSubmit={handleWithdraw} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Amount (Rp)</label>
+                    <input
+                      type="number" min="50000" step="10000"
+                      value={withdrawAmount}
+                      onChange={e => setWithdrawAmount(e.target.value)}
+                      placeholder="50000"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                      required
+                    />
+                  </div>
+                  {withdrawMsg && (
+                    <p className={`text-xs px-3 py-2 rounded-lg ${withdrawMsg.startsWith('success:') ? 'bg-teal-50 text-teal-700' : 'bg-red-50 text-red-600'}`}>
+                      {withdrawMsg.replace('success:', '')}
+                    </p>
+                  )}
+                  <button
+                    type="submit" disabled={withdrawing || (wallet?.balance ?? 0) < 50000}
+                    className="w-full py-2.5 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 disabled:opacity-50 transition-colors"
+                  >
+                    {withdrawing ? 'Processing...' : `Withdraw Rp ${(wallet?.balance ?? 0).toLocaleString('id-ID')}`}
+                  </button>
+                </form>
+              </>
+            )}
           </div>
 
           {/* Earning history */}
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <h3 className="text-sm font-semibold text-gray-800 mb-3">Riwayat Earning</h3>
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">Earning History</h3>
             {!wallet?.earnings.length ? (
-              <p className="text-sm text-gray-400 text-center py-4">Belum ada earning. Upload PRO sound dan tunggu downloads!</p>
+              <p className="text-sm text-gray-400 text-center py-4">No earnings yet. Upload sounds and wait for purchases or downloads!</p>
             ) : (
               <div className="space-y-2">
                 {wallet.earnings.map(e => (
@@ -326,6 +339,10 @@ export default function StudioPage() {
             )}
           </div>
         </div>
+      )}
+
+      {tab === 'analytics' && (
+        <AnalyticsTab accessToken={accessToken} />
       )}
 
       {uploadSuccess && tab === 'sounds' && (
@@ -545,6 +562,97 @@ export default function StudioPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Analytics Tab ────────────────────────────────────────
+
+interface MonthlyPoint { month: string; totalRp: number; downloadCount: number; }
+interface TopSound { soundId: string; title: string; slug: string; earnings: number; downloads: number; }
+
+function AnalyticsTab({ accessToken }: { accessToken: string | null }) {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+  const [data, setData] = useState<{ monthlyEarnings: MonthlyPoint[]; topSounds: TopSound[]; totalThisMonth: number; totalLastMonth: number; trend: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = accessToken || (typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null);
+    fetch(`${API_URL}/earnings/analytics?months=12`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(setData)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" /></div>;
+  if (!data) return <p className="text-center text-gray-400 py-8">No analytics data yet.</p>;
+
+  const maxRp = Math.max(...data.monthlyEarnings.map(m => m.totalRp), 1);
+  const trendColor = data.trend === 'up' ? 'text-teal-600' : data.trend === 'down' ? 'text-red-500' : 'text-gray-500';
+  const trendLabel = data.trend === 'up' ? '▲ Up' : data.trend === 'down' ? '▼ Down' : '— Flat';
+
+  return (
+    <div className="space-y-4">
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+          <p className="text-xs text-gray-400 mb-1">This Month</p>
+          <p className="text-xl font-bold text-violet-600">Rp {data.totalThisMonth.toLocaleString('id-ID')}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+          <p className="text-xs text-gray-400 mb-1">Last Month</p>
+          <p className="text-xl font-bold text-gray-700">Rp {data.totalLastMonth.toLocaleString('id-ID')}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+          <p className="text-xs text-gray-400 mb-1">Trend</p>
+          <p className={`text-xl font-bold ${trendColor}`}>{trendLabel}</p>
+        </div>
+      </div>
+
+      {/* Bar chart */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <h3 className="text-sm font-semibold text-gray-800 mb-4">Monthly Earnings (12 months)</h3>
+        <div className="flex items-end gap-1 h-32">
+          {data.monthlyEarnings.map(m => {
+            const pct = maxRp > 0 ? (m.totalRp / maxRp) * 100 : 0;
+            const [, mon] = m.month.split('-');
+            const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            return (
+              <div key={m.month} className="flex-1 flex flex-col items-center gap-1" title={`${m.month}: Rp ${m.totalRp.toLocaleString('id-ID')}`}>
+                <div className="w-full flex items-end justify-center" style={{ height: '100px' }}>
+                  <div
+                    className="w-full bg-violet-400 rounded-t transition-all hover:bg-violet-600"
+                    style={{ height: `${Math.max(pct, m.totalRp > 0 ? 4 : 0)}%` }}
+                  />
+                </div>
+                <span className="text-[9px] text-gray-400">{monthNames[parseInt(mon, 10) - 1]}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Top sounds */}
+      {data.topSounds.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+          <h3 className="text-sm font-semibold text-gray-800 mb-3">Top Sounds by Earnings</h3>
+          <div className="space-y-2">
+            {data.topSounds.map((s, i) => (
+              <div key={s.soundId} className="flex items-center gap-3">
+                <span className="text-xs font-bold text-gray-300 w-4">{i + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <a href={`/sounds/${s.slug}`} className="text-sm font-medium text-gray-700 hover:text-violet-600 truncate block">{s.title}</a>
+                  <p className="text-xs text-gray-400">{s.downloads} downloads</p>
+                </div>
+                <span className="text-sm font-semibold text-teal-600">Rp {s.earnings.toLocaleString('id-ID')}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}

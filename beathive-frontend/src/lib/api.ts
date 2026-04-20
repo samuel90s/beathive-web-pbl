@@ -10,11 +10,20 @@ export const api = axios.create({
 
 // ─── Request interceptor: inject access token ─────────────
 
+function getToken(key: 'accessToken' | 'refreshToken'): string | null {
+  if (typeof window === 'undefined') return null
+  const direct = sessionStorage.getItem(key)
+  if (direct) return direct
+  try {
+    const raw = sessionStorage.getItem('beathive-auth')
+    if (raw) return JSON.parse(raw)?.state?.[key] ?? null
+  } catch { /* ignore */ }
+  return null
+}
+
 api.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('accessToken')
-    if (token) config.headers.Authorization = `Bearer ${token}`
-  }
+  const token = getToken('accessToken')
+  if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
@@ -44,15 +53,15 @@ api.interceptors.response.use(
       isRefreshing = true
 
       try {
-        const refreshToken = localStorage.getItem('refreshToken')
+        const refreshToken = getToken('refreshToken')
         if (!refreshToken) throw new Error('No refresh token')
 
         const { data } = await axios.post(`${API_BASE}/auth/refresh`, {
           refreshToken,
         })
 
-        localStorage.setItem('accessToken', data.accessToken)
-        localStorage.setItem('refreshToken', data.refreshToken)
+        sessionStorage.setItem('accessToken', data.accessToken)
+        sessionStorage.setItem('refreshToken', data.refreshToken)
 
         queue.forEach((cb) => cb(data.accessToken))
         queue = []
@@ -61,8 +70,8 @@ api.interceptors.response.use(
         return api(original)
       } catch {
         // Refresh gagal — logout
-        localStorage.removeItem('accessToken')
-        localStorage.removeItem('refreshToken')
+        sessionStorage.removeItem('accessToken')
+        sessionStorage.removeItem('refreshToken')
         window.location.href = '/login'
       } finally {
         isRefreshing = false

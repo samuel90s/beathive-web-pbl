@@ -9,6 +9,8 @@ import { authApi } from '@/lib/api/auth';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [totpToken, setTotpToken] = useState('');
+  const [needs2FA, setNeeds2FA] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { login } = useAuth();
@@ -19,10 +21,15 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
-      await login(email, password);
+      const result = await login(email, password, needs2FA ? totpToken : undefined);
+      if ('requiresTwoFactor' in result) {
+        setNeeds2FA(true);
+        setLoading(false);
+        return;
+      }
       router.push('/browse');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Email atau password salah');
+      setError(err.response?.data?.message || 'Invalid email or password');
     } finally {
       setLoading(false);
     }
@@ -35,7 +42,7 @@ export default function LoginPage() {
           <Link href="/" className="text-2xl font-semibold">
             beat<span className="text-violet-600">hive</span>
           </Link>
-          <p className="text-gray-400 text-sm mt-2">Masuk ke akunmu</p>
+          <p className="text-gray-400 text-sm mt-2">Sign in to your account</p>
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
@@ -49,12 +56,12 @@ export default function LoginPage() {
               <path d="M3.964 10.706A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/>
               <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
             </svg>
-            Masuk dengan Google
+            Continue with Google
           </a>
 
           <div className="flex items-center gap-3 mb-4">
             <div className="flex-1 h-px bg-gray-100" />
-            <span className="text-xs text-gray-400">atau</span>
+            <span className="text-xs text-gray-400">or</span>
             <div className="flex-1 h-px bg-gray-100" />
           </div>
 
@@ -63,25 +70,46 @@ export default function LoginPage() {
               <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-                placeholder="email@kamu.com" />
+                placeholder="you@example.com" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Password</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-medium text-gray-600">Password</label>
+                <Link href="/auth/forgot-password" className="text-xs text-violet-600 hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
                 placeholder="••••••••" />
             </div>
+            {needs2FA && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Authenticator Code</label>
+                <input
+                  type="text"
+                  value={totpToken}
+                  onChange={e => setTotpToken(e.target.value)}
+                  required={needs2FA}
+                  maxLength={6}
+                  placeholder="6-digit code"
+                  autoFocus
+                  className="w-full px-3 py-2.5 border border-violet-300 rounded-xl text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-400 mt-1">Enter the code from your authenticator app.</p>
+              </div>
+            )}
             {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
             <button type="submit" disabled={loading}
               className="w-full py-2.5 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors disabled:opacity-50">
-              {loading ? 'Memproses...' : 'Masuk'}
+              {loading ? 'Signing in...' : needs2FA ? 'Verify & Sign In' : 'Sign In'}
             </button>
           </form>
         </div>
 
         <p className="text-center text-sm text-gray-400 mt-4">
-          Belum punya akun?{' '}
-          <Link href="/auth/register" className="text-violet-600 hover:text-violet-700 font-medium">Daftar gratis</Link>
+          Don&apos;t have an account?{' '}
+          <Link href="/auth/register" className="text-violet-600 hover:text-violet-700 font-medium">Sign up free</Link>
         </p>
       </div>
     </div>

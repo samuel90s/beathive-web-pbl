@@ -25,6 +25,7 @@ export default function Navbar() {
   const navLinks = [
     { href: '/browse', label: 'Browse' },
     ...(!isPaidPlan ? [{ href: '/pricing', label: 'Pricing' }] : []),
+    { href: '/faq', label: 'FAQ' },
   ];
 
   return (

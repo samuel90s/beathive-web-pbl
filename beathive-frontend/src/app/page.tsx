@@ -9,40 +9,40 @@ export default function HomePage() {
       <section className="py-20 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-violet-50 text-violet-700 text-xs font-medium rounded-full mb-6">
           <span className="w-1.5 h-1.5 bg-violet-500 rounded-full" />
-          10.000+ sound effect siap pakai
+          10,000+ ready-to-use sound effects
         </div>
         <h1 className="text-4xl md:text-5xl font-semibold text-gray-900 leading-tight mb-5">
-          Sound effect premium<br />
-          <span className="text-violet-600">untuk kreator konten</span>
+          Premium sound effects<br />
+          <span className="text-violet-600">for content creators</span>
         </h1>
         <p className="text-lg text-gray-400 max-w-xl mx-auto mb-8">
-          Ribuan SFX berkualitas tinggi untuk video, game, podcast, dan iklan. Berlangganan atau beli satuan — pilihan ada di tangan kamu.
+          Thousands of high-quality SFX for video, games, podcasts, and ads. Subscribe or buy individually — the choice is yours.
         </p>
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-center gap-3 flex-wrap">
           <Link href="/browse"
             className="px-6 py-3 bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-700 transition-colors">
             Browse Sound Effects
           </Link>
           <Link href="/pricing"
             className="px-6 py-3 border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors">
-            Lihat Harga
+            View Pricing
           </Link>
         </div>
       </section>
 
       {/* Categories */}
       <section className="py-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-5">Jelajahi kategori</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-5">Explore categories</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { slug: 'aksi', label: 'Aksi & Efek', icon: '💥', count: '1.2k+' },
-            { slug: 'alam', label: 'Alam', icon: '🌿', count: '800+' },
+            { slug: 'aksi', label: 'Action & FX', icon: '💥', count: '1.2k+' },
+            { slug: 'alam', label: 'Nature', icon: '🌿', count: '800+' },
             { slug: 'ui-game', label: 'UI / Game', icon: '🎮', count: '2k+' },
-            { slug: 'suasana', label: 'Suasana', icon: '🌆', count: '600+' },
-            { slug: 'manusia', label: 'Manusia', icon: '🚶', count: '400+' },
-            { slug: 'kendaraan', label: 'Kendaraan', icon: '🚗', count: '300+' },
-            { slug: 'hewan', label: 'Hewan', icon: '🐾', count: '250+' },
-            { slug: 'elektronik', label: 'Elektronik', icon: '⚡', count: '500+' },
+            { slug: 'suasana', label: 'Ambience', icon: '🌆', count: '600+' },
+            { slug: 'manusia', label: 'Human', icon: '🚶', count: '400+' },
+            { slug: 'kendaraan', label: 'Vehicles', icon: '🚗', count: '300+' },
+            { slug: 'hewan', label: 'Animals', icon: '🐾', count: '250+' },
+            { slug: 'elektronik', label: 'Electronic', icon: '⚡', count: '500+' },
           ].map((cat) => (
             <Link
               key={cat.slug}
@@ -65,18 +65,18 @@ export default function HomePage() {
           {[
             {
               icon: '🎧',
-              title: 'Preview sebelum beli',
-              desc: 'Dengarkan preview 30 detik untuk setiap sound effect sebelum memutuskan.',
+              title: 'Preview before you buy',
+              desc: 'Listen to a 30-second preview of every sound effect before deciding.',
             },
             {
               icon: '📄',
-              title: 'Lisensi jelas & legal',
-              desc: 'Setiap pembelian dilengkapi sertifikat lisensi PDF yang sah secara hukum.',
+              title: 'Clear & legal license',
+              desc: 'Every purchase comes with a license document that is legally valid.',
             },
             {
               icon: '⚡',
-              title: 'Download instan',
-              desc: 'Setelah bayar, file langsung tersedia. Format WAV resolusi tinggi.',
+              title: 'Instant download',
+              desc: 'After payment, files are immediately available. High-resolution WAV format.',
             },
           ].map((f) => (
             <div key={f.title} className="p-5 bg-white rounded-2xl border border-gray-100">
@@ -91,11 +91,11 @@ export default function HomePage() {
       {/* CTA */}
       <section className="py-10 mb-10">
         <div className="bg-violet-600 rounded-2xl p-8 text-center text-white">
-          <h2 className="text-2xl font-semibold mb-2">Mulai gratis sekarang</h2>
-          <p className="text-violet-200 mb-6 text-sm">5 download gratis per bulan. Tidak perlu kartu kredit.</p>
+          <h2 className="text-2xl font-semibold mb-2">Start for free today</h2>
+          <p className="text-violet-200 mb-6 text-sm">5 free downloads per month. No credit card required.</p>
           <Link href="/auth/register"
             className="inline-block px-6 py-2.5 bg-white text-violet-700 font-medium rounded-xl hover:bg-violet-50 transition-colors text-sm">
-            Buat Akun Gratis
+            Create Free Account
           </Link>
         </div>
       </section>

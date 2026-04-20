@@ -34,8 +34,17 @@ export default function DashboardPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="flex items-center gap-4 mb-8">
-        <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 text-lg font-semibold">
-          {user.name?.[0]?.toUpperCase()}
+        <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 text-lg font-semibold overflow-hidden">
+          {user.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `http://localhost:3000${user.avatarUrl}`}
+              alt="avatar"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            user.name?.[0]?.toUpperCase()
+          )}
         </div>
         <div>
           <h1 className="text-xl font-semibold text-gray-900">{user.name}</h1>

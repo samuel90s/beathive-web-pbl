@@ -12,14 +12,14 @@ const PLANS = [
     name: 'Free',
     priceMonthly: 0,
     priceYearly: 0,
-    description: 'Untuk coba-coba dulu',
+    description: 'Just getting started',
     features: [
-      '5 download per bulan',
-      'Akses sound effect gratis',
-      'Preview 30 detik semua SFX',
-      'Lisensi personal only',
+      '5 downloads per month',
+      'Access to free sound effects',
+      '30-second preview for all SFX',
+      'Personal license only',
     ],
-    cta: 'Mulai Gratis',
+    cta: 'Get Started Free',
     highlight: false,
   },
   {
@@ -27,15 +27,15 @@ const PLANS = [
     name: 'Pro',
     priceMonthly: 99000,
     priceYearly: 890000,
-    description: 'Untuk kreator aktif',
+    description: 'For active creators',
     features: [
-      '100 download per bulan',
-      'Akses semua SFX Pro & Free',
-      'Lisensi komersial included',
-      'Download WAV original',
+      '100 downloads per month',
+      'Access to all Pro & Free SFX',
+      'Commercial license included',
+      'Original WAV download',
       'Priority support',
     ],
-    cta: 'Mulai Pro',
+    cta: 'Start Pro',
     highlight: true,
   },
   {
@@ -43,16 +43,16 @@ const PLANS = [
     name: 'Business',
     priceMonthly: 299000,
     priceYearly: 2500000,
-    description: 'Untuk tim & studio',
+    description: 'For teams & studios',
     features: [
-      'Download unlimited',
-      'Akses semua SFX termasuk Business',
-      'Lisensi komersial penuh',
-      'Multi-seat (3 akun)',
-      'Invoice perusahaan',
+      'Unlimited downloads',
+      'Access to all SFX including Business',
+      'Full commercial license',
+      'Multi-seat (3 accounts)',
+      'Company invoice',
       'Dedicated support',
     ],
-    cta: 'Mulai Business',
+    cta: 'Start Business',
     highlight: false,
   },
 ];
@@ -74,7 +74,7 @@ export default function PricingPage() {
           onSuccess: async () => {
             try {
               await subscriptionsApi.verifyPayment(result.orderId);
-            } catch { /* webhook mungkin sudah proses duluan */ }
+            } catch { /* webhook may have already processed it */ }
             router.push('/dashboard?upgrade=success');
           },
           onError: () => setLoading(null),
@@ -94,8 +94,8 @@ export default function PricingPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-14">
       <div className="text-center mb-10">
-        <h1 className="text-3xl font-semibold text-gray-900 mb-3">Pilih plan yang tepat</h1>
-        <p className="text-gray-400 mb-6">Mulai gratis, upgrade kapan saja. Tidak ada kontrak.</p>
+        <h1 className="text-3xl font-semibold text-gray-900 mb-3">Choose the right plan</h1>
+        <p className="text-gray-400 mb-6">Start free, upgrade anytime. No contracts.</p>
 
         {/* Billing toggle */}
         <div className="inline-flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
@@ -109,9 +109,9 @@ export default function PricingPage() {
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {c === 'monthly' ? 'Bulanan' : 'Tahunan'}
+              {c === 'monthly' ? 'Monthly' : 'Yearly'}
               {c === 'yearly' && (
-                <span className="ml-1.5 text-xs text-teal-600 font-medium">Hemat 25%</span>
+                <span className="ml-1.5 text-xs text-teal-600 font-medium">Save 25%</span>
               )}
             </button>
           ))}
@@ -138,7 +138,7 @@ export default function PricingPage() {
               {plan.highlight && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <span className="bg-violet-600 text-white text-xs px-3 py-1 rounded-full font-medium">
-                    Paling Populer
+                    Most Popular
                   </span>
                 </div>
               )}
@@ -150,18 +150,18 @@ export default function PricingPage() {
 
               <div className="mb-5">
                 {price === 0 ? (
-                  <div className="text-3xl font-semibold text-gray-900">Gratis</div>
+                  <div className="text-3xl font-semibold text-gray-900">Free</div>
                 ) : (
                   <>
                     <div className="flex items-baseline gap-1">
                       <span className="text-3xl font-semibold text-gray-900">
                         {formatPrice(monthlyEquiv)}
                       </span>
-                      <span className="text-sm text-gray-400">/bulan</span>
+                      <span className="text-sm text-gray-400">/mo</span>
                     </div>
                     {cycle === 'yearly' && discount > 0 && (
                       <p className="text-xs text-teal-600 mt-0.5">
-                        Ditagih {formatPrice(price)}/tahun · Hemat {discount}%
+                        Billed {formatPrice(price)}/year · Save {discount}%
                       </p>
                     )}
                   </>
@@ -188,7 +188,7 @@ export default function PricingPage() {
                     : 'bg-gray-900 text-white hover:bg-gray-800'
                 }`}
               >
-                {loading === plan.slug ? 'Memproses...' : plan.cta}
+                {loading === plan.slug ? 'Processing...' : plan.cta}
               </button>
             </div>
           );
@@ -196,7 +196,7 @@ export default function PricingPage() {
       </div>
 
       <p className="text-center text-xs text-gray-400 mt-8">
-        Semua plan bisa di-cancel kapan saja. Akses tetap aktif hingga akhir periode.
+        All plans can be cancelled anytime. Access remains active until the end of the billing period.
       </p>
 
       <script

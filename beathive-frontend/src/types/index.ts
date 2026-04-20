@@ -6,8 +6,12 @@ export interface User {
   email: string;
   avatarUrl?: string;
   bio?: string;
+  bankName?: string;
+  bankAccount?: string;
+  bankAccountName?: string;
   role: 'USER' | 'AUTHOR' | 'ADMIN';
   provider: string;
+  isTwoFactorEnabled?: boolean;
   createdAt: string;
   subscription?: Subscription;
 }
@@ -140,7 +144,10 @@ export interface SoundFilters {
   accessLevel?: 'FREE' | 'PRO' | 'BUSINESS' | 'PURCHASE';
   minDuration?: number;
   maxDuration?: number;
-  sortBy?: 'newest' | 'oldest' | 'popular' | 'mostplayed' | 'price_asc' | 'price_desc';
+  minPrice?: number;
+  maxPrice?: number;
+  tags?: string;
+  sortBy?: 'newest' | 'oldest' | 'popular' | 'mostplayed' | 'price_asc' | 'price_desc' | 'trending';
   page?: number;
   limit?: number;
 }

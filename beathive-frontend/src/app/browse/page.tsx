@@ -21,6 +21,7 @@ const CATEGORIES = [
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
+  { value: 'trending', label: 'Trending' },
   { value: 'popular', label: 'Most Downloaded' },
   { value: 'mostplayed', label: 'Most Played' },
   { value: 'price_asc', label: 'Price: Low to High' },
@@ -44,6 +45,8 @@ export default function BrowsePage() {
     limit: 30,
   });
   const [searchInput, setSearchInput] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
   const debouncedSearch = useDebounce(searchInput, 400);
 
   // Baca URL params saat pertama kali (dari link di halaman lain)
@@ -54,7 +57,12 @@ export default function BrowsePage() {
     if (search) setSearchInput(search);
   }, []);
 
-  const activeFilters: SoundFilters = { ...filters, search: debouncedSearch || undefined };
+  const activeFilters: SoundFilters = {
+    ...filters,
+    search: debouncedSearch || undefined,
+    minPrice: minPrice ? parseInt(minPrice) : undefined,
+    maxPrice: maxPrice ? parseInt(maxPrice) : undefined,
+  };
   const { data, isLoading, isError } = useSounds(activeFilters);
 
   const setCategory = useCallback((slug: string) => {
@@ -128,6 +136,36 @@ export default function BrowsePage() {
                     {opt.label}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Price Range (Rp)</p>
+              <div className="space-y-1.5">
+                <input
+                  type="number"
+                  min="0"
+                  value={minPrice}
+                  onChange={e => setMinPrice(e.target.value)}
+                  placeholder="Min"
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-violet-400"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  value={maxPrice}
+                  onChange={e => setMaxPrice(e.target.value)}
+                  placeholder="Max"
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-violet-400"
+                />
+                {(minPrice || maxPrice) && (
+                  <button
+                    onClick={() => { setMinPrice(''); setMaxPrice(''); }}
+                    className="text-xs text-violet-600 hover:underline"
+                  >
+                    Clear
+                  </button>
+                )}
               </div>
             </div>
 

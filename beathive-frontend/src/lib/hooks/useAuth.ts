@@ -20,10 +20,10 @@ export function useAuth() {
     }
   }, []);
 
-  const login = async (email: string, password: string) => {
-    // Clear previous user's cart before logging in as new user
+  const login = async (email: string, password: string, totpToken?: string) => {
     cart.clearCart();
-    const result = await authApi.login(email, password);
+    const result = await authApi.login(email, password, totpToken);
+    if ('requiresTwoFactor' in result) return result;
     store.setAuth(result.user, result.accessToken, result.refreshToken);
     return result;
   };
@@ -50,16 +50,16 @@ export function useAuth() {
   };
 }
 
-// Guard hook — redirect ke login kalau belum auth
+// Guard hook — redirect to login if not authenticated (waits for store hydration)
 export function useRequireAuth() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, _hasHydrated } = useAuthStore();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (_hasHydrated && !isAuthenticated) {
       router.push('/auth/login');
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, _hasHydrated]);
 
   return isAuthenticated;
 }

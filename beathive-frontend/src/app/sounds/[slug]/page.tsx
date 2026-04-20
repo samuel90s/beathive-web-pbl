@@ -11,6 +11,7 @@ import { useWishlist } from '@/lib/hooks/useWishlist';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { formatDuration } from '@/lib/utils';
 import WaveformBar from '@/components/sounds/WaveformBar';
+import RatingSection from '@/components/sounds/RatingSection';
 import type { SoundEffect } from '@/types';
 
 export default function SoundDetailPage() {
@@ -37,7 +38,7 @@ export default function SoundDetailPage() {
         setSound(s);
         setLiked(s.isLiked ?? false);
       })
-      .catch(() => setError('Sound tidak ditemukan'))
+      .catch(() => setError('Sound not found'))
       .finally(() => setLoading(false));
   }, [slug]);
 
@@ -52,8 +53,8 @@ export default function SoundDetailPage() {
   if (error || !sound) {
     return (
       <div className="max-w-3xl mx-auto px-4 pt-12 text-center">
-        <p className="text-gray-500">{error || 'Sound tidak ditemukan'}</p>
-        <Link href="/browse" className="text-violet-600 text-sm mt-2 inline-block">Kembali ke Browse</Link>
+        <p className="text-gray-500">{error || 'Sound not found'}</p>
+        <Link href="/browse" className="text-violet-600 text-sm mt-2 inline-block">Back to Browse</Link>
       </div>
     );
   }
@@ -76,7 +77,7 @@ export default function SoundDetailPage() {
     try {
       await download(sound.id, sound.slug, sound.format);
     } catch (err: any) {
-      setDownloadError(err.message || 'Gagal download');
+      setDownloadError(err.message || 'Download failed');
     }
   };
 
@@ -86,10 +87,10 @@ export default function SoundDetailPage() {
   };
 
   const accessLabels = {
-    FREE: { label: 'Gratis', cls: 'bg-teal-50 text-teal-700 border-teal-200' },
+    FREE: { label: 'Free', cls: 'bg-teal-50 text-teal-700 border-teal-200' },
     PRO: { label: 'Pro', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
     BUSINESS: { label: 'Business', cls: 'bg-purple-50 text-purple-700 border-purple-200' },
-    PURCHASE: { label: 'Beli Satuan', cls: 'bg-gray-50 text-gray-700 border-gray-200' },
+    PURCHASE: { label: 'Buy', cls: 'bg-gray-50 text-gray-700 border-gray-200' },
   };
   const badge = accessLabels[sound.accessLevel];
 
@@ -125,14 +126,14 @@ export default function SoundDetailPage() {
             </div>
             {sound.author && (
               <p className="text-sm text-gray-400">
-                oleh <span className="text-gray-600 font-medium">{sound.author.name}</span>
+                by <span className="text-gray-600 font-medium">{sound.author.name}</span>
               </p>
             )}
           </div>
           <button
             onClick={handleWishlist}
             disabled={wishlistLoading}
-            title={liked ? 'Hapus dari wishlist' : 'Tambah ke wishlist'}
+            title={liked ? 'Remove from wishlist' : 'Add to wishlist'}
             className={`flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full border transition-colors ${
               liked ? 'border-rose-200 text-rose-500 bg-rose-50' : 'border-gray-200 text-gray-300 hover:text-rose-400 hover:border-rose-200'
             } ${wishlistLoading ? 'opacity-50' : ''}`}
@@ -190,9 +191,9 @@ export default function SoundDetailPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5 text-center">
           {[
             { label: 'Format', value: sound.format.toUpperCase() },
-            { label: 'Durasi', value: formatDuration(sound.durationMs) },
-            { label: 'Diputar', value: sound.playCount.toLocaleString('id') + 'x' },
-            { label: 'Diunduh', value: sound.downloadCount.toLocaleString('id') + 'x' },
+            { label: 'Duration', value: formatDuration(sound.durationMs) },
+            { label: 'Plays', value: sound.playCount.toLocaleString() + 'x' },
+            { label: 'Downloads', value: sound.downloadCount.toLocaleString() + 'x' },
           ].map(({ label, value }) => (
             <div key={label} className="bg-gray-50 rounded-xl p-3">
               <p className="text-xs text-gray-400 mb-0.5">{label}</p>
@@ -218,7 +219,7 @@ export default function SoundDetailPage() {
 
         {/* File size */}
         {sound.fileSize && (
-          <p className="text-xs text-gray-400 mb-5">Ukuran file: {formatFileSize(sound.fileSize)}</p>
+          <p className="text-xs text-gray-400 mb-5">File size: {formatFileSize(sound.fileSize)}</p>
         )}
 
         {/* Download error */}
@@ -243,6 +244,9 @@ export default function SoundDetailPage() {
           onLogin={() => router.push('/auth/login')}
         />
       </div>
+
+      {/* Ratings & Reviews */}
+      <RatingSection soundId={sound.id} />
 
       {/* Author card */}
       {sound.author && (
@@ -286,29 +290,27 @@ function DownloadCTA({ sound, inCart, isAuthenticated, downloading, onDownload, 
       className="flex-1 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
     >
       {downloading === sound.id ? (
-        <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Mengunduh...</>
+        <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Downloading...</>
       ) : (
         <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> {label}</>
       )}
     </button>
   );
 
-  // FREE: langsung download
   if (sound.accessLevel === 'FREE') {
     return (
       <div className="flex gap-3">
-        <DownloadBtn label="Download Gratis" />
+        <DownloadBtn label="Download Free" />
       </div>
     );
   }
 
-  // PRO / BUSINESS: download dengan subscription
   if (sound.accessLevel === 'PRO' || sound.accessLevel === 'BUSINESS') {
     return (
       <div className="flex items-center gap-3">
         <div className="text-center px-2">
           <p className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded-lg">
-            {sound.accessLevel === 'PRO' ? 'Butuh Plan Pro' : 'Butuh Plan Business'}
+            {sound.accessLevel === 'PRO' ? 'Requires Pro Plan' : 'Requires Business Plan'}
           </p>
         </div>
         <DownloadBtn label={`Download (${sound.accessLevel})`} />
@@ -316,12 +318,11 @@ function DownloadCTA({ sound, inCart, isAuthenticated, downloading, onDownload, 
     );
   }
 
-  // PURCHASE: sudah dibeli → download; belum → keranjang
   if (sound.accessLevel === 'PURCHASE') {
     if (sound.isPurchased) {
       return (
         <div className="flex gap-3">
-          <DownloadBtn label="Download (Sudah Dibeli)" />
+          <DownloadBtn label="Download (Already Purchased)" />
         </div>
       );
     }
@@ -329,7 +330,7 @@ function DownloadCTA({ sound, inCart, isAuthenticated, downloading, onDownload, 
       <div className="flex items-center gap-3">
         <div className="text-center px-2 flex-shrink-0">
           <p className="text-lg font-bold text-gray-900">
-            Rp {(sound.price / 1000).toFixed(0)}rb
+            Rp {(sound.price / 1000).toFixed(0)}k
           </p>
           <p className="text-xs text-gray-400">{sound.licenseType}</p>
         </div>
@@ -341,7 +342,7 @@ function DownloadCTA({ sound, inCart, isAuthenticated, downloading, onDownload, 
               : 'bg-violet-600 text-white hover:bg-violet-700'
           }`}
         >
-          {inCart ? 'Hapus dari Keranjang' : 'Tambah ke Keranjang'}
+          {inCart ? 'Remove from Cart' : 'Add to Cart'}
         </button>
       </div>
     );

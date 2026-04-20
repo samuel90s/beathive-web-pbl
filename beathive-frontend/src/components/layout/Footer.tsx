@@ -30,11 +30,11 @@ export default function Footer() {
           </div>
 
           <div>
-            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Legal</p>
+            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Support</p>
             <ul className="space-y-2">
+              <li><Link href="/faq" className="text-sm text-gray-500 hover:text-violet-600 transition-colors">FAQ</Link></li>
               <li><span className="text-sm text-gray-500">Terms of Service</span></li>
               <li><span className="text-sm text-gray-500">Privacy Policy</span></li>
-              <li><span className="text-sm text-gray-500">License FAQ</span></li>
             </ul>
           </div>
         </div>

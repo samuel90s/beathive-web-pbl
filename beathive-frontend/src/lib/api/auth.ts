@@ -8,9 +8,9 @@ export const authApi = {
     return data as { user: User } & AuthTokens;
   },
 
-  login: async (email: string, password: string) => {
-    const { data } = await apiClient.post('/auth/login', { email, password });
-    return data as { user: User } & AuthTokens;
+  login: async (email: string, password: string, totpToken?: string) => {
+    const { data } = await apiClient.post('/auth/login', { email, password, totpToken });
+    return data as ({ user: User } & AuthTokens) | { requiresTwoFactor: true; userId: string };
   },
 
   getMe: async (): Promise<User> => {
