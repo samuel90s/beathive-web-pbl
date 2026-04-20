@@ -10,6 +10,8 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as speakeasy from 'speakeasy';
+import * as QRCode from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -72,7 +74,7 @@ export class AuthService {
 
   // ─── Login dengan email ─────────────────────────────────
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto & { totpToken?: string }) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
@@ -84,6 +86,15 @@ export class AuthService {
     const passwordMatch = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordMatch) {
       throw new UnauthorizedException('Email atau password salah');
+    }
+
+    // If 2FA is enabled, require TOTP token
+    if (user.isTwoFactorEnabled && user.totpSecret) {
+      if (!dto.totpToken) {
+        return { requiresTwoFactor: true, userId: user.id };
+      }
+      const valid = speakeasy.totp.verify({ secret: user.totpSecret, encoding: 'base32', token: dto.totpToken, window: 1 });
+      if (!valid) throw new UnauthorizedException('Invalid 2FA code');
     }
 
     const tokens = await this.generateTokens(user.id, user.email);
@@ -177,12 +188,15 @@ export class AuthService {
 
   // ─── Update profile (name + bio) ───────────────────────
 
-  async updateProfile(userId: string, dto: { name?: string; bio?: string }) {
+  async updateProfile(userId: string, dto: { name?: string; bio?: string; bankName?: string; bankAccount?: string; bankAccountName?: string }) {
     const updated = await this.prisma.user.update({
       where: { id: userId },
       data: {
         ...(dto.name?.trim() && { name: dto.name.trim() }),
         ...(dto.bio !== undefined && { bio: dto.bio }),
+        ...(dto.bankName !== undefined && { bankName: dto.bankName || null }),
+        ...(dto.bankAccount !== undefined && { bankAccount: dto.bankAccount || null }),
+        ...(dto.bankAccountName !== undefined && { bankAccountName: dto.bankAccountName || null }),
       },
     });
     return this.sanitizeUser(updated);
@@ -230,6 +244,112 @@ export class AuthService {
     return { message: 'Password updated successfully' };
   }
 
+  // ─── Password Reset ─────────────────────────────────────
+
+  async forgotPassword(email: string, emailService: any) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      // Don't reveal if email exists (security best practice)
+      return { message: 'If email exists, a reset link has been sent' };
+    }
+
+    // Generate password reset token (valid for 1 hour)
+    const resetToken = await this.jwt.signAsync(
+      { sub: user.id, email, type: 'password-reset' },
+      {
+        secret: this.config.get('JWT_SECRET'),
+        expiresIn: '1h',
+      },
+    );
+
+    const frontendUrl = this.config.get('FRONTEND_URL') || 'http://localhost:3001';
+    const resetUrl = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
+
+    try {
+      await emailService.sendPasswordReset(email, resetUrl, user.name);
+    } catch (err) {
+      // Log but don't throw (email sending is non-critical)
+      console.error('Failed to send password reset email:', err);
+    }
+
+    return { message: 'If email exists, a reset link has been sent' };
+  }
+
+  // ─── 2FA (TOTP) ─────────────────────────────────────────
+
+  async setup2FA(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException();
+
+    const secret = speakeasy.generateSecret({ name: `BeatHive (${user.email})`, length: 20 });
+
+    // Store temp secret (not yet enabled until verified)
+    await this.prisma.user.update({ where: { id: userId }, data: { totpSecret: secret.base32 } });
+
+    const qrDataUrl = await QRCode.toDataURL(secret.otpauth_url!);
+    return { secret: secret.base32, qrCode: qrDataUrl };
+  }
+
+  async verify2FASetup(userId: string, token: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user?.totpSecret) throw new BadRequestException('2FA setup not started');
+
+    const valid = speakeasy.totp.verify({ secret: user.totpSecret, encoding: 'base32', token, window: 1 });
+    if (!valid) throw new BadRequestException('Invalid 2FA code');
+
+    await this.prisma.user.update({ where: { id: userId }, data: { isTwoFactorEnabled: true } });
+    return { message: '2FA enabled successfully' };
+  }
+
+  async disable2FA(userId: string, password: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException();
+
+    if (user.passwordHash) {
+      const match = await bcrypt.compare(password, user.passwordHash);
+      if (!match) throw new BadRequestException('Incorrect password');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { totpSecret: null, isTwoFactorEnabled: false },
+    });
+    return { message: '2FA disabled' };
+  }
+
+  async verifyTotpForLogin(userId: string, token: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user?.totpSecret) return false;
+    return speakeasy.totp.verify({ secret: user.totpSecret, encoding: 'base32', token, window: 1 });
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    if (newPassword.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters');
+    }
+
+    let decoded: any;
+    try {
+      decoded = await this.jwt.verifyAsync(token, {
+        secret: this.config.get('JWT_SECRET'),
+      });
+    } catch {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    if (decoded.type !== 'password-reset') {
+      throw new BadRequestException('Invalid token type');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await this.prisma.user.update({
+      where: { id: decoded.sub },
+      data: { passwordHash },
+    });
+
+    return { message: 'Password reset successfully' };
+  }
+
   // ─── Helpers ────────────────────────────────────────────
 
   private async generateTokens(userId: string, email: string) {
@@ -250,7 +370,7 @@ export class AuthService {
   }
 
   private sanitizeUser(user: any) {
-    const { passwordHash, ...safe } = user;
+    const { passwordHash, totpSecret, ...safe } = user;
     return safe;
   }
 }

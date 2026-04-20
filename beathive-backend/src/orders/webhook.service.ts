@@ -5,6 +5,7 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { LicenseService } from '../common/license/license.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { EarningsService } from '../earnings/earnings.service';
 
 @Injectable()
 export class WebhookService {
@@ -15,6 +16,7 @@ export class WebhookService {
     private config: ConfigService,
     private licenseService: LicenseService,
     private subscriptionsService: SubscriptionsService,
+    private earnings: EarningsService,
   ) {}
 
   // ─── Verifikasi signature dari Midtrans ─────────────────
@@ -178,7 +180,9 @@ export class WebhookService {
     });
 
     this.logger.log(`Order ${order.id} berhasil dibayar`);
-    // TODO: kirim email konfirmasi + lisensi ke user
+
+    // Record purchase earnings for creator (fire-and-forget)
+    this.earnings.recordOrderEarnings(order.id).catch(() => {});
   }
 
   // ─── DEV ONLY: Simulate payment berhasil (bypass signature) ─

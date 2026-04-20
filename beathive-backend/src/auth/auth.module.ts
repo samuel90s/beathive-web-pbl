@@ -8,10 +8,12 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
     PassportModule,
+    EmailModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

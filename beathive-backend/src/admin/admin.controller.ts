@@ -78,6 +78,30 @@ export class AdminController {
     return this.adminService.getUsers(Number(page), Number(limit), search);
   }
 
+  // GET /admin/withdrawals?status=PENDING&page=1&limit=20
+  @Get('withdrawals')
+  async getWithdrawals(
+    @CurrentUser() userId: string,
+    @Query('status') status?: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+  ) {
+    await this.assertAdmin(userId);
+    return this.adminService.getWithdrawals(status, Number(page), Number(limit));
+  }
+
+  // PATCH /admin/withdrawals/:id
+  @Patch('withdrawals/:id')
+  @HttpCode(HttpStatus.OK)
+  async updateWithdrawal(
+    @Param('id') id: string,
+    @CurrentUser() userId: string,
+    @Body() body: { status: 'PAID' | 'REJECTED'; note?: string },
+  ) {
+    await this.assertAdmin(userId);
+    return this.adminService.updateWithdrawalStatus(id, body.status, body.note);
+  }
+
   // GET /admin/orders?page=1&limit=20
   @Get('orders')
   async getOrders(

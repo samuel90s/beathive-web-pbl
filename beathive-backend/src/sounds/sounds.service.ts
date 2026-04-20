@@ -62,6 +62,22 @@ export class SoundFilterDto {
 
   @IsOptional()
   @IsString()
+  tags?: string; // comma-separated tag slugs
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minPrice?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxPrice?: number;
+
+  @IsOptional()
+  @IsString()
   sortBy?: string;
 
   @IsOptional()
@@ -168,6 +184,22 @@ export class SoundsService {
       where.durationMs = { ...(where.durationMs ?? {}), lte: filters.maxDuration };
     }
 
+    if (filters.minPrice !== undefined) {
+      where.price = { ...(where.price && typeof where.price === 'object' ? where.price : {}), gte: filters.minPrice };
+    }
+    if (filters.maxPrice !== undefined) {
+      where.price = { ...(where.price && typeof where.price === 'object' ? where.price : {}), lte: filters.maxPrice };
+    }
+
+    if (filters.tags) {
+      const tagSlugs = filters.tags.split(',').map(t => t.trim()).filter(Boolean);
+      if (tagSlugs.length > 0) {
+        where.tags = { some: { tag: { slug: { in: tagSlugs } } } };
+      }
+    }
+
+    // "trending" = most downloaded in last 7 days; fall back to downloadCount
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const orderBy: any =
       {
         newest: { createdAt: 'desc' },
@@ -176,19 +208,26 @@ export class SoundsService {
         mostplayed: { playCount: 'desc' },
         price_asc: { price: 'asc' },
         price_desc: { price: 'desc' },
+        trending: { downloads: { _count: 'desc' } },
       }[sortBy] ?? { createdAt: 'desc' };
 
+    const trendingWhere = sortBy === 'trending'
+      ? { downloads: { some: { downloadedAt: { gte: sevenDaysAgo } } } }
+      : {};
+
     const skip = (Number(page) - 1) * Number(limit);
+    const mergedWhere = { ...where, ...trendingWhere };
 
     const [total, items] = await Promise.all([
-      this.prisma.soundEffect.count({ where }),
+      this.prisma.soundEffect.count({ where: mergedWhere }),
       this.prisma.soundEffect.findMany({
-        where,
+        where: mergedWhere,
         include: {
           category: true,
           tags: { include: { tag: true } },
           author: { select: { id: true, name: true, avatarUrl: true } },
           wishlists: userId ? { where: { userId } } : false,
+          _count: { select: { ratings: true } },
         },
         orderBy,
         skip,

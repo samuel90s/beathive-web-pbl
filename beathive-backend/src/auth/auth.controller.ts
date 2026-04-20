@@ -18,6 +18,7 @@ import { memoryStorage } from 'multer';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
+import { EmailService } from '../email/email.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -26,7 +27,10 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private emailService: EmailService,
+  ) {}
 
   // POST /auth/register
   @Post('register')
@@ -41,6 +45,44 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // max 10 login per menit
   async login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  // POST /auth/2fa/setup
+  @Post('2fa/setup')
+  @UseGuards(JwtAuthGuard)
+  async setup2FA(@CurrentUser() userId: string) {
+    return this.authService.setup2FA(userId);
+  }
+
+  // POST /auth/2fa/verify
+  @Post('2fa/verify')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async verify2FA(@CurrentUser() userId: string, @Body() body: { token: string }) {
+    return this.authService.verify2FASetup(userId, body.token);
+  }
+
+  // POST /auth/2fa/disable
+  @Post('2fa/disable')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async disable2FA(@CurrentUser() userId: string, @Body() body: { password: string }) {
+    return this.authService.disable2FA(userId, body.password);
+  }
+
+  // POST /auth/forgot-password
+  @Post('forgot-password')
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() body: { email: string }) {
+    return this.authService.forgotPassword(body.email, this.emailService);
+  }
+
+  // POST /auth/reset-password
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body() body: { token: string; newPassword: string }) {
+    return this.authService.resetPassword(body.token, body.newPassword);
   }
 
   // POST /auth/refresh

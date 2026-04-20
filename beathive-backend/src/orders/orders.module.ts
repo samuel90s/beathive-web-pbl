@@ -7,9 +7,10 @@ import { WebhookService } from './webhook.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { LicenseModule } from '../common/license/license.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { EarningsModule } from '../earnings/earnings.module';
 
 @Module({
-  imports: [ConfigModule, LicenseModule, SubscriptionsModule],
+  imports: [ConfigModule, LicenseModule, SubscriptionsModule, EarningsModule],
   controllers: [OrdersController],
   providers: [OrdersService, WebhookService, PrismaService],
 })

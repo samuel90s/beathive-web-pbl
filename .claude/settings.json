@@ -20,7 +20,18 @@
       "Bash(curl -s -X PATCH http://localhost:3000/api/v1/auth/profile -H \"Content-Type: application/json\" -d '{\"name\":\"test\"}')",
       "Bash(powershell -Command \"Stop-Process -Id 18504 -Force\")",
       "Bash(awk '{print $5}')",
-      "Bash(xargs -I{} powershell -Command \"Stop-Process -Id {} -Force\")"
+      "Bash(xargs -I{} powershell -Command \"Stop-Process -Id {} -Force\")",
+      "Bash(curl -s http://localhost:3000/api/v1/earnings/wallet -H \"Authorization: Bearer test\")",
+      "Bash(npx ts-node --transpile-only --compiler-options '{\"module\":\"commonjs\",\"experimentalDecorators\":true,\"emitDecoratorMetadata\":true,\"skipLibCheck\":true,\"esModuleInterop\":true}' -e ' *)",
+      "Bash(npx ts-node *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(findstr :3000)",
+      "Bash(findstr LISTENING)",
+      "Bash(taskkill /PID 3840 /F)",
+      "Bash(cmd /c \"taskkill /PID 3840 /F\")",
+      "Bash(cmd /c \"taskkill /PID 3840 /F && echo done\")",
+      "Bash(powershell -Command \"Stop-Process -Id 3840 -Force; Write-Output 'killed'\")",
+      "Bash(grep -v \"^$\\\\|update available\\\\|major update\\\\|pris.ly\\\\|npm i\")"
     ]
   }
 }

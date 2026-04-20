@@ -1,10 +1,14 @@
 // src/admin/admin.service.ts
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private email: EmailService,
+  ) {}
 
   // ─── Dashboard stats ─────────────────────────────────────
 
@@ -68,7 +72,7 @@ export class AdminService {
     const sound = await this.prisma.soundEffect.findUnique({ where: { id: soundId } });
     if (!sound) throw new NotFoundException('Sound tidak ditemukan');
 
-    return this.prisma.soundEffect.update({
+    const updated = await this.prisma.soundEffect.update({
       where: { id: soundId },
       data: {
         reviewStatus: 'APPROVED',
@@ -79,6 +83,16 @@ export class AdminService {
         publishedAt: sound.publishedAt ?? new Date(),
       },
     });
+
+    // Notify creator via email (fire-and-forget)
+    if (sound.authorId) {
+      this.prisma.user.findUnique({ where: { id: sound.authorId }, select: { email: true, name: true } })
+        .then(author => {
+          if (author) this.email.sendSoundReviewNotification(author.email, sound.title, 'APPROVED', undefined, author.name).catch(() => {});
+        }).catch(() => {});
+    }
+
+    return updated;
   }
 
   // ─── Reject sound ────────────────────────────────────────
@@ -87,7 +101,7 @@ export class AdminService {
     const sound = await this.prisma.soundEffect.findUnique({ where: { id: soundId } });
     if (!sound) throw new NotFoundException('Sound tidak ditemukan');
 
-    return this.prisma.soundEffect.update({
+    const updated = await this.prisma.soundEffect.update({
       where: { id: soundId },
       data: {
         reviewStatus: 'REJECTED',
@@ -97,6 +111,16 @@ export class AdminService {
         isPublished: false,
       },
     });
+
+    // Notify creator via email (fire-and-forget)
+    if (sound.authorId) {
+      this.prisma.user.findUnique({ where: { id: sound.authorId }, select: { email: true, name: true } })
+        .then(author => {
+          if (author) this.email.sendSoundReviewNotification(author.email, sound.title, 'REJECTED', reason, author.name).catch(() => {});
+        }).catch(() => {});
+    }
+
+    return updated;
   }
 
   // ─── List users ──────────────────────────────────────────
@@ -134,6 +158,78 @@ export class AdminService {
       items,
       pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
+  }
+
+  // ─── List withdrawal requests ─────────────────────────────
+
+  async getWithdrawals(status?: string, page = 1, limit = 20) {
+    const where: any = {};
+    if (status) where.status = status;
+
+    const skip = (page - 1) * limit;
+    const [total, items] = await Promise.all([
+      this.prisma.withdrawalRequest.count({ where }),
+      this.prisma.withdrawalRequest.findMany({
+        where,
+        include: {
+          wallet: {
+            include: { user: { select: { id: true, name: true, email: true } } },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      items,
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  async updateWithdrawalStatus(id: string, status: 'PAID' | 'REJECTED', note?: string) {
+    const req = await this.prisma.withdrawalRequest.findUnique({ where: { id } });
+    if (!req) throw new NotFoundException('Withdrawal request not found');
+
+    if (req.status !== 'PENDING') {
+      throw new ForbiddenException('Only PENDING withdrawals can be updated');
+    }
+
+    if (status === 'REJECTED') {
+      // Refund the balance
+      await this.prisma.$transaction([
+        this.prisma.withdrawalRequest.update({
+          where: { id },
+          data: { status, note: note ?? null },
+        }),
+        this.prisma.creatorWallet.update({
+          where: { id: req.walletId },
+          data: { balance: { increment: req.amountRp } },
+        }),
+      ]);
+    } else {
+      await this.prisma.withdrawalRequest.update({
+        where: { id },
+        data: { status, note: note ?? null },
+      });
+    }
+
+    // Notify creator via email (fire-and-forget)
+    this.prisma.creatorWallet.findUnique({
+      where: { id: req.walletId },
+      include: { user: { select: { email: true, name: true } } },
+    }).then(wallet => {
+      if (!wallet?.user) return;
+      const { email, name } = wallet.user;
+      if (status === 'PAID') {
+        this.email.sendWithdrawalApproved(email, req.amountRp, { bankName: req.bankName, accountNo: req.accountNo }, name ?? undefined).catch(() => {});
+      } else {
+        this.email.sendWithdrawalRejected(email, req.amountRp, note ?? 'No reason provided', name ?? undefined).catch(() => {});
+      }
+    }).catch(() => {});
+
+    return { ok: true };
   }
 
   // ─── List orders ─────────────────────────────────────────

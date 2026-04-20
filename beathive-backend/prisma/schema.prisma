@@ -16,19 +16,26 @@ model User {
   email        String   @unique
   passwordHash String?  // null kalau login via OAuth
   avatarUrl    String?
-  bio          String?  // bio singkat untuk author
+  bio          String?
+  bankName        String?
+  bankAccount     String?
+  bankAccountName String?
   role         String   @default("USER") // "USER" | "AUTHOR" | "ADMIN"
   provider     String   @default("email") // "email" | "google"
   providerId   String?  // ID dari Google OAuth
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  subscription  Subscription?
-  orders        Order[]
-  downloads     Download[]
-  wishlists     Wishlist[]
+  totpSecret         String?
+  isTwoFactorEnabled Boolean  @default(false)
+
+  subscription   Subscription?
+  orders         Order[]
+  downloads      Download[]
+  wishlists      Wishlist[]
   uploadedSounds SoundEffect[] @relation("AuthorSounds")
-  wallet        CreatorWallet?
+  wallet         CreatorWallet?
+  ratings        Rating[]
 
   @@map("users")
 }
@@ -139,6 +146,7 @@ model SoundEffect {
   orderItems OrderItem[]
   downloads  Download[]
   wishlists  Wishlist[]
+  ratings    Rating[]
 
   @@map("sound_effects")
 }
@@ -290,6 +298,24 @@ model WithdrawalRequest {
   wallet CreatorWallet @relation(fields: [walletId], references: [id])
 
   @@map("withdrawal_requests")
+}
+
+// ─── Ratings & Reviews ───────────────────────────────────
+
+model Rating {
+  id         String   @id @default(uuid())
+  userId     String
+  soundId    String
+  score      Int      // 1–5
+  reviewText String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user  User        @relation(fields: [userId], references: [id])
+  sound SoundEffect @relation(fields: [soundId], references: [id])
+
+  @@unique([userId, soundId])
+  @@map("ratings")
 }
 
 // ─── Wishlists ───────────────────────────────────────────

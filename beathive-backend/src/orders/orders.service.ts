@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { EarningsService } from '../earnings/earnings.service';
 
 // Midtrans tidak punya tipe resmi, pakai require
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -25,6 +26,7 @@ export class OrdersService {
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    private earnings: EarningsService,
   ) {
     this.snap = new midtransClient.Snap({
       isProduction: config.get('MIDTRANS_IS_PRODUCTION') === 'true',
@@ -172,6 +174,9 @@ export class OrdersService {
       where: { id: order.id },
       data: { status: 'PAID', paidAt: new Date() },
     });
+
+    // Record purchase earnings (idempotent — safe to call even if webhook already fired)
+    this.earnings.recordOrderEarnings(order.id).catch(() => {});
 
     return { activated: true };
   }
