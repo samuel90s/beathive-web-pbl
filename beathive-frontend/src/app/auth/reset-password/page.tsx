@@ -1,10 +1,10 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiClient } from '@/lib/api/client';
 
-export default function ResetPasswordPage() {
+function ResetPasswordInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get('token');
@@ -55,15 +55,12 @@ export default function ResetPasswordPage() {
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
           {success ? (
             <div className="text-center py-4">
-              <div className="text-4xl mb-4">✅</div>
+              <div className="text-4xl mb-4">&#10003;</div>
               <h2 className="text-lg font-semibold text-gray-900 mb-2">Password reset!</h2>
               <p className="text-sm text-gray-500">
                 Your password has been updated. Redirecting to sign in...
               </p>
-              <Link
-                href="/auth/login"
-                className="mt-6 inline-block text-sm text-violet-600 hover:underline"
-              >
+              <Link href="/auth/login" className="mt-6 inline-block text-sm text-violet-600 hover:underline">
                 Sign in now
               </Link>
             </div>
@@ -125,5 +122,17 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <ResetPasswordInner />
+    </Suspense>
   );
 }

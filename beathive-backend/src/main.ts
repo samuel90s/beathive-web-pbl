@@ -23,13 +23,16 @@ async function bootstrap() {
     process.env.FRONTEND_URL || 'http://localhost:3001',
     'http://localhost:3001',
   ];
+  const isProduction = process.env.NODE_ENV === 'production';
 
   app.enableCors({
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       // Izinkan request tanpa origin (Postman, curl, server-to-server)
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
-      callback(null, true); // Development: izinkan semua
+      // Development: izinkan semua origin; Production: tolak origin yang tidak dikenal
+      if (!isProduction) return callback(null, true);
+      callback(new Error(`Origin ${origin} not allowed by CORS`), false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

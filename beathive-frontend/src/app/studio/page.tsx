@@ -21,7 +21,7 @@ const CATEGORIES = [
 ];
 
 interface Earning { id: string; soundTitle: string; amountRp: number; earnedAt: string; }
-interface Withdrawal { id: string; amountRp: number; status: string; bankName: string; accountNo: string; createdAt: string; }
+interface Withdrawal { id: string; amountRp: number; status: string; bankName: string; accountNo: string; note?: string; createdAt: string; }
 interface WalletData { balance: number; totalEarned: number; earnings: Earning[]; withdrawals: Withdrawal[]; }
 
 export default function StudioPage() {
@@ -330,11 +330,44 @@ export default function StudioPage() {
                   <div key={e.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
                     <div>
                       <p className="text-sm text-gray-700 truncate max-w-xs">{e.soundTitle}</p>
-                      <p className="text-xs text-gray-400">{new Date(e.earnedAt).toLocaleDateString('id-ID')}</p>
+                      <p className="text-xs text-gray-400">{new Date(e.earnedAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</p>
                     </div>
                     <span className="text-sm font-medium text-teal-600">+Rp {e.amountRp.toLocaleString('id-ID')}</span>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* Withdrawal history */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">Withdrawal History</h3>
+            {!wallet?.withdrawals.length ? (
+              <p className="text-sm text-gray-400 text-center py-4">No withdrawal requests yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {wallet.withdrawals.map(w => {
+                  const statusCls = w.status === 'PAID'
+                    ? 'bg-teal-50 text-teal-700'
+                    : w.status === 'REJECTED'
+                    ? 'bg-red-50 text-red-600'
+                    : 'bg-amber-50 text-amber-700';
+                  return (
+                    <div key={w.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                      <div>
+                        <p className="text-sm text-gray-700">{w.bankName} · {w.accountNo}</p>
+                        <p className="text-xs text-gray-400">{new Date(w.createdAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</p>
+                        {w.note && !w.note.startsWith('Account holder:') && (
+                          <p className="text-xs text-red-500 mt-0.5">{w.note}</p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-gray-700">Rp {w.amountRp.toLocaleString('id-ID')}</p>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusCls}`}>{w.status}</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

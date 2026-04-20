@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { useCartStore } from '@/lib/store/cart.store';
 import { subscriptionsApi } from '@/lib/api/subscriptions';
 import clsx from 'clsx';
+import { mediaUrl } from '@/lib/utils';
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -146,7 +147,7 @@ export default function Navbar() {
                   <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 text-xs font-medium overflow-hidden">
                     {user?.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `http://localhost:3000${user.avatarUrl}`} alt="" className="w-full h-full object-cover" />
+                      <img src={mediaUrl(user.avatarUrl)} alt="" className="w-full h-full object-cover" />
                     ) : (
                       user?.name?.[0]?.toUpperCase()
                     )}

@@ -1,7 +1,28 @@
-// src/app/page.tsx
 import Link from 'next/link';
 
-export default function HomePage() {
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  icon?: string;
+  _count: { soundEffects: number };
+}
+
+async function getCategories(): Promise<Category[]> {
+  const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+  try {
+    const res = await fetch(`${api}/sounds/categories`, { next: { revalidate: 3600 } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : data.items ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export default async function HomePage() {
+  const categories = await getCategories();
+
   return (
     <div className="max-w-5xl mx-auto px-4">
 
@@ -31,33 +52,26 @@ export default function HomePage() {
       </section>
 
       {/* Categories */}
-      <section className="py-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-5">Explore categories</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { slug: 'aksi', label: 'Action & FX', icon: '💥', count: '1.2k+' },
-            { slug: 'alam', label: 'Nature', icon: '🌿', count: '800+' },
-            { slug: 'ui-game', label: 'UI / Game', icon: '🎮', count: '2k+' },
-            { slug: 'suasana', label: 'Ambience', icon: '🌆', count: '600+' },
-            { slug: 'manusia', label: 'Human', icon: '🚶', count: '400+' },
-            { slug: 'kendaraan', label: 'Vehicles', icon: '🚗', count: '300+' },
-            { slug: 'hewan', label: 'Animals', icon: '🐾', count: '250+' },
-            { slug: 'elektronik', label: 'Electronic', icon: '⚡', count: '500+' },
-          ].map((cat) => (
-            <Link
-              key={cat.slug}
-              href={`/browse?categorySlug=${cat.slug}`}
-              className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-100 hover:border-violet-200 hover:bg-violet-50 transition-all group"
-            >
-              <span className="text-2xl">{cat.icon}</span>
-              <div>
-                <p className="text-sm font-medium text-gray-900 group-hover:text-violet-700">{cat.label}</p>
-                <p className="text-xs text-gray-400">{cat.count} SFX</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
+      {categories.length > 0 && (
+        <section className="py-10">
+          <h2 className="text-xl font-semibold text-gray-900 mb-5">Explore categories</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {categories.slice(0, 8).map((cat) => (
+              <Link
+                key={cat.slug}
+                href={`/browse?categorySlug=${cat.slug}`}
+                className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-100 hover:border-violet-200 hover:bg-violet-50 transition-all group"
+              >
+                <span className="text-2xl">{cat.icon || '🎵'}</span>
+                <div>
+                  <p className="text-sm font-medium text-gray-900 group-hover:text-violet-700">{cat.name}</p>
+                  <p className="text-xs text-gray-400">{cat._count.soundEffects} SFX</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Features */}
       <section className="py-10">

@@ -2,9 +2,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
-
-const CREATOR_POOL_PERCENT = 25;
-const MIN_WITHDRAWAL_RP = 50_000;
+import {
+  CREATOR_POOL_PERCENT,
+  CREATOR_PURCHASE_PERCENT,
+  MIN_WITHDRAWAL_RP,
+  SUBSCRIPTION_FALLBACK_PRICE_RP,
+} from '../config/constants';
 
 @Injectable()
 export class EarningsService {
@@ -30,31 +33,23 @@ export class EarningsService {
       let amountRp = 0;
 
       if (sound.accessLevel === 'PURCHASE') {
-        // Per-item purchase: creator gets 70% of the sale price
-        const download = await this.prisma.download.findUnique({
-          where: { id: downloadId },
-          select: { source: true, userId: true },
-        });
-
-        if (download?.source !== 'purchase') return;
-
-        const orderItem = await this.prisma.orderItem.findFirst({
-          where: {
-            soundEffectId: soundId,
-            order: { userId: download.userId, status: 'PAID' },
-          },
-          orderBy: { order: { paidAt: 'desc' } },
-          select: { priceSnapshot: true },
-        });
-
-        if (!orderItem) return;
-        amountRp = Math.round(orderItem.priceSnapshot * 0.7);
-
+        // PURCHASE earnings are recorded by recordOrderEarnings() on order payment — skip here
+        return;
       } else if (sound.accessLevel === 'PRO') {
         // PRO subscription download: pool-based
         const startOfMonth = new Date();
         startOfMonth.setDate(1);
         startOfMonth.setHours(0, 0, 0, 0);
+
+        const download = await this.prisma.download.findUnique({ where: { id: downloadId }, select: { userId: true } });
+        if (!download?.userId) return;
+
+        // Use predictable dedup key — prevents race condition between concurrent requests
+        const yearMonth = `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth() + 1).padStart(2, '0')}`;
+        const dedupKey = `pro:${download.userId}:${soundId}:${yearMonth}`;
+
+        const priorEarning = await this.prisma.creatorEarning.findFirst({ where: { downloadId: dedupKey } });
+        if (priorEarning) return;
 
         const subRevenue = await this.prisma.order.aggregate({
           where: {
@@ -70,7 +65,7 @@ export class EarningsService {
           const activeSubs = await this.prisma.subscription.count({
             where: { status: 'ACTIVE', plan: { slug: { not: 'free' } } },
           });
-          monthlyRevenue = activeSubs * 99_000;
+          monthlyRevenue = activeSubs * SUBSCRIPTION_FALLBACK_PRICE_RP;
         }
 
         const totalDownloads = await this.prisma.download.count({
@@ -96,24 +91,37 @@ export class EarningsService {
         create: { userId: sound.authorId, balance: 0, totalEarned: 0 },
       });
 
-      await this.prisma.$transaction([
-        this.prisma.creatorEarning.create({
-          data: {
-            walletId: wallet.id,
-            soundId,
-            downloadId,
-            amountRp,
-            poolPercent: sound.accessLevel === 'PURCHASE' ? 70 : CREATOR_POOL_PERCENT,
-          },
-        }),
-        this.prisma.creatorWallet.update({
-          where: { id: wallet.id },
-          data: {
-            balance: { increment: amountRp },
-            totalEarned: { increment: amountRp },
-          },
-        }),
-      ]);
+      const earningKey = sound.accessLevel === 'PRO'
+        ? (() => {
+            const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
+            const ym = `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth()+1).padStart(2,'0')}`;
+            return `pro:${(download as any)?.userId ?? ''}:${soundId}:${ym}`;
+          })()
+        : downloadId;
+
+      try {
+        await this.prisma.$transaction([
+          this.prisma.creatorEarning.create({
+            data: {
+              walletId: wallet.id,
+              soundId,
+              downloadId: earningKey,
+              amountRp,
+              poolPercent: sound.accessLevel === 'PURCHASE' ? CREATOR_PURCHASE_PERCENT : CREATOR_POOL_PERCENT,
+            },
+          }),
+          this.prisma.creatorWallet.update({
+            where: { id: wallet.id },
+            data: {
+              balance: { increment: amountRp },
+              totalEarned: { increment: amountRp },
+            },
+          }),
+        ]);
+      } catch (err: any) {
+        if (err.code === 'P2002') return; // duplicate earning — concurrent request won the race
+        throw err;
+      }
 
       this.logger.log(
         `Earning recorded: creator=${sound.authorId} sound="${sound.title}" amount=Rp${amountRp.toLocaleString()} type=${sound.accessLevel}`,
@@ -153,7 +161,7 @@ export class EarningsService {
         });
         if (existing) continue;
 
-        const amountRp = Math.round(item.priceSnapshot * 0.7);
+        const amountRp = Math.round(item.priceSnapshot * (CREATOR_PURCHASE_PERCENT / 100));
         if (amountRp <= 0) continue;
 
         const wallet = await this.prisma.creatorWallet.upsert({
@@ -169,7 +177,7 @@ export class EarningsService {
               soundId: item.soundEffectId,
               downloadId: dedupKey,
               amountRp,
-              poolPercent: 70,
+              poolPercent: CREATOR_PURCHASE_PERCENT,
             },
           }),
           this.prisma.creatorWallet.update({
@@ -315,28 +323,37 @@ export class EarningsService {
       throw new Error(`Minimum withdrawal is Rp ${MIN_WITHDRAWAL_RP.toLocaleString('id-ID')}`);
     }
 
-    const [withdrawal] = await this.prisma.$transaction([
-      this.prisma.withdrawalRequest.create({
-        data: {
-          walletId: wallet.id,
-          amountRp,
-          bankName: user.bankName,
-          accountNo: user.bankAccount,
-          note: `Account holder: ${user.bankAccountName}`,
-          status: 'PENDING',
-        },
-      }),
-      this.prisma.creatorWallet.update({
-        where: { id: wallet.id },
-        data: { balance: { decrement: amountRp } },
-      }),
-    ]);
+    // Atomic withdrawal — balance check inside transaction prevents double-spend
+    let withdrawal: any;
+    try {
+      [withdrawal] = await this.prisma.$transaction([
+        this.prisma.withdrawalRequest.create({
+          data: {
+            walletId: wallet.id,
+            amountRp,
+            bankName: user.bankName,
+            accountNo: user.bankAccount,
+            note: `Account holder: ${user.bankAccountName}`,
+            status: 'PENDING',
+          },
+        }),
+        this.prisma.creatorWallet.update({
+          where: { id: wallet.id, balance: { gte: amountRp } },
+          data: { balance: { decrement: amountRp } },
+        }),
+      ]);
+    } catch (err: any) {
+      if (err.code === 'P2025') {
+        throw new Error('Insufficient balance — please refresh and try again');
+      }
+      throw err;
+    }
 
     // Notify creator via email (fire-and-forget)
     this.prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } })
       .then(u => {
-        if (u) this.email.sendWithdrawalRequested(u.email, amountRp, user.bankName!, user.bankAccount!, u.name ?? undefined).catch(() => {});
-      }).catch(() => {});
+        if (u) this.email.sendWithdrawalRequested(u.email, amountRp, user.bankName!, user.bankAccount!, u.name ?? undefined).catch((err: any) => this.logger.error(`Email notification failed: ${err?.message}`));
+      }).catch((err: any) => this.logger.error(`Email notification failed: ${err?.message}`));
 
     return withdrawal;
   }

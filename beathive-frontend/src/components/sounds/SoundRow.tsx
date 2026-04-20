@@ -113,7 +113,7 @@ export default function SoundRow({ sound }: Props) {
         </div>
         <p className="text-xs text-gray-400 truncate">
           {sound.category.name}
-          {sound.tags.slice(0, 2).map((t) => ` · ${t.name}`)}
+          {sound.tags?.slice(0, 2).map((t) => ` · ${t.name}`)}
         </p>
         {downloadError && (
           <p className="text-xs text-red-500 mt-0.5 truncate">{downloadError}</p>

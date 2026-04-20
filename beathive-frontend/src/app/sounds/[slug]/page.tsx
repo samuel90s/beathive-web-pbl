@@ -9,7 +9,7 @@ import { useCartStore } from '@/lib/store/cart.store';
 import { useDownload } from '@/lib/hooks/useDownload';
 import { useWishlist } from '@/lib/hooks/useWishlist';
 import { useAuthStore } from '@/lib/store/auth.store';
-import { formatDuration } from '@/lib/utils';
+import { formatDuration, mediaUrl } from '@/lib/utils';
 import WaveformBar from '@/components/sounds/WaveformBar';
 import RatingSection from '@/components/sounds/RatingSection';
 import type { SoundEffect } from '@/types';
@@ -32,14 +32,18 @@ export default function SoundDetailPage() {
   const { isAuthenticated } = useAuthStore();
 
   useEffect(() => {
+    const controller = new AbortController();
     setLoading(true);
+    setError(null);
     soundsApi.getOne(slug)
       .then((s) => {
+        if (controller.signal.aborted) return;
         setSound(s);
         setLiked(s.isLiked ?? false);
       })
-      .catch(() => setError('Sound not found'))
-      .finally(() => setLoading(false));
+      .catch(() => { if (!controller.signal.aborted) setError('Sound not found'); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, [slug]);
 
   if (loading) {
@@ -54,7 +58,16 @@ export default function SoundDetailPage() {
     return (
       <div className="max-w-3xl mx-auto px-4 pt-12 text-center">
         <p className="text-gray-500">{error || 'Sound not found'}</p>
-        <Link href="/browse" className="text-violet-600 text-sm mt-2 inline-block">Back to Browse</Link>
+        <div className="flex items-center justify-center gap-3 mt-3">
+          <button
+            onClick={() => { setError(null); setLoading(true); soundsApi.getOne(slug).then(s => { setSound(s); setLiked(s.isLiked ?? false); }).catch(() => setError('Sound not found')).finally(() => setLoading(false)); }}
+            className="text-violet-600 text-sm hover:underline"
+          >
+            Try again
+          </button>
+          <span className="text-gray-300">·</span>
+          <Link href="/browse" className="text-gray-500 text-sm hover:underline">Back to Browse</Link>
+        </div>
       </div>
     );
   }
@@ -250,20 +263,18 @@ export default function SoundDetailPage() {
 
       {/* Author card */}
       {sound.author && (
-        <div className="mt-4 bg-white rounded-2xl border border-gray-100 p-5">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Author</h3>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0 text-violet-600 font-semibold text-sm">
-              {sound.author.avatarUrl
-                ? <img src={sound.author.avatarUrl} alt={sound.author.name} className="w-full h-full rounded-full object-cover" />
-                : sound.author.name.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-900">{sound.author.name}</p>
-              {sound.author.bio && <p className="text-xs text-gray-400 mt-0.5">{sound.author.bio}</p>}
-            </div>
+        <Link href={`/creators/${sound.author.id}`} className="mt-4 bg-white rounded-2xl border border-gray-100 p-5 flex items-center gap-3 hover:border-violet-200 hover:bg-violet-50/30 transition-colors group block">
+          <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0 text-violet-600 font-semibold text-sm overflow-hidden">
+            {sound.author.avatarUrl
+              ? <img src={mediaUrl(sound.author.avatarUrl)} alt={sound.author.name} className="w-full h-full rounded-full object-cover" />
+              : sound.author.name.charAt(0).toUpperCase()}
           </div>
-        </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Creator</p>
+            <p className="text-sm font-medium text-gray-900 group-hover:text-violet-700 transition-colors">{sound.author.name}</p>
+          </div>
+          <svg className="w-4 h-4 text-gray-300 group-hover:text-violet-400 transition-colors flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </Link>
       )}
     </div>
   );

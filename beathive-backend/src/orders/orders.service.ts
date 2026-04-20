@@ -50,21 +50,7 @@ export class OrdersService {
       throw new NotFoundException('Satu atau lebih sound effect tidak ditemukan');
     }
 
-    // 2. Cek apakah user sudah pernah beli item yang sama
-    const existingPurchases = await this.prisma.orderItem.findMany({
-      where: {
-        soundEffectId: { in: dto.items.map((i) => i.soundEffectId) },
-        order: { userId, status: 'PAID' },
-      },
-    });
-
-    if (existingPurchases.length > 0) {
-      throw new BadRequestException(
-        'Kamu sudah pernah membeli beberapa sound effect ini',
-      );
-    }
-
-    // 3. Hitung total (harga lisensi commercial = 2x personal)
+    // 2. Hitung total (harga lisensi commercial = 2x personal)
     const itemsWithPrice = dto.items.map((item) => {
       const sound = sounds.find((s) => s.id === item.soundEffectId)!;
       const price =
@@ -80,11 +66,22 @@ export class OrdersService {
       throw new BadRequestException('Semua item gratis — tidak perlu checkout');
     }
 
-    // 4. Ambil data user
+    // 3. Ambil data user
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
-    // 5. Buat order di database
+    // 4. Buat order di database (cek duplikat di dalam transaction agar atomic)
     const order = await this.prisma.$transaction(async (tx) => {
+      // Atomic duplicate check — prevents race condition
+      const existingPurchases = await tx.orderItem.findMany({
+        where: {
+          soundEffectId: { in: dto.items.map((i) => i.soundEffectId) },
+          order: { userId, status: 'PAID' },
+        },
+      });
+      if (existingPurchases.length > 0) {
+        throw new BadRequestException('Kamu sudah pernah membeli beberapa sound effect ini');
+      }
+
       const newOrder = await tx.order.create({
         data: {
           userId,

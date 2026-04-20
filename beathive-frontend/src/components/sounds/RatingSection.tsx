@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { apiClient } from '@/lib/api/client';
+import { mediaUrl } from '@/lib/utils';
 
 interface Review {
   id: string;
@@ -197,7 +198,7 @@ export default function RatingSection({ soundId }: { soundId: string }) {
           <div key={r.id} className="flex gap-3">
             <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-600 text-xs font-semibold flex items-center justify-center flex-shrink-0">
               {r.user.avatarUrl
-                ? <img src={r.user.avatarUrl} alt={r.user.name} className="w-full h-full rounded-full object-cover" />
+                ? <img src={mediaUrl(r.user.avatarUrl)} alt={r.user.name} className="w-full h-full rounded-full object-cover" />
                 : r.user.name.charAt(0).toUpperCase()}
             </div>
             <div>

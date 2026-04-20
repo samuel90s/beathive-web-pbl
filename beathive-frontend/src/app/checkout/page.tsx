@@ -29,10 +29,10 @@ export default function CheckoutPage() {
               await ordersApi.verifyPayment(result.orderId);
             } catch { /* webhook may have already processed it */ }
             clearCart();
-            router.push(`/dashboard?order=${result.orderId}&status=success`);
+            router.push(`/orders/${result.orderId}/success`);
           },
           onPending: () => {
-            router.push(`/dashboard?order=${result.orderId}&status=pending`);
+            router.push(`/orders/${result.orderId}/success?status=pending`);
           },
           onError: () => setError('Payment failed. Please try again.'),
           onClose: () => setLoading(false),

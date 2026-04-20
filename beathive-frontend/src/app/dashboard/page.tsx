@@ -7,7 +7,7 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { subscriptionsApi } from '@/lib/api/subscriptions';
 import { ordersApi } from '@/lib/api/orders';
 import { useDownload } from '@/lib/hooks/useDownload';
-import { formatPrice, formatDate } from '@/lib/utils';
+import { formatPrice, formatDate, mediaUrl } from '@/lib/utils';
 
 export default function DashboardPage() {
   const isAuth = useRequireAuth();
@@ -38,7 +38,7 @@ export default function DashboardPage() {
           {user.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `http://localhost:3000${user.avatarUrl}`}
+              src={mediaUrl(user.avatarUrl)}
               alt="avatar"
               className="w-full h-full object-cover"
             />

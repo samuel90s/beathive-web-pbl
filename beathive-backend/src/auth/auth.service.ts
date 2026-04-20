@@ -170,6 +170,48 @@ export class AuthService {
     return { user: this.sanitizeUser(user), ...tokens };
   }
 
+  // ─── Generate short-lived auth code for OAuth callback ──
+  // Instead of putting real tokens in the URL, we generate a one-time code
+  // that the frontend exchanges for tokens via a secure POST request.
+
+  async generateAuthCode(userId: string): Promise<string> {
+    return this.jwt.signAsync(
+      { sub: userId, type: 'auth-code' },
+      {
+        secret: this.config.get('JWT_SECRET'),
+        expiresIn: '2m', // very short-lived
+      },
+    );
+  }
+
+  async exchangeAuthCode(code: string) {
+    interface AuthCodePayload { sub: string; type: string }
+    let decoded: AuthCodePayload;
+    try {
+      decoded = await this.jwt.verifyAsync<AuthCodePayload>(code, {
+        secret: this.config.get('JWT_SECRET'),
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid or expired auth code');
+    }
+
+    if (decoded.type !== 'auth-code') {
+      throw new UnauthorizedException('Invalid token type');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: decoded.sub },
+      include: {
+        subscription: { include: { plan: true } },
+      },
+    });
+
+    if (!user) throw new UnauthorizedException();
+
+    const tokens = await this.generateTokens(user.id, user.email);
+    return { user: this.sanitizeUser(user), ...tokens };
+  }
+
   // ─── Get current user (dari JWT) ───────────────────────
 
   async getMe(userId: string) {
@@ -184,6 +226,38 @@ export class AuthService {
 
     if (!user) throw new UnauthorizedException();
     return this.sanitizeUser(user);
+  }
+
+  // ─── Public profile (visible to anyone) ────────────────
+
+  async getPublicProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, avatarUrl: true, bio: true, createdAt: true },
+    });
+    if (!user) return null;
+
+    const [soundCount, sounds] = await Promise.all([
+      this.prisma.soundEffect.count({ where: { authorId: userId, isPublished: true } }),
+      this.prisma.soundEffect.findMany({
+        where: { authorId: userId, isPublished: true },
+        orderBy: { downloadCount: 'desc' },
+        take: 20,
+        select: {
+          id: true, title: true, slug: true, accessLevel: true, price: true,
+          durationMs: true, downloadCount: true, playCount: true, previewUrl: true, waveformData: true,
+          category: { select: { name: true, slug: true } },
+          tags: { select: { tag: { select: { name: true, slug: true } } } },
+        },
+      }),
+    ]);
+
+    const flatSounds = sounds.map((s: any) => ({
+      ...s,
+      tags: s.tags?.map((t: any) => t.tag) ?? [],
+    }));
+
+    return { ...user, soundCount, sounds: flatSounds };
   }
 
   // ─── Update profile (name + bio) ───────────────────────
@@ -209,7 +283,8 @@ export class AuthService {
     if (!fs.existsSync(avatarsDir)) fs.mkdirSync(avatarsDir, { recursive: true });
 
     const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-    const filename = `${userId}${ext}`;
+    const { v4: uuidv4 } = await import('uuid');
+    const filename = `${uuidv4()}${ext}`;
     const filepath = path.join(avatarsDir, filename);
 
     fs.writeFileSync(filepath, file.buffer);
@@ -254,10 +329,11 @@ export class AuthService {
     }
 
     // Generate password reset token (valid for 1 hour)
+    // Uses a SEPARATE secret so reset tokens can't be reused as access tokens
     const resetToken = await this.jwt.signAsync(
       { sub: user.id, email, type: 'password-reset' },
       {
-        secret: this.config.get('JWT_SECRET'),
+        secret: this.config.get('JWT_RESET_SECRET') || this.config.get('JWT_SECRET') + '-reset',
         expiresIn: '1h',
       },
     );
@@ -328,10 +404,11 @@ export class AuthService {
       throw new BadRequestException('Password must be at least 8 characters');
     }
 
-    let decoded: any;
+    interface ResetPayload { sub: string; email: string; type: string }
+    let decoded: ResetPayload;
     try {
-      decoded = await this.jwt.verifyAsync(token, {
-        secret: this.config.get('JWT_SECRET'),
+      decoded = await this.jwt.verifyAsync<ResetPayload>(token, {
+        secret: this.config.get('JWT_RESET_SECRET') || this.config.get('JWT_SECRET') + '-reset',
       });
     } catch {
       throw new BadRequestException('Invalid or expired reset token');

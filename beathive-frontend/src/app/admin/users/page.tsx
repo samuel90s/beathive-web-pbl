@@ -1,8 +1,8 @@
 'use client';
+import { API_URL as API } from '@/lib/config';
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/lib/store/auth.store';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
 interface User {
   id: string;

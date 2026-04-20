@@ -15,6 +15,8 @@ import { ConfigService } from '@nestjs/config';
 import { OrdersService, CreateOrderDto } from './orders.service';
 import { WebhookService } from './webhook.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('orders')
@@ -65,9 +67,10 @@ export class OrdersController {
   // ─── DEV ONLY: Simulate payment success ──────────────────
   // POST /orders/dev/simulate-payment
   // Body: { orderId: "SUB-xxx-xxx" } or { orderId: "regular-order-id" }
-  // Hanya bisa digunakan di NODE_ENV !== production
+  // Triple protection: NODE_ENV check + JWT required + ADMIN role only
   @Post('dev/simulate-payment')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async devSimulatePayment(@Body() body: { orderId: string }) {
     if (this.config.get('NODE_ENV') === 'production') {

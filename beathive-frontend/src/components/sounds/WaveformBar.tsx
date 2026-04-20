@@ -1,5 +1,6 @@
 // src/components/sounds/WaveformBar.tsx
 'use client';
+import { memo } from 'react';
 
 interface Props {
   data: number[];
@@ -7,8 +8,8 @@ interface Props {
   progress: number; // 0–100
 }
 
-export default function WaveformBar({ data, isActive, progress }: Props) {
-  const bars = data.length ? data : Array(40).fill(8);
+function WaveformBar({ data, isActive, progress }: Props) {
+  const bars = data?.length ? data : Array(40).fill(8);
   const progressIdx = Math.floor((progress / 100) * bars.length);
 
   return (
@@ -31,3 +32,5 @@ export default function WaveformBar({ data, isActive, progress }: Props) {
     </div>
   );
 }
+
+export default memo(WaveformBar);

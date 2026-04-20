@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { User } from '@/types';
+import { useCartStore } from './cart.store';
+import { usePlayerStore } from './player.store';
 
 interface AuthState {
   user: User | null;
@@ -39,6 +41,8 @@ export const useAuthStore = create<AuthState>()(
           sessionStorage.removeItem('accessToken');
           sessionStorage.removeItem('refreshToken');
         }
+        useCartStore.getState().clearCart();
+        usePlayerStore.getState().stop();
         set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
       },
     }),

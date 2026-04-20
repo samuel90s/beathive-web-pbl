@@ -1,10 +1,12 @@
 // src/admin/admin.service.ts
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+
   constructor(
     private prisma: PrismaService,
     private email: EmailService,
@@ -88,8 +90,8 @@ export class AdminService {
     if (sound.authorId) {
       this.prisma.user.findUnique({ where: { id: sound.authorId }, select: { email: true, name: true } })
         .then(author => {
-          if (author) this.email.sendSoundReviewNotification(author.email, sound.title, 'APPROVED', undefined, author.name).catch(() => {});
-        }).catch(() => {});
+          if (author) this.email.sendSoundReviewNotification(author.email, sound.title, 'APPROVED', undefined, author.name).catch((err: any) => this.logger.error(`Email notification failed: ${err?.message}`));
+        }).catch((err: any) => this.logger.error(`Email notification failed: ${err?.message}`));
     }
 
     return updated;
@@ -116,8 +118,8 @@ export class AdminService {
     if (sound.authorId) {
       this.prisma.user.findUnique({ where: { id: sound.authorId }, select: { email: true, name: true } })
         .then(author => {
-          if (author) this.email.sendSoundReviewNotification(author.email, sound.title, 'REJECTED', reason, author.name).catch(() => {});
-        }).catch(() => {});
+          if (author) this.email.sendSoundReviewNotification(author.email, sound.title, 'REJECTED', reason, author.name).catch((err: any) => this.logger.error(`Email notification failed: ${err?.message}`));
+        }).catch((err: any) => this.logger.error(`Email notification failed: ${err?.message}`));
     }
 
     return updated;
@@ -223,11 +225,11 @@ export class AdminService {
       if (!wallet?.user) return;
       const { email, name } = wallet.user;
       if (status === 'PAID') {
-        this.email.sendWithdrawalApproved(email, req.amountRp, { bankName: req.bankName, accountNo: req.accountNo }, name ?? undefined).catch(() => {});
+        this.email.sendWithdrawalApproved(email, req.amountRp, { bankName: req.bankName ?? '', accountNo: req.accountNo ?? '' }, name ?? undefined).catch((err: any) => this.logger.error(`Email notification failed: ${err?.message}`));
       } else {
-        this.email.sendWithdrawalRejected(email, req.amountRp, note ?? 'No reason provided', name ?? undefined).catch(() => {});
+        this.email.sendWithdrawalRejected(email, req.amountRp, note ?? 'No reason provided', name ?? undefined).catch((err: any) => this.logger.error(`Email notification failed: ${err?.message}`));
       }
-    }).catch(() => {});
+    }).catch((err: any) => this.logger.error(`Email notification failed: ${err?.message}`));
 
     return { ok: true };
   }
@@ -254,5 +256,55 @@ export class AdminService {
       items,
       pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
+  }
+
+  // ─── Categories ──────────────────────────────────────────
+
+  async getCategories() {
+    const cats = await this.prisma.category.findMany({
+      orderBy: { name: 'asc' },
+      include: { _count: { select: { soundEffects: true } } },
+    });
+    return cats;
+  }
+
+  async createCategory(name: string, slug: string, icon?: string) {
+    return this.prisma.category.create({ data: { name, slug, icon } });
+  }
+
+  async updateCategory(id: string, name: string, slug: string, icon?: string) {
+    const cat = await this.prisma.category.findUnique({ where: { id } });
+    if (!cat) throw new NotFoundException('Category not found');
+    return this.prisma.category.update({ where: { id }, data: { name, slug, icon } });
+  }
+
+  async deleteCategory(id: string) {
+    const cat = await this.prisma.category.findUnique({
+      where: { id },
+      include: { _count: { select: { soundEffects: true } } },
+    });
+    if (!cat) throw new NotFoundException('Category not found');
+    if (cat._count.soundEffects > 0) throw new ForbiddenException(`Cannot delete: ${cat._count.soundEffects} sounds use this category`);
+    await this.prisma.category.delete({ where: { id } });
+    return { ok: true };
+  }
+
+  // ─── Tags ────────────────────────────────────────────────
+
+  async getTags() {
+    return this.prisma.tag.findMany({
+      orderBy: { name: 'asc' },
+      include: { _count: { select: { soundEffects: true } } },
+    });
+  }
+
+  async createTag(name: string, slug: string) {
+    return this.prisma.tag.create({ data: { name, slug } });
+  }
+
+  async deleteTag(id: string) {
+    await this.prisma.soundEffectOnTag.deleteMany({ where: { tagId: id } });
+    await this.prisma.tag.delete({ where: { id } });
+    return { ok: true };
   }
 }

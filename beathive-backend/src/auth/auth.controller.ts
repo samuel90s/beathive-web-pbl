@@ -5,6 +5,7 @@ import {
   Get,
   Patch,
   Body,
+  Param,
   UseGuards,
   UseInterceptors,
   UploadedFile,
@@ -12,6 +13,7 @@ import {
   Res,
   HttpCode,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -116,8 +118,14 @@ export class AuthController {
     storage: memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
     fileFilter: (_req, file, cb) => {
-      if (file.mimetype.startsWith('image/')) cb(null, true);
-      else cb(new Error('Only image files are allowed'), false);
+      const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      const allowedExts = ['.jpg', '.jpeg', '.png', '.webp'];
+      const ext = require('path').extname(file.originalname).toLowerCase();
+      if (allowedMimes.includes(file.mimetype) && allowedExts.includes(ext)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only JPG, PNG, or WebP images are allowed'), false);
+      }
     },
   }))
   async uploadAvatar(
@@ -140,6 +148,14 @@ export class AuthController {
   }
 
   // GET /auth/google  — redirect ke Google
+  // GET /auth/users/:id  — public profile (no auth required)
+  @Get('users/:id')
+  async getPublicProfile(@Param('id') id: string) {
+    const profile = await this.authService.getPublicProfile(id);
+    if (!profile) throw new NotFoundException('User not found');
+    return profile;
+  }
+
   @Get('google')
   @UseGuards(AuthGuard('google'))
   async googleAuth() {
@@ -147,16 +163,22 @@ export class AuthController {
   }
 
   // GET /auth/google/callback  — Google redirect ke sini
+  // Instead of putting real tokens in the URL (insecure — visible in logs, history, referrer),
+  // we generate a short-lived auth code and the frontend exchanges it via POST.
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleCallback(@Req() req: any, @Res() res: any) {
     const result = await this.authService.handleGoogleCallback(req.user);
+    const authCode = await this.authService.generateAuthCode(result.user.id);
 
-    // Redirect ke frontend dengan token di query param
-    // Di production: pakai httpOnly cookie atau fragment URL
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-    res.redirect(
-      `${frontendUrl}/auth/callback?accessToken=${result.accessToken}&refreshToken=${result.refreshToken}`,
-    );
+    res.redirect(`${frontendUrl}/auth/callback?code=${authCode}`);
+  }
+
+  // POST /auth/exchange-code  — exchange short-lived auth code for real tokens
+  @Post('exchange-code')
+  @HttpCode(HttpStatus.OK)
+  async exchangeCode(@Body() body: { code: string }) {
+    return this.authService.exchangeAuthCode(body.code);
   }
 }

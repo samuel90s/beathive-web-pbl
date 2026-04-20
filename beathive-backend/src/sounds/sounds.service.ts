@@ -13,6 +13,7 @@ import {
   IsOptional,
   IsString,
   IsBoolean,
+  MaxLength,
   Min,
   Max,
 } from 'class-validator';
@@ -22,6 +23,7 @@ import { StorageService } from '../common/storage/storage.service';
 import { AudioService } from '../common/audio/audio.service';
 import { EarningsService } from '../earnings/earnings.service';
 import { v4 as uuidv4 } from 'uuid';
+import * as fs from 'fs';
 
 // ─── DTOs ─────────────────────────────────────────────────
 
@@ -108,6 +110,7 @@ export class UploadSoundDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   description?: string;
 
   @IsOptional()
@@ -118,6 +121,7 @@ export class UploadSoundDto {
   @Type(() => Number)
   @IsNumber()
   @Min(0)
+  @Max(10_000_000)
   price?: number;
 
   @IsOptional()
@@ -236,7 +240,7 @@ export class SoundsService {
     ]);
 
     return {
-      items: items.map((s) => this.formatSound(s, userId)),
+      items: items.map((s) => this.formatSound(s, userId, false, true)),
       pagination: {
         total,
         page: Number(page),
@@ -406,7 +410,9 @@ export class SoundsService {
     ]);
 
     // Fire-and-forget: catat earning untuk creator (hanya PRO sound)
-    this.earnings.recordEarning(soundId, downloadRecord.id).catch(() => {});
+    this.earnings.recordEarning(soundId, downloadRecord.id).catch((err) =>
+      this.logger.error(`recordEarning failed for sound=${soundId}: ${err?.message}`),
+    );
 
     return {
       downloadUrl,
@@ -487,15 +493,17 @@ export class SoundsService {
 
     const soundId = uuidv4();
 
+    // Read file from disk (diskStorage) or memory (memoryStorage fallback)
+    const fileBuffer: Buffer = file.buffer ?? fs.readFileSync(file.path!);
+
     // Proses audio
-    let previewBuffer: Buffer = file.buffer;
+    let previewBuffer: Buffer = fileBuffer;
     let waveformData: number[] = this.generateDefaultWaveform();
     let durationMs = 0;
 
     // ── 1. Durasi: selalu dari header parser (tidak butuh FFmpeg) ─
-    // Dijalankan TERPISAH dari FFmpeg agar tidak ikut gagal jika FFmpeg error
     try {
-      durationMs = await this.audio.getDuration(file.buffer, ext);
+      durationMs = await this.audio.getDuration(fileBuffer, ext);
     } catch {
       durationMs = 0;
     }
@@ -503,8 +511,8 @@ export class SoundsService {
     // ── 2. Preview + Waveform: pakai FFmpeg (opsional) ─────────
     try {
       const [preview, waveform] = await Promise.all([
-        this.audio.generatePreview(file.buffer, ext),
-        this.audio.generateWaveform(file.buffer, ext),
+        this.audio.generatePreview(fileBuffer, ext),
+        this.audio.generateWaveform(fileBuffer, ext),
       ]);
       previewBuffer = preview;
       waveformData = waveform;
@@ -516,7 +524,7 @@ export class SoundsService {
 
     // Simpan file
     const fileUrl = await this.storage.uploadAudioFile(
-      file.buffer,
+      fileBuffer,
       file.originalname,
       file.mimetype,
     );
@@ -573,7 +581,27 @@ export class SoundsService {
       }
     }
 
+    // Clean up temp file if diskStorage was used
+    if (file.path) {
+      try { fs.unlinkSync(file.path); } catch {}
+    }
+
     return this.formatSound(sound, uploaderId);
+  }
+
+  // ─── Public categories list (for homepage / browse filters) ─
+
+  async getCategories() {
+    return this.prisma.category.findMany({
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        icon: true,
+        _count: { select: { soundEffects: true } },
+      },
+    });
   }
 
   // ─── Wishlist ─────────────────────────────────────────────
@@ -665,7 +693,7 @@ export class SoundsService {
 
   // ─── Format response ──────────────────────────────────────
 
-  private formatSound(sound: any, userId?: string, forceIsLiked?: boolean) {
+  private formatSound(sound: any, userId?: string, forceIsLiked?: boolean, slimList = false) {
     const isLiked =
       forceIsLiked ??
       (userId && sound.wishlists ? sound.wishlists.length > 0 : false);
@@ -676,7 +704,7 @@ export class SoundsService {
       slug: sound.slug,
       description: sound.description,
       previewUrl: sound.previewUrl,
-      waveformData: sound.waveformData,
+      waveformData: slimList ? undefined : sound.waveformData,
       durationMs: sound.durationMs,
       format: sound.format,
       fileSize: sound.fileSize,

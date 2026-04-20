@@ -19,14 +19,19 @@ import {
   Optional,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
+import { diskStorage } from 'multer';
+import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
+import * as os from 'os';
+import * as path from 'path';
 import * as fs from 'fs';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const archiver = require('archiver');
 import { SoundsService, SoundFilterDto, UploadSoundDto } from './sounds.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('sounds')
@@ -45,6 +50,12 @@ export class SoundsController {
     // userId opsional untuk menampilkan isLiked
     const userId = req?.user?.sub ?? req?.user?.userId ?? undefined;
     return this.soundsService.findAll(filters, userId);
+  }
+
+  // ─── GET /sounds/categories  (public, for homepage/browse) ─
+  @Get('categories')
+  async getCategories() {
+    return this.soundsService.getCategories();
   }
 
   // ─── GET /sounds/wishlist  (HARUS sebelum :slug) ──────────
@@ -71,10 +82,14 @@ export class SoundsController {
 
   // ─── POST /admin/sounds/upload ────────────────────────────
   @Post('upload')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('AUTHOR', 'ADMIN')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: memoryStorage(),
+      storage: diskStorage({
+        destination: (_req, _file, cb) => cb(null, os.tmpdir()),
+        filename: (_req, file, cb) => cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${path.extname(file.originalname)}`),
+      }),
       limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
       fileFilter: (_req, file, cb) => {
         const allowed = [
@@ -332,6 +347,7 @@ export class SoundsController {
   // ─── POST /sounds/:id/play  (increment play count, no auth) ─
   @Post(':id/play')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   async incrementPlay(@Param('id') id: string) {
     await this.soundsService.incrementPlayCount(id);
     return { ok: true };
@@ -340,6 +356,7 @@ export class SoundsController {
   // ─── POST /sounds/:id/download  (butuh JWT) ──────────────
   @Post(':id/download')
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async requestDownload(
     @Param('id') id: string,
     @CurrentUser() userId: string,
@@ -351,6 +368,7 @@ export class SoundsController {
   @Post(':id/wishlist')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   async toggleWishlist(
     @Param('id') id: string,
     @CurrentUser() userId: string,

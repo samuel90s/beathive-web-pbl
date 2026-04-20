@@ -8,6 +8,6 @@ import { EmailModule } from '../email/email.module';
 @Module({
   imports: [EmailModule],
   controllers: [AdminController],
-  providers: [AdminService, PrismaService],
+  providers: [AdminService, PrismaService],  // PrismaService used by AdminService
 })
 export class AdminModule {}

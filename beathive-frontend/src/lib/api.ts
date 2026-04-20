@@ -72,7 +72,8 @@ api.interceptors.response.use(
         // Refresh gagal — logout
         sessionStorage.removeItem('accessToken')
         sessionStorage.removeItem('refreshToken')
-        window.location.href = '/login'
+        sessionStorage.removeItem('beathive-auth')
+        window.location.href = '/auth/login'
       } finally {
         isRefreshing = false
       }

@@ -1,8 +1,9 @@
 'use client'
 // src/components/sounds/CheckoutModal.tsx
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { SoundEffect } from '@/types'
-import { ordersApi } from '@/lib/api'
+import { ordersApi, api } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import toast from 'react-hot-toast'
 import { X, ShoppingCart, FileText, Briefcase, Check } from 'lucide-react'
@@ -19,6 +20,7 @@ export default function CheckoutModal({ sound, onClose }: Props) {
   const [licenseType, setLicenseType] = useState<LicenseType>('personal')
   const [isLoading, setIsLoading] = useState(false)
   const { user } = useAuthStore()
+  const router = useRouter()
 
   if (!sound) return null
 
@@ -47,13 +49,15 @@ export default function CheckoutModal({ sound, onClose }: Props) {
       }
 
       snap.pay(data.snapToken, {
-        onSuccess: () => {
-          toast.success('Pembayaran berhasil! File siap didownload.')
+        onSuccess: async () => {
+          try { await api.post('/orders/verify-payment', { orderId: data.orderId }) } catch { /* webhook may have fired first */ }
           onClose()
+          router.push(`/orders/${data.orderId}/success`)
         },
         onPending: () => {
           toast('Pembayaran pending, silakan selesaikan pembayaran.', { icon: '⏳' })
           onClose()
+          router.push(`/orders/${data.orderId}/success?status=pending`)
         },
         onError: () => {
           toast.error('Pembayaran gagal, silakan coba lagi.')

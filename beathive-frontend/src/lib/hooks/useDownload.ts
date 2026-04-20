@@ -46,7 +46,11 @@ export function useDownload() {
       const fileName = result.fileName || `${slug}.${format}`;
 
       if (result.requiresAuth) {
-        // Local dev: stream via backend dengan Authorization header
+        // Stream via backend dengan Authorization header
+        // Construct URL langsung dari API base agar tidak double-prefix
+        const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1').replace(/\/$/, '');
+        const streamUrl = `${apiBase}/sounds/${soundId}/download-stream`;
+
         let token = accessToken;
         if (!token) {
           token = sessionStorage.getItem('accessToken');
@@ -60,7 +64,7 @@ export function useDownload() {
 
         let response: Response;
         try {
-          response = await fetch(result.downloadUrl, {
+          response = await fetch(streamUrl, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
           });
         } catch {

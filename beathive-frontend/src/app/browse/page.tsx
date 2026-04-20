@@ -1,6 +1,6 @@
 // src/app/browse/page.tsx
 'use client';
-import { useState, useCallback, useEffect } from 'react';
+import { Suspense, useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useSounds } from '@/lib/hooks/useSounds';
 import SoundRow from '@/components/sounds/SoundRow';
@@ -36,7 +36,7 @@ const ACCESS_OPTIONS = [
   { value: 'PURCHASE', label: 'Buy Single' },
 ];
 
-export default function BrowsePage() {
+function BrowseContent() {
   const searchParams = useSearchParams();
 
   const [filters, setFilters] = useState<SoundFilters>({
@@ -258,5 +258,22 @@ export default function BrowsePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function BrowsePage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="h-12 bg-white rounded-xl border border-gray-100 animate-pulse mb-6" />
+        <div className="space-y-2">
+          {Array(8).fill(0).map((_, i) => (
+            <div key={i} className="h-16 bg-white rounded-xl border border-gray-100 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    }>
+      <BrowseContent />
+    </Suspense>
   );
 }

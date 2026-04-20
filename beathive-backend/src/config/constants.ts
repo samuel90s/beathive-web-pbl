@@ -1,0 +1,6 @@
+export const CREATOR_POOL_PERCENT = 25;
+export const CREATOR_PURCHASE_PERCENT = 70;
+export const MIN_WITHDRAWAL_RP = 50_000;
+export const SUBSCRIPTION_FALLBACK_PRICE_RP = 99_000;
+export const DEFAULT_DOWNLOAD_LIMIT = 20;
+export const TRENDING_DAYS = 7;
