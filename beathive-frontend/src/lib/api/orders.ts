@@ -22,4 +22,31 @@ export const ordersApi = {
     const { data } = await apiClient.get('/orders/me');
     return data;
   },
+
+  cancelOrder: async (orderId: string) => {
+    const { data } = await apiClient.patch(`/orders/${orderId}/cancel`);
+    return data as { cancelled: boolean };
+  },
+
+  getSnapToken: async (orderId: string) => {
+    const { data } = await apiClient.get(`/orders/${orderId}/snap-token`);
+    return data as { snapToken: string };
+  },
+
+  getInvoice: async (orderId: string) => {
+    const { data } = await apiClient.get(`/orders/${orderId}/invoice`);
+    return data;
+  },
+
+  downloadInvoicePdf: async (orderId: string, invoiceNumber: string) => {
+    const { data } = await apiClient.get(`/orders/${orderId}/invoice/pdf`, {
+      responseType: 'blob',
+    });
+    const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${invoiceNumber}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 };

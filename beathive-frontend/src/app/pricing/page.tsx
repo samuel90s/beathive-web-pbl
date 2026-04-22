@@ -6,6 +6,83 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { subscriptionsApi } from '@/lib/api/subscriptions';
 import { formatPrice } from '@/lib/utils';
 
+const SERVICE_FEE_PERCENT = 5;
+const TAX_PERCENT = 11;
+
+interface ConfirmPlan {
+  slug: string;
+  name: string;
+  price: number;
+  cycle: 'monthly' | 'yearly';
+}
+
+function ConfirmModal({ plan, onConfirm, onClose, loading }: {
+  plan: ConfirmPlan;
+  onConfirm: () => void;
+  onClose: () => void;
+  loading: boolean;
+}) {
+  const serviceFee = Math.round(plan.price * SERVICE_FEE_PERCENT / 100);
+  const tax = Math.round((plan.price + serviceFee) * TAX_PERCENT / 100);
+  const total = plan.price + serviceFee + tax;
+  const cycleLabel = plan.cycle === 'yearly' ? 'Tahunan' : 'Bulanan';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+        <div className="bg-violet-600 px-6 py-5 text-white">
+          <p className="text-lg font-bold">Konfirmasi Berlangganan</p>
+          <p className="text-sm text-violet-200 mt-0.5">Plan {plan.name} · {cycleLabel}</p>
+        </div>
+
+        <div className="px-6 py-5">
+          <div className="space-y-2.5">
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>Plan {plan.name} ({cycleLabel})</span>
+              <span>{formatPrice(plan.price)}</span>
+            </div>
+            <div className="flex justify-between text-sm text-gray-500">
+              <span>Biaya Layanan ({SERVICE_FEE_PERCENT}%)</span>
+              <span>{formatPrice(serviceFee)}</span>
+            </div>
+            <div className="flex justify-between text-sm text-gray-500">
+              <span>PPN ({TAX_PERCENT}%)</span>
+              <span>{formatPrice(tax)}</span>
+            </div>
+            <div className="border-t border-gray-100 pt-2.5 flex justify-between font-bold text-gray-900">
+              <span className="text-sm">Total</span>
+              <span className="text-violet-700">{formatPrice(total)}</span>
+            </div>
+          </div>
+
+          <p className="text-xs text-gray-400 mt-4 leading-relaxed">
+            Akses aktif langsung setelah pembayaran dikonfirmasi. Bisa dibatalkan kapan saja.
+          </p>
+        </div>
+
+        <div className="px-6 pb-5 flex gap-2">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            Batal
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="flex-1 py-2.5 bg-violet-600 text-white text-sm font-medium rounded-xl hover:bg-violet-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+          >
+            {loading ? (
+              <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Memproses...</>
+            ) : `Bayar ${formatPrice(total)}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const PLANS = [
   {
     slug: 'free',
@@ -25,8 +102,8 @@ const PLANS = [
   {
     slug: 'pro',
     name: 'Pro',
-    priceMonthly: 99000,
-    priceYearly: 890000,
+    priceMonthly: 19000,
+    priceYearly: 179000,
     description: 'For active creators',
     features: [
       '100 downloads per month',
@@ -41,8 +118,8 @@ const PLANS = [
   {
     slug: 'business',
     name: 'Business',
-    priceMonthly: 299000,
-    priceYearly: 2500000,
+    priceMonthly: 49000,
+    priceYearly: 459000,
     description: 'For teams & studios',
     features: [
       'Unlimited downloads',
@@ -60,21 +137,27 @@ const PLANS = [
 export default function PricingPage() {
   const [cycle, setCycle] = useState<'monthly' | 'yearly'>('monthly');
   const [loading, setLoading] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmPlan | null>(null);
   const { isAuthenticated } = useAuthStore();
   const router = useRouter();
 
-  const handleUpgrade = async (planSlug: string) => {
+  const handleClickPlan = (planSlug: string, priceMonthly: number, priceYearly: number, name: string) => {
     if (planSlug === 'free') { router.push('/auth/register'); return; }
     if (!isAuthenticated) { router.push('/auth/login'); return; }
-    setLoading(planSlug);
+    const price = cycle === 'yearly' ? priceYearly : priceMonthly;
+    setConfirm({ slug: planSlug, name, price, cycle });
+  };
+
+  const handleConfirmPay = async () => {
+    if (!confirm) return;
+    setLoading(confirm.slug);
     try {
-      const result = await subscriptionsApi.upgrade(planSlug, cycle);
+      const result = await subscriptionsApi.upgrade(confirm.slug, confirm.cycle);
+      setConfirm(null);
       if ((window as any).snap) {
         (window as any).snap.pay(result.snapToken, {
           onSuccess: async () => {
-            try {
-              await subscriptionsApi.verifyPayment(result.orderId);
-            } catch { /* webhook may have already processed it */ }
+            try { await subscriptionsApi.verifyPayment(result.orderId); } catch { /* webhook */ }
             router.push('/dashboard?upgrade=success');
           },
           onError: () => setLoading(null),
@@ -92,6 +175,15 @@ export default function PricingPage() {
   };
 
   return (
+    <>
+    {confirm && (
+      <ConfirmModal
+        plan={confirm}
+        onConfirm={handleConfirmPay}
+        onClose={() => setConfirm(null)}
+        loading={loading === confirm.slug}
+      />
+    )}
     <div className="max-w-5xl mx-auto px-4 py-14">
       <div className="text-center mb-10">
         <h1 className="text-3xl font-semibold text-gray-900 mb-3">Choose the right plan</h1>
@@ -180,7 +272,7 @@ export default function PricingPage() {
               </ul>
 
               <button
-                onClick={() => handleUpgrade(plan.slug)}
+                onClick={() => handleClickPlan(plan.slug, plan.priceMonthly, plan.priceYearly, plan.name)}
                 disabled={loading === plan.slug}
                 className={`w-full py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-50 ${
                   plan.highlight
@@ -205,5 +297,6 @@ export default function PricingPage() {
         data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
       />
     </div>
+    </>
   );
 }

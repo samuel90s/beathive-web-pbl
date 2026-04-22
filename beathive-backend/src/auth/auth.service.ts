@@ -49,7 +49,7 @@ export class AuthService {
           email: dto.email,
           passwordHash,
           provider: 'email',
-          role: dto.role ?? 'USER',
+          role: 'USER',
         },
       });
 
@@ -328,14 +328,12 @@ export class AuthService {
       return { message: 'If email exists, a reset link has been sent' };
     }
 
-    // Generate password reset token (valid for 1 hour)
-    // Uses a SEPARATE secret so reset tokens can't be reused as access tokens
+    const resetSecret = this.config.get<string>('JWT_RESET_SECRET');
+    if (!resetSecret) throw new Error('JWT_RESET_SECRET env var is required');
+
     const resetToken = await this.jwt.signAsync(
       { sub: user.id, email, type: 'password-reset' },
-      {
-        secret: this.config.get('JWT_RESET_SECRET') || this.config.get('JWT_SECRET') + '-reset',
-        expiresIn: '1h',
-      },
+      { secret: resetSecret, expiresIn: '1h' },
     );
 
     const frontendUrl = this.config.get('FRONTEND_URL') || 'http://localhost:3001';
@@ -404,12 +402,13 @@ export class AuthService {
       throw new BadRequestException('Password must be at least 8 characters');
     }
 
+    const resetSecret = this.config.get<string>('JWT_RESET_SECRET');
+    if (!resetSecret) throw new Error('JWT_RESET_SECRET env var is required');
+
     interface ResetPayload { sub: string; email: string; type: string }
     let decoded: ResetPayload;
     try {
-      decoded = await this.jwt.verifyAsync<ResetPayload>(token, {
-        secret: this.config.get('JWT_RESET_SECRET') || this.config.get('JWT_SECRET') + '-reset',
-      });
+      decoded = await this.jwt.verifyAsync<ResetPayload>(token, { secret: resetSecret });
     } catch {
       throw new BadRequestException('Invalid or expired reset token');
     }

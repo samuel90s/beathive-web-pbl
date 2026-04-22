@@ -1,9 +1,9 @@
 'use client';
 import { useState, useRef } from 'react';
-import Image from 'next/image';
 import { useRequireAuth } from '@/lib/hooks/useAuth';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { apiClient } from '@/lib/api/client';
+import { mediaUrl } from '@/lib/utils';
 
 const BANKS = [
   { code: 'BCA',       name: 'BCA — Bank Central Asia' },
@@ -58,11 +58,7 @@ export default function ProfilePage() {
 
   if (!isAuth || !user) return null;
 
-  const avatarSrc = user.avatarUrl
-    ? user.avatarUrl.startsWith('http')
-      ? user.avatarUrl
-      : `http://localhost:3000${user.avatarUrl}`
-    : null;
+  const avatarSrc = mediaUrl(user.avatarUrl) ?? null;
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -146,7 +142,8 @@ export default function ProfilePage() {
           <div className="relative">
             <div className="w-20 h-20 rounded-full bg-violet-100 flex items-center justify-center overflow-hidden border-2 border-white shadow-sm">
               {avatarSrc ? (
-                <Image src={avatarSrc} alt="avatar" width={80} height={80} className="object-cover w-full h-full" unoptimized />
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarSrc} alt="avatar" className="w-full h-full object-cover" />
               ) : (
                 <span className="text-2xl font-semibold text-violet-600">{user.name?.[0]?.toUpperCase()}</span>
               )}

@@ -164,6 +164,13 @@ export class SoundsService {
       sortBy = 'newest',
     } = filters;
 
+    if (filters.minDuration !== undefined && filters.maxDuration !== undefined && filters.minDuration > filters.maxDuration) {
+      throw new BadRequestException('minDuration cannot exceed maxDuration');
+    }
+    if (filters.minPrice !== undefined && filters.maxPrice !== undefined && filters.minPrice > filters.maxPrice) {
+      throw new BadRequestException('minPrice cannot exceed maxPrice');
+    }
+
     const where: any = { isPublished: true };
 
     if (search) {
@@ -353,6 +360,12 @@ export class SoundsService {
           );
         }
 
+        if (subscription.currentPeriodEnd < new Date()) {
+          throw new ForbiddenException(
+            'Subscription kamu sudah expired. Perbarui plan kamu untuk melanjutkan download.',
+          );
+        }
+
         const userLevel = planHierarchy.indexOf(subscription.plan.slug);
         if (userLevel < required) {
           throw new ForbiddenException(
@@ -409,10 +422,13 @@ export class SoundsService {
       }),
     ]);
 
-    // Fire-and-forget: catat earning untuk creator (hanya PRO sound)
-    this.earnings.recordEarning(soundId, downloadRecord.id).catch((err) =>
-      this.logger.error(`recordEarning failed for sound=${soundId}: ${err?.message}`),
-    );
+    // Fire-and-forget: catat earning untuk creator
+    // Skip jika user sudah pernah beli (earnings sudah dicatat saat order paid)
+    if (!alreadyPurchased) {
+      this.earnings.recordEarning(soundId, downloadRecord.id).catch((err) =>
+        this.logger.error(`CRITICAL: recordEarning failed sound=${soundId} download=${downloadRecord.id}: ${err?.message}`, err?.stack),
+      );
+    }
 
     return {
       downloadUrl,
@@ -430,9 +446,16 @@ export class SoundsService {
 
   // ─── Recalculate duration for sounds with durationMs = 0 ──
 
-  async recalculateDuration(soundId: string): Promise<{ durationMs: number }> {
+  async recalculateDuration(soundId: string, requesterId?: string): Promise<{ durationMs: number }> {
     const sound = await this.prisma.soundEffect.findUnique({ where: { id: soundId } });
     if (!sound) throw new NotFoundException('Sound tidak ditemukan');
+
+    if (requesterId) {
+      const requester = await this.prisma.user.findUnique({ where: { id: requesterId }, select: { role: true } });
+      if (requester?.role !== 'ADMIN' && sound.authorId !== requesterId) {
+        throw new ForbiddenException('Hanya pemilik sound atau admin yang bisa melakukan ini');
+      }
+    }
 
     // Baca file dari local storage
     const filePath = this.storage.getLocalFilePath(sound.fileUrl);
@@ -478,6 +501,9 @@ export class SoundsService {
     // Resolve categoryId dari slug jika diperlukan
     let categoryId = dto.categoryId;
     if (!categoryId && dto.categorySlug) {
+      if (!/^[a-z0-9-]+$/.test(dto.categorySlug)) {
+        throw new BadRequestException('Format category slug tidak valid');
+      }
       const cat = await this.prisma.category.findUnique({
         where: { slug: dto.categorySlug },
       });
@@ -537,8 +563,8 @@ export class SoundsService {
     const sound = await this.prisma.soundEffect.create({
       data: {
         id: soundId,
-        categoryId: categoryId!,
-        authorId: uploader.role !== 'ADMIN' ? uploaderId : null,
+        category: { connect: { id: categoryId! } },
+        ...(uploader.role !== 'ADMIN' ? { author: { connect: { id: uploaderId } } } : {}),
         title: dto.title,
         slug,
         description: dto.description ?? null,
@@ -549,7 +575,7 @@ export class SoundsService {
         fileSize: file.size,
         format: ext,
         price: dto.price ?? 0,
-        accessLevel: (dto.accessLevel ?? 'FREE') as any,
+        accessLevel: (dto.accessLevel ?? 'FREE') as 'FREE' | 'PRO' | 'BUSINESS' | 'PURCHASE',
         licenseType: dto.licenseType ?? 'personal',
         isPublished: false,
         reviewStatus: 'PENDING',
@@ -584,6 +610,11 @@ export class SoundsService {
     // Clean up temp file if diskStorage was used
     if (file.path) {
       try { fs.unlinkSync(file.path); } catch {}
+    }
+
+    // Auto-fix durasi jika 0 (fire-and-forget)
+    if (durationMs === 0) {
+      this.recalculateDuration(soundId).catch(() => {});
     }
 
     return this.formatSound(sound, uploaderId);

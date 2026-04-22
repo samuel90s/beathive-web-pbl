@@ -1,13 +1,32 @@
 // src/admin/admin.controller.ts
 import {
   Controller, Get, Post, Patch, Delete, Body, Param, Query,
-  UseGuards, HttpCode, HttpStatus,
+  UseGuards, HttpCode, HttpStatus, BadRequestException,
 } from '@nestjs/common';
+import { IsString, IsOptional, IsIn, MaxLength } from 'class-validator';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+
+class RejectSoundDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}
+
+class UpdateWithdrawalDto {
+  @IsString()
+  @IsIn(['PAID', 'REJECTED'])
+  status: 'PAID' | 'REJECTED';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+}
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -28,7 +47,9 @@ export class AdminController {
     @Query('page') page = '1',
     @Query('limit') limit = '20',
   ) {
-    return this.adminService.getSounds(status, Number(page), Number(limit));
+    const p = Math.max(1, Number(page) || 1);
+    const l = Math.min(100, Math.max(1, Number(limit) || 20));
+    return this.adminService.getSounds(status, p, l);
   }
 
   // PATCH /admin/sounds/:id/approve
@@ -47,7 +68,7 @@ export class AdminController {
   async rejectSound(
     @Param('id') id: string,
     @CurrentUser() userId: string,
-    @Body() body: { reason: string },
+    @Body() body: RejectSoundDto,
   ) {
     return this.adminService.rejectSound(id, userId, body.reason || 'Tidak memenuhi standar');
   }
@@ -59,7 +80,9 @@ export class AdminController {
     @Query('page') page = '1',
     @Query('limit') limit = '20',
   ) {
-    return this.adminService.getUsers(Number(page), Number(limit), search);
+    const p = Math.max(1, Number(page) || 1);
+    const l = Math.min(100, Math.max(1, Number(limit) || 20));
+    return this.adminService.getUsers(p, l, search);
   }
 
   // GET /admin/withdrawals?status=PENDING&page=1&limit=20
@@ -69,7 +92,9 @@ export class AdminController {
     @Query('page') page = '1',
     @Query('limit') limit = '20',
   ) {
-    return this.adminService.getWithdrawals(status, Number(page), Number(limit));
+    const p = Math.max(1, Number(page) || 1);
+    const l = Math.min(100, Math.max(1, Number(limit) || 20));
+    return this.adminService.getWithdrawals(status, p, l);
   }
 
   // PATCH /admin/withdrawals/:id
@@ -77,7 +102,7 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async updateWithdrawal(
     @Param('id') id: string,
-    @Body() body: { status: 'PAID' | 'REJECTED'; note?: string },
+    @Body() body: UpdateWithdrawalDto,
   ) {
     return this.adminService.updateWithdrawalStatus(id, body.status, body.note);
   }
@@ -88,7 +113,9 @@ export class AdminController {
     @Query('page') page = '1',
     @Query('limit') limit = '20',
   ) {
-    return this.adminService.getOrders(Number(page), Number(limit));
+    const p = Math.max(1, Number(page) || 1);
+    const l = Math.min(100, Math.max(1, Number(limit) || 20));
+    return this.adminService.getOrders(p, l);
   }
 
   // ─── Categories ──────────────────────────────────────────

@@ -127,9 +127,10 @@ export class StorageService {
 
   getLocalFilePath(relativeKey: string): string | null {
     if (!this.isLocal) return null;
-    // relativeKey bisa 'sounds/uuid.wav' atau 'previews/uuid-preview.mp3'
     const clean = relativeKey.replace(/^local:/, '');
-    const abs   = path.join(this.uploadsDir, clean);
+    const abs   = path.resolve(path.join(this.uploadsDir, clean));
+    // Path traversal guard — ensure resolved path stays inside uploadsDir
+    if (!abs.startsWith(path.resolve(this.uploadsDir) + path.sep)) return null;
     return fs.existsSync(abs) ? abs : null;
   }
 

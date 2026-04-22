@@ -198,7 +198,7 @@ export default function GlobalPlayer() {
 
         {/* Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {currentTrack.isFree ? (
+          {currentTrack.accessLevel !== 'PURCHASE' ? (
             <button
               onClick={async () => {
                 try {
@@ -210,7 +210,7 @@ export default function GlobalPlayer() {
               disabled={downloading === currentTrack.id}
               className="px-3 py-1.5 text-xs font-medium rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors disabled:opacity-50"
             >
-              {downloading === currentTrack.id ? 'Mengunduh...' : 'Download Gratis'}
+              {downloading === currentTrack.id ? 'Mengunduh...' : currentTrack.accessLevel === 'FREE' ? 'Download Gratis' : `Download ${currentTrack.accessLevel}`}
             </button>
           ) : (
             <button

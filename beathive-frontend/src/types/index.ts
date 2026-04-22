@@ -9,7 +9,7 @@ export interface User {
   bankName?: string;
   bankAccount?: string;
   bankAccountName?: string;
-  role: 'USER' | 'AUTHOR' | 'ADMIN';
+  role: 'USER' | 'ADMIN';
   provider: string;
   isTwoFactorEnabled?: boolean;
   createdAt: string;

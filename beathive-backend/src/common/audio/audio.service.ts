@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import * as mm from 'music-metadata';
 
 @Injectable()
 export class AudioService {
@@ -81,20 +82,25 @@ export class AudioService {
   // ─── Get durasi audio dalam milidetik ───────────────────
 
   async getDuration(inputBuffer: Buffer, inputFormat: string): Promise<number> {
-    // Selalu coba header parser dulu — tidak butuh FFmpeg, tidak tulis file sementara
-    const fromHeader = this.getDurationFromHeader(inputBuffer, inputFormat);
-    if (fromHeader > 0) {
-      this.logger.debug(`Duration via header parser: ${fromHeader}ms`);
-      return fromHeader;
+    // music-metadata: akurat untuk MP3 VBR/CBR, WAV, OGG, FLAC, dll
+    try {
+      const fmt = inputFormat.toLowerCase();
+      const mimeType = fmt === 'mp3' ? 'audio/mpeg' : fmt === 'wav' ? 'audio/wav' : fmt === 'ogg' ? 'audio/ogg' : fmt === 'flac' ? 'audio/flac' : `audio/${fmt}`;
+      const metadata = await mm.parseBuffer(inputBuffer, { mimeType });
+      const durationSec = metadata.format.duration;
+      if (durationSec && durationSec > 0) {
+        this.logger.debug(`Duration via music-metadata: ${Math.round(durationSec * 1000)}ms`);
+        return Math.round(durationSec * 1000);
+      }
+    } catch (e: any) {
+      this.logger.debug(`music-metadata failed: ${e.message}`);
     }
 
-    // Fallback ke FFmpeg (bisa gagal jika tidak terinstall)
+    // Fallback ke FFmpeg
     const tmpDir = os.tmpdir();
     const inputPath = path.join(tmpDir, `${uuidv4()}.${inputFormat}`);
-
     try {
       fs.writeFileSync(inputPath, inputBuffer);
-
       return await new Promise((resolve) => {
         ffmpeg.ffprobe(inputPath, (err, metadata) => {
           if (err) {
@@ -111,7 +117,7 @@ export class AudioService {
     }
   }
 
-  // ─── Parse durasi dari audio header (tanpa FFmpeg) ──────
+  // ─── DEPRECATED — kept for reference only, no longer called ──────
 
   private getDurationFromHeader(buffer: Buffer, format: string): number {
     try {
@@ -172,29 +178,203 @@ export class AudioService {
   }
 
   private getMp3DurationEstimate(buffer: Buffer): number {
-    // Cari frame sync (0xFF 0xE0) dan baca bitrate + sample rate dari header frame pertama
-    const bitrates = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320];
-    const sampleRates = [44100, 48000, 32000];
+    // ─── Tabel bitrate per MPEG version & layer ──────────────
+    // Index 0 = free, 15 = bad → skip keduanya
+    const bitrateTable: Record<string, number[]> = {
+      // MPEG1 Layer 3
+      '11-01': [0,32,40,48,56,64,80,96,112,128,160,192,224,256,320,0],
+      // MPEG1 Layer 2
+      '11-10': [0,32,48,56,64,80,96,112,128,160,192,224,256,320,384,0],
+      // MPEG1 Layer 1
+      '11-11': [0,32,64,96,128,160,192,224,256,288,320,352,384,416,448,0],
+      // MPEG2/2.5 Layer 3
+      '00-01': [0,8,16,24,32,40,48,56,64,80,96,112,128,144,160,0],
+      '10-01': [0,8,16,24,32,40,48,56,64,80,96,112,128,144,160,0],
+      // MPEG2/2.5 Layer 2
+      '00-10': [0,8,16,24,32,40,48,56,64,80,96,112,128,144,160,0],
+      '10-10': [0,8,16,24,32,40,48,56,64,80,96,112,128,144,160,0],
+      // MPEG2/2.5 Layer 1
+      '00-11': [0,32,48,56,64,80,96,112,128,144,160,176,192,224,256,0],
+      '10-11': [0,32,48,56,64,80,96,112,128,144,160,176,192,224,256,0],
+    };
+
+    const sampleRateTable: Record<string, number[]> = {
+      '11': [44100, 48000, 32000],  // MPEG1
+      '10': [22050, 24000, 16000],  // MPEG2
+      '00': [11025, 12000, 8000],   // MPEG2.5
+    };
+
+    // Samples per frame per MPEG version & layer
+    const samplesPerFrameTable: Record<string, number> = {
+      '11-01': 1152,  // MPEG1 Layer 3
+      '11-10': 1152,  // MPEG1 Layer 2
+      '11-11': 384,   // MPEG1 Layer 1
+      '10-01': 576,   // MPEG2 Layer 3
+      '10-10': 1152,  // MPEG2 Layer 2
+      '10-11': 384,   // MPEG2 Layer 1
+      '00-01': 576,   // MPEG2.5 Layer 3
+      '00-10': 1152,  // MPEG2.5 Layer 2
+      '00-11': 384,   // MPEG2.5 Layer 1
+    };
+
+    // ─── Cari frame sync pertama ─────────────────────────────
+    let firstFrameOffset = -1;
+    let mpegVer = '';
+    let layerBits = '';
+    let sampleRate = 0;
+    let samplesPerFrame = 0;
 
     for (let i = 0; i < Math.min(buffer.length - 4, 512 * 1024); i++) {
       if (buffer[i] !== 0xFF) continue;
       const b1 = buffer[i + 1];
-      if ((b1 & 0xE0) !== 0xE0) continue; // frame sync
+      if ((b1 & 0xE0) !== 0xE0) continue;
 
-      const bitrateIdx = (buffer[i + 2] >> 4) & 0x0F;
+      const verBits = ((b1 >> 3) & 0x03).toString(2).padStart(2, '0');
+      const lBits = ((b1 >> 1) & 0x03).toString(2).padStart(2, '0');
+      if (verBits === '01' || lBits === '00') continue; // reserved
+
       const srIdx = (buffer[i + 2] >> 2) & 0x03;
+      if (srIdx === 3) continue;
 
-      if (bitrateIdx === 0 || bitrateIdx === 15 || srIdx === 3) continue;
+      const srArr = sampleRateTable[verBits];
+      if (!srArr) continue;
 
-      const bitrate = bitrates[bitrateIdx] * 1000; // bps
-      const sampleRate = sampleRates[srIdx];
-      if (!bitrate || !sampleRate) continue;
-
-      // Estimasi berdasarkan file size dan bitrate
-      const dataSizeBytes = buffer.length - i;
-      const durationMs = Math.round((dataSizeBytes * 8 * 1000) / bitrate);
-      if (durationMs > 100 && durationMs < 3600000) return durationMs; // 0.1s - 1jam
+      firstFrameOffset = i;
+      mpegVer = verBits;
+      layerBits = lBits;
+      sampleRate = srArr[srIdx];
+      samplesPerFrame = samplesPerFrameTable[`${verBits}-${lBits}`] || 1152;
+      break;
     }
+
+    if (firstFrameOffset < 0 || sampleRate === 0) return 0;
+
+    // ─── Cek Xing/VBRI header di frame pertama ──────────────
+    // Xing header biasanya ada di offset tertentu dari frame pertama
+    const xingDuration = this.tryXingVbriDuration(
+      buffer, firstFrameOffset, mpegVer, layerBits, sampleRate, samplesPerFrame,
+    );
+    if (xingDuration > 0) return xingDuration;
+
+    // ─── Fallback: sampling beberapa frame untuk rata-rata bitrate ──
+    const key = `${mpegVer}-${layerBits}`;
+    const brTable = bitrateTable[key];
+    if (!brTable) return 0;
+
+    let totalBitrate = 0;
+    let frameCount = 0;
+    const maxSample = 64; // sample max 64 frame untuk estimasi
+    let offset = firstFrameOffset;
+
+    while (offset < buffer.length - 4 && frameCount < maxSample) {
+      if (buffer[offset] !== 0xFF || (buffer[offset + 1] & 0xE0) !== 0xE0) {
+        offset++;
+        continue;
+      }
+
+      const b1 = buffer[offset + 1];
+      const curVer = ((b1 >> 3) & 0x03).toString(2).padStart(2, '0');
+      const curLayer = ((b1 >> 1) & 0x03).toString(2).padStart(2, '0');
+      if (curVer !== mpegVer || curLayer !== layerBits) { offset++; continue; }
+
+      const brIdx = (buffer[offset + 2] >> 4) & 0x0F;
+      const srIdx = (buffer[offset + 2] >> 2) & 0x03;
+      const padding = (buffer[offset + 2] >> 1) & 0x01;
+
+      if (brIdx === 0 || brIdx === 15 || srIdx === 3) { offset++; continue; }
+
+      const br = brTable[brIdx] * 1000;
+      if (!br) { offset++; continue; }
+
+      totalBitrate += br;
+      frameCount++;
+
+      // Hitung frame size dan lompat ke frame berikutnya
+      const curSr = (sampleRateTable[mpegVer] || [])[srIdx] || sampleRate;
+      let frameSize: number;
+      if (layerBits === '11') {
+        // Layer 1
+        frameSize = Math.floor((12 * br / curSr + padding) * 4);
+      } else {
+        // Layer 2 & 3
+        const spf = samplesPerFrame;
+        frameSize = Math.floor(spf * br / (8 * curSr)) + padding;
+      }
+
+      if (frameSize < 1) { offset++; continue; }
+      offset += frameSize;
+    }
+
+    if (frameCount === 0) return 0;
+
+    const avgBitrate = totalBitrate / frameCount;
+    const dataSizeBytes = buffer.length - firstFrameOffset;
+    const durationMs = Math.round((dataSizeBytes * 8 * 1000) / avgBitrate);
+
+    if (durationMs > 100 && durationMs < 3600000) return durationMs;
+    return 0;
+  }
+
+  /**
+   * Cari Xing atau VBRI header di frame pertama MP3 untuk durasi akurat pada file VBR.
+   */
+  private tryXingVbriDuration(
+    buffer: Buffer,
+    frameOffset: number,
+    mpegVer: string,
+    layerBits: string,
+    sampleRate: number,
+    samplesPerFrame: number,
+  ): number {
+    // Xing header offset tergantung MPEG version dan channel mode
+    const channelMode = (buffer[frameOffset + 3] >> 6) & 0x03;
+    let xingOffset: number;
+    if (mpegVer === '11') {
+      // MPEG1
+      xingOffset = channelMode === 3 ? 17 : 32; // mono vs stereo
+    } else {
+      // MPEG2/2.5
+      xingOffset = channelMode === 3 ? 9 : 17;
+    }
+
+    const searchStart = frameOffset + 4 + xingOffset;
+
+    // Cari "Xing" atau "Info" tag
+    for (const tag of ['Xing', 'Info']) {
+      if (searchStart + 4 > buffer.length) continue;
+      const found = buffer.toString('ascii', searchStart, searchStart + 4);
+      if (found === tag) {
+        const flags = buffer.readUInt32BE(searchStart + 4);
+        if (flags & 0x01) {
+          // Bit 0 = jumlah frame tersedia
+          const totalFrames = buffer.readUInt32BE(searchStart + 8);
+          if (totalFrames > 0 && totalFrames < 100000000) {
+            const durationMs = Math.round((totalFrames * samplesPerFrame / sampleRate) * 1000);
+            if (durationMs > 100 && durationMs < 3600000) {
+              this.logger.debug(`Duration via Xing/Info header: ${durationMs}ms (${totalFrames} frames)`);
+              return durationMs;
+            }
+          }
+        }
+      }
+    }
+
+    // Cari VBRI header (selalu di offset 36 dari frame start)
+    const vbriOffset = frameOffset + 4 + 32;
+    if (vbriOffset + 26 <= buffer.length) {
+      const vbriTag = buffer.toString('ascii', vbriOffset, vbriOffset + 4);
+      if (vbriTag === 'VBRI') {
+        const totalFrames = buffer.readUInt32BE(vbriOffset + 14);
+        if (totalFrames > 0 && totalFrames < 100000000) {
+          const durationMs = Math.round((totalFrames * samplesPerFrame / sampleRate) * 1000);
+          if (durationMs > 100 && durationMs < 3600000) {
+            this.logger.debug(`Duration via VBRI header: ${durationMs}ms (${totalFrames} frames)`);
+            return durationMs;
+          }
+        }
+      }
+    }
+
     return 0;
   }
 

@@ -74,25 +74,27 @@ export class SubscriptionsService {
       throw new BadRequestException('Tidak bisa upgrade ke free plan');
     }
 
-    const price =
+    const basePrice =
       billingCycle === 'yearly' ? plan.priceYearly : plan.priceMonthly;
+
+    const SERVICE_FEE_PERCENT = 5;
+    const TAX_PERCENT = 11;
+    const serviceFee = Math.round(basePrice * SERVICE_FEE_PERCENT / 100);
+    const tax = Math.round((basePrice + serviceFee) * TAX_PERCENT / 100);
+    const totalAmount = basePrice + serviceFee + tax;
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
-    // Buat Midtrans Snap untuk pembayaran upgrade
     const snap = new midtransClient.Snap({
       isProduction: this.config.get('MIDTRANS_IS_PRODUCTION') === 'true',
       serverKey: this.config.get('MIDTRANS_SERVER_KEY'),
       clientKey: this.config.get('MIDTRANS_CLIENT_KEY'),
     });
 
-    // Generate short orderId ≤ 36 chars (Midtrans limit)
-    // Format: SUB-{base36timestamp}-{random6}
     const ts = Date.now().toString(36).toUpperCase();
     const rnd = Math.random().toString(36).substring(2, 8).toUpperCase();
     const orderId = `SUB-${ts}-${rnd}`;
 
-    // Simpan intent ke DB agar webhook bisa memproses aktivasi
     await this.prisma.subscriptionIntent.create({
       data: { orderId, userId, planSlug, billingCycle },
     });
@@ -100,14 +102,28 @@ export class SubscriptionsService {
     const transaction = await snap.createTransaction({
       transaction_details: {
         order_id: orderId,
-        gross_amount: price,
+        gross_amount: totalAmount,
       },
-      item_details: [{
-        id: plan.id,
-        price,
-        quantity: 1,
-        name: `Plan ${plan.name} - ${billingCycle === 'yearly' ? 'Tahunan' : 'Bulanan'}`,
-      }],
+      item_details: [
+        {
+          id: plan.id,
+          price: basePrice,
+          quantity: 1,
+          name: `Plan ${plan.name} - ${billingCycle === 'yearly' ? 'Tahunan' : 'Bulanan'}`,
+        },
+        {
+          id: 'service-fee',
+          price: serviceFee,
+          quantity: 1,
+          name: `Biaya Layanan (${SERVICE_FEE_PERCENT}%)`,
+        },
+        {
+          id: 'ppn',
+          price: tax,
+          quantity: 1,
+          name: `PPN (${TAX_PERCENT}%)`,
+        },
+      ],
       customer_details: {
         first_name: user!.name,
         email: user!.email,
@@ -118,7 +134,7 @@ export class SubscriptionsService {
       snapToken: transaction.token,
       orderId,
       plan: plan.name,
-      price,
+      price: totalAmount,
       billingCycle,
     };
   }

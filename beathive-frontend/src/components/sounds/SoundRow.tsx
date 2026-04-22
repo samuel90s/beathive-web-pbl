@@ -163,9 +163,12 @@ export default function SoundRow({ sound }: Props) {
 
       {/* Price / Action */}
       <div className="flex items-center gap-2 flex-shrink-0 w-28 justify-end">
-        {sound.isFree ? (
+        {sound.accessLevel !== 'PURCHASE' ? (
           <>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium">Free</span>
+            {sound.accessLevel === 'FREE' && <span className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium">Free</span>}
+            {sound.accessLevel === 'PRO' && sound.price > 0 && (
+              <span className="text-xs text-gray-500 font-medium">Rp {(sound.price / 1000).toFixed(0)}k</span>
+            )}
             <button
               onClick={handleDownload}
               disabled={downloading === sound.id}

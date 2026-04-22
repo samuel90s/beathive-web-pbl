@@ -6,18 +6,7 @@ import { useSounds } from '@/lib/hooks/useSounds';
 import SoundRow from '@/components/sounds/SoundRow';
 import type { SoundFilters } from '@/types';
 import { useDebounce } from '@/lib/hooks/useDebounce';
-
-const CATEGORIES = [
-  { slug: '', label: 'All' },
-  { slug: 'aksi', label: 'Action' },
-  { slug: 'alam', label: 'Nature' },
-  { slug: 'ui-game', label: 'UI / Game' },
-  { slug: 'suasana', label: 'Ambient' },
-  { slug: 'manusia', label: 'Human' },
-  { slug: 'kendaraan', label: 'Vehicles' },
-  { slug: 'hewan', label: 'Animals' },
-  { slug: 'elektronik', label: 'Electronic' },
-];
+import { API_URL } from '@/lib/config';
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
@@ -32,7 +21,6 @@ const ACCESS_OPTIONS = [
   { value: '', label: 'All' },
   { value: 'FREE', label: 'Free' },
   { value: 'PRO', label: 'Pro' },
-  { value: 'BUSINESS', label: 'Business' },
   { value: 'PURCHASE', label: 'Buy Single' },
 ];
 
@@ -47,14 +35,27 @@ function BrowseContent() {
   const [searchInput, setSearchInput] = useState('');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
+  const [categories, setCategories] = useState<{ slug: string; name: string }[]>([]);
   const debouncedSearch = useDebounce(searchInput, 400);
+
+  useEffect(() => {
+    fetch(`${API_URL}/sounds/categories`)
+      .then((r) => r.ok ? r.json() : [])
+      .then(setCategories)
+      .catch(() => {});
+  }, []);
 
   // Baca URL params saat pertama kali (dari link di halaman lain)
   useEffect(() => {
     const category = searchParams.get('categorySlug');
     const search = searchParams.get('search');
+    const page = searchParams.get('page');
     if (category) setFilters((f) => ({ ...f, categorySlug: category }));
     if (search) setSearchInput(search);
+    if (page) {
+      const p = Math.max(1, Math.min(1000, parseInt(page, 10) || 1));
+      setFilters((f) => ({ ...f, page: p }));
+    }
   }, []);
 
   const activeFilters: SoundFilters = {
@@ -104,7 +105,7 @@ function BrowseContent() {
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Category</p>
               <div className="space-y-0.5">
-                {CATEGORIES.map((cat) => (
+                {[{ slug: '', name: 'All' }, ...categories].map((cat) => (
                   <button
                     key={cat.slug}
                     onClick={() => setCategory(cat.slug)}
@@ -114,7 +115,7 @@ function BrowseContent() {
                         : 'text-gray-600 hover:bg-gray-50'
                     }`}
                   >
-                    {cat.label}
+                    {cat.name}
                   </button>
                 ))}
               </div>

@@ -83,7 +83,7 @@ export class SoundsController {
   // ─── POST /admin/sounds/upload ────────────────────────────
   @Post('upload')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('AUTHOR', 'ADMIN')
+  @Roles('USER', 'ADMIN')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -339,9 +339,13 @@ export class SoundsController {
 
   // ─── POST /sounds/:id/recalculate-duration  (admin/author only) ──
   @Post(':id/recalculate-duration')
-  @UseGuards(JwtAuthGuard)
-  async recalculateDuration(@Param('id') id: string) {
-    return this.soundsService.recalculateDuration(id);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('USER', 'ADMIN')
+  async recalculateDuration(
+    @Param('id') id: string,
+    @CurrentUser() userId: string,
+  ) {
+    return this.soundsService.recalculateDuration(id, userId);
   }
 
   // ─── POST /sounds/:id/play  (increment play count, no auth) ─

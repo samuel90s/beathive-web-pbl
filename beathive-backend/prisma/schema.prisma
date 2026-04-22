@@ -20,7 +20,7 @@ model User {
   bankName        String?
   bankAccount     String?
   bankAccountName String?
-  role         String   @default("USER") // "USER" | "AUTHOR" | "ADMIN"
+  role         String   @default("USER") // "USER" | "ADMIN"
   provider     String   @default("email") // "email" | "google"
   providerId   String?  // ID dari Google OAuth
   createdAt    DateTime @default(now())
@@ -177,6 +177,7 @@ model Order {
   totalAmount    Int         // total dalam Rupiah
   status         OrderStatus @default(PENDING)
   gatewayOrderId String?     // ID order di Midtrans/Xendit
+  snapToken      String?     // Midtrans Snap token untuk re-open popup
   paidAt         DateTime?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
@@ -192,6 +193,7 @@ enum OrderStatus {
   PENDING
   PAID
   FAILED
+  CANCELLED
   REFUNDED
 }
 
@@ -203,7 +205,7 @@ model OrderItem {
   licenseType   String // "personal" | "commercial"
   licensePdfUrl String? // URL PDF lisensi setelah generated
 
-  order       Order       @relation(fields: [orderId], references: [id])
+  order       Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   soundEffect SoundEffect @relation(fields: [soundEffectId], references: [id])
 
   @@map("order_items")
@@ -274,13 +276,14 @@ model CreatorEarning {
   id           String   @id @default(uuid())
   walletId     String
   soundId      String
-  downloadId   String?  // Download record yang trigger earning ini
+  downloadId   String?  // dedup key: download ID or 'pro:userId:soundId:YYYY-MM' or 'order:itemId'
   amountRp     Int      // nominal Rupiah yang didapat
   poolPercent  Int      @default(25) // % pool yang dipakai saat itu
   earnedAt     DateTime @default(now())
 
   wallet CreatorWallet @relation(fields: [walletId], references: [id])
 
+  @@unique([walletId, downloadId]) // prevents duplicate earnings from race conditions
   @@map("creator_earnings")
 }
 

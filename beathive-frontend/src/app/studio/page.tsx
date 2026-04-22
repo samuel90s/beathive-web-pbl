@@ -4,21 +4,9 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { formatDuration } from '@/lib/utils';
+import { API_URL } from '@/lib/config';
 import type { SoundEffect } from '@/types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
-
-const CATEGORIES = [
-  { id: '', label: 'Pilih Kategori...' },
-  { id: 'aksi', label: 'Aksi' },
-  { id: 'alam', label: 'Alam' },
-  { id: 'ui-game', label: 'UI / Game' },
-  { id: 'suasana', label: 'Suasana' },
-  { id: 'manusia', label: 'Manusia' },
-  { id: 'kendaraan', label: 'Kendaraan' },
-  { id: 'hewan', label: 'Hewan' },
-  { id: 'elektronik', label: 'Elektronik' },
-];
 
 interface Earning { id: string; soundTitle: string; amountRp: number; earnedAt: string; }
 interface Withdrawal { id: string; amountRp: number; status: string; bankName: string; accountNo: string; note?: string; createdAt: string; }
@@ -41,6 +29,7 @@ export default function StudioPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [fixingId, setFixingId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<{ slug: string; name: string }[]>([]);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
@@ -59,7 +48,13 @@ export default function StudioPage() {
     if (!isAuthenticated) { router.push('/auth/login'); return; }
     fetchMySounds();
     fetchWallet();
+    fetchCategories();
   }, [isAuthenticated, _hasHydrated]);
+
+  const fetchCategories = async () => {
+    const res = await fetch(`${API_URL}/sounds/categories`);
+    if (res.ok) setCategories(await res.json());
+  };
 
   const fetchWallet = async () => {
     const token = accessToken || sessionStorage.getItem('accessToken');
@@ -80,6 +75,10 @@ export default function StudioPage() {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ amountRp: Number(withdrawAmount) }),
       });
+      if (res.status === 401 || res.status === 403) {
+        router.push('/auth/login');
+        return;
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Gagal');
       setWithdrawMsg('success:Withdrawal request submitted! Admin will process within 1–3 business days.');
@@ -176,8 +175,11 @@ export default function StudioPage() {
       });
 
       if (!res.ok) {
+        if (res.status === 413) throw new Error('File terlalu besar. Kurangi ukuran file dan coba lagi.');
         const err = await res.json().catch(() => ({ message: 'Upload gagal' }));
-        throw new Error(err.message || 'Upload gagal');
+        if (res.status === 400) throw new Error(err.message || 'Data tidak valid. Periksa form dan coba lagi.');
+        if (res.status === 401 || res.status === 403) throw new Error('Sesi kamu expired. Silakan login ulang.');
+        throw new Error(err.message || 'Upload gagal. Coba lagi.');
       }
 
       const data = await res.json();
@@ -197,8 +199,31 @@ export default function StudioPage() {
 
   if (!isAuthenticated || !user) return null;
 
+  const sub = user.subscription;
+  const subExpiresAt = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
+  const subExpiresSoon = subExpiresAt && sub?.plan?.slug !== 'free'
+    && subExpiresAt.getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000
+    && subExpiresAt > new Date();
+  const subExpired = subExpiresAt && sub?.plan?.slug !== 'free' && sub?.status !== 'ACTIVE';
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
+      {(subExpiresSoon || subExpired) && (
+        <div className={`mb-4 flex items-start gap-2.5 rounded-xl px-4 py-3 border ${subExpired ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-100'}`}>
+          <svg className={`w-4 h-4 mt-0.5 flex-shrink-0 ${subExpired ? 'text-red-500' : 'text-amber-500'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <div>
+            <p className={`text-sm font-medium ${subExpired ? 'text-red-700' : 'text-amber-700'}`}>
+              {subExpired ? 'Subscription expired' : `Subscription berakhir ${subExpiresAt!.toLocaleDateString('id-ID')}`}
+            </p>
+            <p className={`text-xs mt-0.5 ${subExpired ? 'text-red-600' : 'text-amber-600'}`}>
+              {subExpired ? 'Download sound PRO/Business tidak tersedia. ' : 'Perbarui sebelum expired. '}
+              <a href="/pricing" className="underline font-medium">Lihat paket</a>
+            </p>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Studio</h1>
@@ -428,14 +453,6 @@ export default function StudioPage() {
                       {' · '}{sound.playCount}x diputar · {sound.downloadCount}x diunduh
                     </p>
                   </div>
-                  <button
-                    onClick={() => fixDuration(sound)}
-                    disabled={fixingId === sound.id}
-                    title="Kalkulasi ulang durasi dari file"
-                    className="text-xs px-2 py-1 text-amber-600 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-50 flex-shrink-0"
-                  >
-                    {fixingId === sound.id ? '...' : 'Fix Durasi'}
-                  </button>
                   <span className={`text-xs px-2 py-0.5 rounded-full border flex-shrink-0 font-medium ${statusCls}`}>
                     {statusLabel}
                   </span>
@@ -516,8 +533,9 @@ export default function StudioPage() {
                   value={form.categorySlug} onChange={set('categorySlug')} required
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
                 >
-                  {CATEGORIES.map((c) => (
-                    <option key={c.id} value={c.id} disabled={!c.id}>{c.label}</option>
+                  <option value="" disabled>Pilih Kategori...</option>
+                  {categories.map((c) => (
+                    <option key={c.slug} value={c.slug}>{c.name}</option>
                   ))}
                 </select>
               </div>
@@ -542,7 +560,6 @@ export default function StudioPage() {
                   >
                     <option value="FREE">Gratis</option>
                     <option value="PRO">Pro</option>
-                    <option value="BUSINESS">Business</option>
                     <option value="PURCHASE">Beli Satuan</option>
                   </select>
                 </div>
@@ -608,7 +625,6 @@ interface MonthlyPoint { month: string; totalRp: number; downloadCount: number; 
 interface TopSound { soundId: string; title: string; slug: string; earnings: number; downloads: number; }
 
 function AnalyticsTab({ accessToken }: { accessToken: string | null }) {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
   const [data, setData] = useState<{ monthlyEarnings: MonthlyPoint[]; topSounds: TopSound[]; totalThisMonth: number; totalLastMonth: number; trend: string } | null>(null);
   const [loading, setLoading] = useState(true);
 

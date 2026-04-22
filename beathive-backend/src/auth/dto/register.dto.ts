@@ -1,5 +1,5 @@
 // src/auth/dto/register.dto.ts
-import { IsEmail, IsString, IsOptional, IsIn, MinLength, MaxLength } from 'class-validator';
+import { IsEmail, IsString, MinLength, MaxLength } from 'class-validator';
 
 export class RegisterDto {
   @IsString()
@@ -14,9 +14,4 @@ export class RegisterDto {
   @MinLength(8, { message: 'Password minimal 8 karakter' })
   @MaxLength(72)
   password: string;
-
-  @IsOptional()
-  @IsString()
-  @IsIn(['USER', 'AUTHOR'])
-  role?: string;
 }

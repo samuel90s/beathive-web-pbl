@@ -31,6 +31,7 @@ export class EarningsService {
       if (!sound?.authorId) return;
 
       let amountRp = 0;
+      let earningKey = downloadId;
 
       if (sound.accessLevel === 'PURCHASE') {
         // PURCHASE earnings are recorded by recordOrderEarnings() on order payment — skip here
@@ -41,12 +42,16 @@ export class EarningsService {
         startOfMonth.setDate(1);
         startOfMonth.setHours(0, 0, 0, 0);
 
-        const download = await this.prisma.download.findUnique({ where: { id: downloadId }, select: { userId: true } });
+        const download = await this.prisma.download.findUnique({ where: { id: downloadId }, select: { userId: true, source: true } });
         if (!download?.userId) return;
+
+        // Purchase downloads are already paid via recordOrderEarnings — skip double-counting
+        if (download.source === 'purchase') return;
 
         // Use predictable dedup key — prevents race condition between concurrent requests
         const yearMonth = `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth() + 1).padStart(2, '0')}`;
         const dedupKey = `pro:${download.userId}:${soundId}:${yearMonth}`;
+        earningKey = dedupKey;
 
         const priorEarning = await this.prisma.creatorEarning.findFirst({ where: { downloadId: dedupKey } });
         if (priorEarning) return;
@@ -55,7 +60,7 @@ export class EarningsService {
           where: {
             status: 'PAID',
             createdAt: { gte: startOfMonth },
-            items: { none: {} },
+            gatewayOrderId: { startsWith: 'SUB-' },
           },
           _sum: { totalAmount: true },
         });
@@ -90,14 +95,6 @@ export class EarningsService {
         update: {},
         create: { userId: sound.authorId, balance: 0, totalEarned: 0 },
       });
-
-      const earningKey = sound.accessLevel === 'PRO'
-        ? (() => {
-            const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
-            const ym = `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth()+1).padStart(2,'0')}`;
-            return `pro:${(download as any)?.userId ?? ''}:${soundId}:${ym}`;
-          })()
-        : downloadId;
 
       try {
         await this.prisma.$transaction([
@@ -150,7 +147,6 @@ export class EarningsService {
       if (!order || order.status !== 'PAID') return;
 
       for (const item of order.items) {
-        if (item.soundEffect.accessLevel !== 'PURCHASE') continue;
         if (!item.soundEffect.authorId) continue;
 
         const dedupKey = `order:${item.id}`;
@@ -302,46 +298,50 @@ export class EarningsService {
   // ─── Request withdrawal ───────────────────────────────────
 
   async requestWithdrawal(userId: string, amountRp: number) {
-    const [wallet, user] = await Promise.all([
-      this.prisma.creatorWallet.findUnique({ where: { userId } }),
-      this.prisma.user.findUnique({ where: { id: userId }, select: { bankName: true, bankAccount: true, bankAccountName: true } }),
-    ]);
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { bankName: true, bankAccount: true, bankAccountName: true, email: true, name: true },
+    });
 
     if (!user?.bankName || !user?.bankAccount || !user?.bankAccountName) {
       throw new Error('Please complete your bank account details (bank, account number, and account holder name) in Profile Settings first.');
-    }
-
-    if (!wallet || wallet.balance < MIN_WITHDRAWAL_RP) {
-      throw new Error(`Minimum balance to withdraw is Rp ${MIN_WITHDRAWAL_RP.toLocaleString('id-ID')}`);
-    }
-
-    if (amountRp > wallet.balance) {
-      throw new Error('Amount exceeds available balance');
     }
 
     if (amountRp < MIN_WITHDRAWAL_RP) {
       throw new Error(`Minimum withdrawal is Rp ${MIN_WITHDRAWAL_RP.toLocaleString('id-ID')}`);
     }
 
-    // Atomic withdrawal — balance check inside transaction prevents double-spend
+    // Fetch wallet AND decrement inside interactive transaction to prevent double-spend race condition
     let withdrawal: any;
     try {
-      [withdrawal] = await this.prisma.$transaction([
-        this.prisma.withdrawalRequest.create({
+      withdrawal = await this.prisma.$transaction(async (tx) => {
+        const wallet = await tx.creatorWallet.findUnique({ where: { userId } });
+
+        if (!wallet || wallet.balance < MIN_WITHDRAWAL_RP) {
+          throw new Error(`Minimum balance to withdraw is Rp ${MIN_WITHDRAWAL_RP.toLocaleString('id-ID')}`);
+        }
+        if (wallet.balance < amountRp) {
+          throw new Error('Amount exceeds available balance');
+        }
+
+        const newWithdrawal = await tx.withdrawalRequest.create({
           data: {
             walletId: wallet.id,
             amountRp,
-            bankName: user.bankName,
-            accountNo: user.bankAccount,
+            bankName: user.bankName!,
+            accountNo: user.bankAccount!,
             note: `Account holder: ${user.bankAccountName}`,
             status: 'PENDING',
           },
-        }),
-        this.prisma.creatorWallet.update({
+        });
+
+        await tx.creatorWallet.update({
           where: { id: wallet.id, balance: { gte: amountRp } },
           data: { balance: { decrement: amountRp } },
-        }),
-      ]);
+        });
+
+        return newWithdrawal;
+      });
     } catch (err: any) {
       if (err.code === 'P2025') {
         throw new Error('Insufficient balance — please refresh and try again');
@@ -350,10 +350,8 @@ export class EarningsService {
     }
 
     // Notify creator via email (fire-and-forget)
-    this.prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } })
-      .then(u => {
-        if (u) this.email.sendWithdrawalRequested(u.email, amountRp, user.bankName!, user.bankAccount!, u.name ?? undefined).catch((err: any) => this.logger.error(`Email notification failed: ${err?.message}`));
-      }).catch((err: any) => this.logger.error(`Email notification failed: ${err?.message}`));
+    this.email.sendWithdrawalRequested(user.email!, amountRp, user.bankName!, user.bankAccount!, user.name ?? undefined)
+      .catch((err: any) => this.logger.error(`Email notification failed: ${err?.message}`));
 
     return withdrawal;
   }

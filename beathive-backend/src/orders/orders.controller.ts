@@ -3,7 +3,10 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
+  Param,
+  Res,
   UseGuards,
   RawBodyRequest,
   Req,
@@ -11,6 +14,7 @@ import {
   HttpStatus,
   ForbiddenException,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { OrdersService, CreateOrderDto } from './orders.service';
 import { WebhookService } from './webhook.service';
@@ -62,6 +66,55 @@ export class OrdersController {
   @HttpCode(HttpStatus.OK)
   async midtransWebhook(@Body() payload: any) {
     return this.webhookService.handleMidtransWebhook(payload);
+  }
+
+  // GET /orders/:id/invoice  — detail invoice
+  @Get(':id/invoice')
+  @UseGuards(JwtAuthGuard)
+  async getInvoice(
+    @CurrentUser() userId: string,
+    @Param('id') orderId: string,
+  ) {
+    return this.ordersService.getInvoice(userId, orderId);
+  }
+
+  // GET /orders/:id/invoice/pdf  — download PDF invoice
+  @Get(':id/invoice/pdf')
+  @UseGuards(JwtAuthGuard)
+  async downloadInvoicePdf(
+    @CurrentUser() userId: string,
+    @Param('id') orderId: string,
+    @Res() res: Response,
+  ) {
+    const invoice = await this.ordersService.getInvoice(userId, orderId);
+    const pdf = await this.ordersService.downloadInvoicePdf(userId, orderId);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${invoice.invoiceNumber}.pdf"`,
+      'Content-Length': pdf.length,
+    });
+    res.end(pdf);
+  }
+
+  // PATCH /orders/:id/cancel  — batalkan order PENDING
+  @Patch(':id/cancel')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async cancelOrder(
+    @CurrentUser() userId: string,
+    @Param('id') orderId: string,
+  ) {
+    return this.ordersService.cancelOrder(userId, orderId);
+  }
+
+  // GET /orders/:id/snap-token  — ambil snap token untuk lanjut bayar
+  @Get(':id/snap-token')
+  @UseGuards(JwtAuthGuard)
+  async getSnapToken(
+    @CurrentUser() userId: string,
+    @Param('id') orderId: string,
+  ) {
+    return this.ordersService.getSnapToken(userId, orderId);
   }
 
   // ─── DEV ONLY: Simulate payment success ──────────────────
