@@ -27,12 +27,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (!user || user.role !== 'ADMIN') return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-white/[0.03] flex">
       {/* Sidebar */}
-      <aside className="w-56 bg-white border-r border-gray-100 flex flex-col fixed h-full z-10">
-        <div className="px-5 py-5 border-b border-gray-100">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Admin</p>
-          <p className="text-sm font-medium text-gray-800 mt-0.5">{user.name}</p>
+      <aside className="w-56 bg-surface border-r border-rim flex flex-col fixed h-full z-10">
+        <div className="px-5 py-5 border-b border-rim">
+          <p className="text-xs font-semibold text-[#6b6f82] uppercase tracking-widest">Admin</p>
+          <p className="text-sm font-medium text-[#c4c6d8] mt-0.5">{user.name}</p>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-0.5">
           {NAV.map((item) => {
@@ -43,8 +43,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 href={item.href}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
                   isActive
-                    ? 'bg-violet-50 text-violet-700 font-medium'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    ? 'bg-accent/10 text-accent-bright font-medium'
+                    : 'text-[#8b8fa8] hover:bg-white/[0.03] hover:text-white'
                 }`}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -55,8 +55,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             );
           })}
         </nav>
-        <div className="px-3 py-4 border-t border-gray-100">
-          <Link href="/browse" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-400 hover:text-gray-600 transition-colors">
+        <div className="px-3 py-4 border-t border-rim">
+          <Link href="/browse" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[#6b6f82] hover:text-[#8b8fa8] transition-colors">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
             </svg>
@@ -66,7 +66,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main */}
-      <main className="flex-1 ml-56 p-6">
+      <main className="flex-1 ml-56 p-6 overflow-hidden">
         {children}
       </main>
     </div>

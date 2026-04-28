@@ -10,6 +10,7 @@ import { useDownload } from '@/lib/hooks/useDownload';
 import { useWishlist } from '@/lib/hooks/useWishlist';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { formatDuration, mediaUrl } from '@/lib/utils';
+import { toast } from '@/lib/store/toast.store';
 import WaveformBar from '@/components/sounds/WaveformBar';
 import RatingSection from '@/components/sounds/RatingSection';
 import type { SoundEffect } from '@/types';
@@ -23,7 +24,6 @@ export default function SoundDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [liked, setLiked] = useState(false);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const { currentTrack, isPlaying, play, pause } = usePlayerStore();
   const { addItem, removeItem, hasItem } = useCartStore();
@@ -57,16 +57,16 @@ export default function SoundDetailPage() {
   if (error || !sound) {
     return (
       <div className="max-w-3xl mx-auto px-4 pt-12 text-center">
-        <p className="text-gray-500">{error || 'Sound not found'}</p>
+        <p className="text-[#6b6f82]">{error || 'Sound not found'}</p>
         <div className="flex items-center justify-center gap-3 mt-3">
           <button
             onClick={() => { setError(null); setLoading(true); soundsApi.getOne(slug).then(s => { setSound(s); setLiked(s.isLiked ?? false); }).catch(() => setError('Sound not found')).finally(() => setLoading(false)); }}
-            className="text-violet-600 text-sm hover:underline"
+            className="text-accent-bright text-sm hover:underline"
           >
             Try again
           </button>
-          <span className="text-gray-300">·</span>
-          <Link href="/browse" className="text-gray-500 text-sm hover:underline">Back to Browse</Link>
+          <span className="text-[#3a3c4e]">·</span>
+          <Link href="/browse" className="text-[#6b6f82] text-sm hover:underline">Back to Browse</Link>
         </div>
       </div>
     );
@@ -86,11 +86,10 @@ export default function SoundDetailPage() {
   };
 
   const handleDownload = async () => {
-    setDownloadError(null);
     try {
       await download(sound.id, sound.slug, sound.format);
     } catch (err: any) {
-      setDownloadError(err.message || 'Download failed');
+      toast.error(err.message || 'Download failed');
     }
   };
 
@@ -100,10 +99,10 @@ export default function SoundDetailPage() {
   };
 
   const accessLabels = {
-    FREE: { label: 'Free', cls: 'bg-teal-50 text-teal-700 border-teal-200' },
-    PRO: { label: 'Pro', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-    BUSINESS: { label: 'Business', cls: 'bg-purple-50 text-purple-700 border-purple-200' },
-    PURCHASE: { label: 'Buy', cls: 'bg-gray-50 text-gray-700 border-gray-200' },
+    FREE: { label: 'Free', cls: 'bg-teal/10 text-teal border-teal-200' },
+    PRO: { label: 'Pro', cls: 'bg-amber-500/10 text-amber-400 border-amber-200' },
+    BUSINESS: { label: 'Business', cls: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
+    PURCHASE: { label: 'Buy', cls: 'bg-white/[0.03] text-[#c4c6d8] border-rim' },
   };
   const badge = accessLabels[sound.accessLevel];
 
@@ -116,30 +115,30 @@ export default function SoundDetailPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-gray-400 mb-6">
-        <Link href="/browse" className="hover:text-violet-600 transition-colors">Browse</Link>
+      <nav className="flex items-center gap-2 text-sm text-[#6b6f82] mb-6">
+        <Link href="/browse" className="hover:text-accent-bright transition-colors">Browse</Link>
         <span>/</span>
-        <Link href={`/browse?categorySlug=${sound.category.slug}`} className="hover:text-violet-600 transition-colors">
+        <Link href={`/browse?categorySlug=${sound.category.slug}`} className="hover:text-accent-bright transition-colors">
           {sound.category.name}
         </Link>
         <span>/</span>
-        <span className="text-gray-600 truncate">{sound.title}</span>
+        <span className="text-[#8b8fa8] truncate">{sound.title}</span>
       </nav>
 
       {/* Main card */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+      <div className="card rounded-2xl border border-rim p-6">
         {/* Title + wishlist */}
         <div className="flex items-start justify-between gap-4 mb-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h1 className="text-xl font-semibold text-gray-900">{sound.title}</h1>
+              <h1 className="text-xl font-semibold text-white">{sound.title}</h1>
               <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${badge.cls}`}>
                 {badge.label}
               </span>
             </div>
             {sound.author && (
-              <p className="text-sm text-gray-400">
-                by <span className="text-gray-600 font-medium">{sound.author.name}</span>
+              <p className="text-sm text-[#6b6f82]">
+                by <span className="text-[#8b8fa8] font-medium">{sound.author.name}</span>
               </p>
             )}
           </div>
@@ -148,7 +147,7 @@ export default function SoundDetailPage() {
             disabled={wishlistLoading}
             title={liked ? 'Remove from wishlist' : 'Add to wishlist'}
             className={`flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full border transition-colors ${
-              liked ? 'border-rose-200 text-rose-500 bg-rose-50' : 'border-gray-200 text-gray-300 hover:text-rose-400 hover:border-rose-200'
+              liked ? 'border-rose-500/30 text-rose-400 bg-rose-500/10' : 'border-rim text-[#3a3c4e] hover:text-rose-400 hover:border-rose-200'
             } ${wishlistLoading ? 'opacity-50' : ''}`}
           >
             <svg width="16" height="16" viewBox="0 0 24 24"
@@ -163,13 +162,13 @@ export default function SoundDetailPage() {
         <div
           onClick={togglePlay}
           className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer mb-5 transition-colors ${
-            isActive ? 'bg-violet-50 border border-violet-200' : 'bg-gray-50 border border-gray-100 hover:border-violet-100'
+            isActive ? 'bg-accent/10 border border-accent/30' : 'bg-white/[0.03] border border-rim hover:border-accent/20'
           }`}
         >
           <button
             onClick={(e) => { e.stopPropagation(); togglePlay(); }}
             className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-              isActive ? 'bg-violet-600' : 'bg-gray-200 hover:bg-violet-100'
+              isActive ? 'bg-accent' : 'bg-white/[0.06] hover:bg-accent/20'
             }`}
           >
             {isCurrentlyPlaying ? (
@@ -190,14 +189,14 @@ export default function SoundDetailPage() {
               progress={isActive ? usePlayerStore.getState().progress : 0}
             />
           </div>
-          <span className="text-sm text-gray-400 tabular-nums flex-shrink-0">
+          <span className="text-sm text-[#6b6f82] tabular-nums flex-shrink-0">
             {formatDuration(sound.durationMs)}
           </span>
         </div>
 
         {/* Description */}
         {sound.description && (
-          <p className="text-sm text-gray-600 mb-5 leading-relaxed">{sound.description}</p>
+          <p className="text-sm text-[#8b8fa8] mb-5 leading-relaxed">{sound.description}</p>
         )}
 
         {/* Meta grid */}
@@ -208,9 +207,9 @@ export default function SoundDetailPage() {
             { label: 'Plays', value: sound.playCount.toLocaleString() + 'x' },
             { label: 'Downloads', value: sound.downloadCount.toLocaleString() + 'x' },
           ].map(({ label, value }) => (
-            <div key={label} className="bg-gray-50 rounded-xl p-3">
-              <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-              <p className="text-sm font-semibold text-gray-700">{value}</p>
+            <div key={label} className="bg-white/[0.03] rounded-xl p-3">
+              <p className="text-xs text-[#6b6f82] mb-0.5">{label}</p>
+              <p className="text-sm font-semibold text-[#c4c6d8]">{value}</p>
             </div>
           ))}
         </div>
@@ -222,7 +221,7 @@ export default function SoundDetailPage() {
               <Link
                 key={tag.id}
                 href={`/browse?search=${tag.slug}`}
-                className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 hover:bg-violet-100 hover:text-violet-700 transition-colors"
+                className="text-xs px-2.5 py-1 rounded-full bg-white/[0.05] text-[#8b8fa8] hover:bg-violet-100 hover:text-accent-bright transition-colors"
               >
                 #{tag.name}
               </Link>
@@ -232,17 +231,7 @@ export default function SoundDetailPage() {
 
         {/* File size */}
         {sound.fileSize && (
-          <p className="text-xs text-gray-400 mb-5">File size: {formatFileSize(sound.fileSize)}</p>
-        )}
-
-        {/* Download error */}
-        {downloadError && (
-          <div className="mb-4 px-3 py-2 bg-red-50 text-red-700 text-sm rounded-lg flex items-start gap-2">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5">
-              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-            {downloadError}
-          </div>
+          <p className="text-xs text-[#6b6f82] mb-5">File size: {formatFileSize(sound.fileSize)}</p>
         )}
 
         {/* CTA */}
@@ -263,17 +252,17 @@ export default function SoundDetailPage() {
 
       {/* Author card */}
       {sound.author && (
-        <Link href={`/creators/${sound.author.id}`} className="mt-4 bg-white rounded-2xl border border-gray-100 p-5 flex items-center gap-3 hover:border-violet-200 hover:bg-violet-50/30 transition-colors group block">
-          <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0 text-violet-600 font-semibold text-sm overflow-hidden">
+        <Link href={`/creators/${sound.author.id}`} className="mt-4 card rounded-2xl border border-rim p-5 flex items-center gap-3 hover:border-accent/30 hover:bg-violet-50/30 transition-colors group block">
+          <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0 text-accent-bright font-semibold text-sm overflow-hidden">
             {sound.author.avatarUrl
               ? <img src={mediaUrl(sound.author.avatarUrl)} alt={sound.author.name} className="w-full h-full rounded-full object-cover" />
               : sound.author.name.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Creator</p>
-            <p className="text-sm font-medium text-gray-900 group-hover:text-violet-700 transition-colors">{sound.author.name}</p>
+            <p className="text-xs font-semibold text-[#6b6f82] uppercase tracking-wide mb-0.5">Creator</p>
+            <p className="text-sm font-medium text-white group-hover:text-accent-bright transition-colors">{sound.author.name}</p>
           </div>
-          <svg className="w-4 h-4 text-gray-300 group-hover:text-violet-400 transition-colors flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+          <svg className="w-4 h-4 text-[#3a3c4e] group-hover:text-violet-400 transition-colors flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
         </Link>
       )}
     </div>
@@ -298,7 +287,7 @@ function DownloadCTA({ sound, inCart, isAuthenticated, downloading, onDownload, 
     <button
       onClick={isAuthenticated ? onDownload : onLogin}
       disabled={downloading === sound.id}
-      className="flex-1 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+      className="flex-1 py-2.5 btn-accent rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
     >
       {downloading === sound.id ? (
         <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Downloading...</>
@@ -340,17 +329,17 @@ function DownloadCTA({ sound, inCart, isAuthenticated, downloading, onDownload, 
     return (
       <div className="flex items-center gap-3">
         <div className="text-center px-2 flex-shrink-0">
-          <p className="text-lg font-bold text-gray-900">
+          <p className="text-lg font-bold text-white">
             Rp {(sound.price / 1000).toFixed(0)}k
           </p>
-          <p className="text-xs text-gray-400">{sound.licenseType}</p>
+          <p className="text-xs text-[#6b6f82]">{sound.licenseType}</p>
         </div>
         <button
           onClick={inCart ? onRemoveCart : onAddCart}
           className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${
             inCart
-              ? 'bg-violet-100 text-violet-700 hover:bg-violet-200'
-              : 'bg-violet-600 text-white hover:bg-violet-700'
+              ? 'bg-violet-100 text-accent-bright hover:bg-violet-200'
+              : 'btn-accent'
           }`}
         >
           {inCart ? 'Remove from Cart' : 'Add to Cart'}

@@ -14,6 +14,7 @@ import {
   HttpCode,
   HttpStatus,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -132,7 +133,7 @@ export class AuthController {
     @CurrentUser() userId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    if (!file) throw new Error('No file uploaded');
+    if (!file) throw new BadRequestException('No file uploaded');
     return this.authService.updateAvatar(userId, file);
   }
 

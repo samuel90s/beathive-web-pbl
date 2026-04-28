@@ -19,10 +19,16 @@ class WithdrawDto {
 export class EarningsController {
   constructor(private earningsService: EarningsService) {}
 
-  // GET /earnings/wallet
+  // GET /earnings/wallet?earningsPage=1&earningsLimit=20
   @Get('wallet')
-  async getWallet(@CurrentUser() userId: string) {
-    return this.earningsService.getWallet(userId);
+  async getWallet(
+    @CurrentUser() userId: string,
+    @Query('earningsPage') earningsPage?: string,
+    @Query('earningsLimit') earningsLimit?: string,
+  ) {
+    const page = Math.max(1, parseInt(earningsPage ?? '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(earningsLimit ?? '20', 10) || 20));
+    return this.earningsService.getWallet(userId, page, limit);
   }
 
   // GET /earnings/analytics

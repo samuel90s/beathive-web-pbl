@@ -97,6 +97,7 @@ model Category {
   name         String
   slug         String        @unique
   icon         String?
+  type         String        @default("sfx") // "sfx" | "music"
   soundEffects SoundEffect[]
 
   @@map("categories")
@@ -148,6 +149,7 @@ model SoundEffect {
   wishlists  Wishlist[]
   ratings    Rating[]
 
+  // Indexes applied via scripts/add-indexes.js (idx_sound_effects_*)
   @@map("sound_effects")
 }
 
@@ -186,6 +188,7 @@ model Order {
   items     OrderItem[]
   invoice   Invoice?
 
+  // Indexes applied via scripts/add-indexes.js (idx_orders_*)
   @@map("orders")
 }
 
@@ -239,6 +242,7 @@ model Download {
   user        User        @relation(fields: [userId], references: [id])
   soundEffect SoundEffect @relation(fields: [soundEffectId], references: [id])
 
+  // Indexes applied via scripts/add-indexes.js (idx_downloads_*)
   @@map("downloads")
 }
 
@@ -284,6 +288,7 @@ model CreatorEarning {
   wallet CreatorWallet @relation(fields: [walletId], references: [id])
 
   @@unique([walletId, downloadId]) // prevents duplicate earnings from race conditions
+  // Indexes applied via scripts/add-indexes.js (idx_creator_earnings_*)
   @@map("creator_earnings")
 }
 

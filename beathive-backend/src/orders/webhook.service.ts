@@ -101,7 +101,7 @@ export class WebhookService {
     });
 
     if (!intent) {
-      this.logger.warn(`Subscription intent tidak ditemukan: ${orderId}`);
+      this.logger.warn(`Subscription intent not found: ${orderId}`);
       return;
     }
 
@@ -112,8 +112,15 @@ export class WebhookService {
       orderId,
     );
 
-    // Hapus intent setelah berhasil diproses
-    await this.prisma.subscriptionIntent.delete({ where: { orderId } });
+    // Hapus intent — activation sudah berhasil (idempotent).
+    // Jika delete gagal, webhook retry akan menjalankan activation lagi (upsert, no-op) lalu delete.
+    try {
+      await this.prisma.subscriptionIntent.delete({ where: { orderId } });
+    } catch (err: any) {
+      if (err?.code !== 'P2025') {
+        this.logger.error(`Failed to delete subscription intent ${orderId}: ${err?.message}`);
+      }
+    }
 
     this.logger.log(
       `Subscription aktif: userId=${intent.userId} plan=${intent.planSlug} cycle=${intent.billingCycle}`,
@@ -139,18 +146,21 @@ export class WebhookService {
       },
     });
 
-    if (!order || order.status === 'PAID') return; // idempotent
+    if (!order) return;
+    if (order.status === 'PAID') return; // already processed
 
     await this.prisma.$transaction(async (tx) => {
-      // Update status order
-      await tx.order.update({
-        where: { id: order.id },
+      // Atomic gate: only one concurrent webhook request will transition PENDING → PAID
+      const { count } = await tx.order.updateMany({
+        where: { id: order.id, status: 'PENDING' },
         data: { status: 'PAID', paidAt: new Date() },
       });
+      if (count === 0) return; // concurrent request already processed
 
-      // Generate invoice number
-      const count = await tx.invoice.count();
-      const invoiceNumber = `INV-${new Date().getFullYear()}-${String(count + 1).padStart(5, '0')}`;
+      // Generate invoice number — derived from orderId (unique by construction, no race condition)
+      const year = new Date().getFullYear();
+      const shortId = order.id.replace(/-/g, '').substring(0, 8).toUpperCase();
+      const invoiceNumber = `INV-${year}-${shortId}`;
 
       await tx.invoice.create({
         data: {
@@ -181,8 +191,8 @@ export class WebhookService {
 
     this.logger.log(`Order ${order.id} berhasil dibayar`);
 
-    // Record purchase earnings for creator (fire-and-forget)
-    this.earnings.recordOrderEarnings(order.id).catch(() => {});
+    // Record purchase earnings — await agar tidak hilang; idempotent via dedup key
+    await this.earnings.recordOrderEarnings(order.id);
   }
 
   // ─── DEV ONLY: Simulate payment berhasil (bypass signature) ─

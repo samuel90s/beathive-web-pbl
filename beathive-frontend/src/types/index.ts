@@ -140,6 +140,7 @@ export interface SoundsResponse {
 export interface SoundFilters {
   search?: string;
   categorySlug?: string;
+  soundType?: string;
   isFree?: boolean;
   accessLevel?: 'FREE' | 'PRO' | 'BUSINESS' | 'PURCHASE';
   minDuration?: number;

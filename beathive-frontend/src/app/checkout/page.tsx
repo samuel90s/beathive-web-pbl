@@ -1,6 +1,6 @@
 // src/app/checkout/page.tsx
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/lib/store/cart.store';
 import { ordersApi } from '@/lib/api/orders';
@@ -27,25 +27,31 @@ function InvoiceModal({ invoice, onClose, onDownload, downloading }: {
   const serviceFee = Math.round(invoice.subtotal * SERVICE_FEE_PERCENT / 100);
   const tax = Math.round((invoice.subtotal + serviceFee) * TAX_PERCENT / 100);
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div className="card-lift rounded-2xl shadow-elevated w-full max-w-md overflow-hidden border border-rim">
         {/* Header */}
-        <div className="bg-violet-600 px-6 py-5 text-white">
+        <div className="bg-accent px-6 py-5 text-white">
           <div className="flex items-center justify-between mb-1">
             <span className="text-lg font-bold">BeatHive</span>
-            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">Pembayaran Berhasil ✓</span>
+            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">Payment Successful ✓</span>
           </div>
-          <p className="text-sm text-violet-200">{invoice.invoiceNumber}</p>
-          <p className="text-xs text-violet-300 mt-0.5">{formatDate(invoice.issuedAt)}</p>
+          <p className="text-sm text-accent-bright/80">{invoice.invoiceNumber}</p>
+          <p className="text-xs text-accent-bright/60 mt-0.5">{formatDate(invoice.issuedAt)}</p>
         </div>
 
         <div className="px-6 py-4">
           {/* Customer */}
-          <div className="mb-4 pb-4 border-b border-gray-100">
-            <p className="text-xs text-gray-400 mb-1">Pembeli</p>
-            <p className="text-sm font-medium text-gray-800">{invoice.customer.name}</p>
-            <p className="text-xs text-gray-500">{invoice.customer.email}</p>
+          <div className="mb-4 pb-4 border-b border-rim">
+            <p className="text-xs text-[#6b6f82] mb-1">Customer</p>
+            <p className="text-sm font-medium text-[#c4c6d8]">{invoice.customer.name}</p>
+            <p className="text-xs text-[#6b6f82]">{invoice.customer.email}</p>
           </div>
 
           {/* Items */}
@@ -53,31 +59,31 @@ function InvoiceModal({ invoice, onClose, onDownload, downloading }: {
             {invoice.items.map((item, i) => (
               <div key={i} className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-sm text-gray-800 font-medium">{item.title}</p>
-                  <p className="text-xs text-gray-400 capitalize">{item.licenseType} license</p>
+                  <p className="text-sm text-[#c4c6d8] font-medium">{item.title}</p>
+                  <p className="text-xs text-[#6b6f82] capitalize">{item.licenseType} license</p>
                 </div>
-                <span className="text-sm text-gray-700 flex-shrink-0">{formatPrice(item.price)}</span>
+                <span className="text-sm text-[#c4c6d8] flex-shrink-0">{formatPrice(item.price)}</span>
               </div>
             ))}
           </div>
 
           {/* Breakdown */}
-          <div className="border-t border-gray-100 pt-3 space-y-1.5">
-            <div className="flex justify-between text-xs text-gray-500">
+          <div className="border-t border-rim pt-3 space-y-1.5">
+            <div className="flex justify-between text-xs text-[#6b6f82]">
               <span>Subtotal</span>
               <span>{formatPrice(invoice.subtotal)}</span>
             </div>
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>Biaya Layanan ({SERVICE_FEE_PERCENT}%)</span>
+            <div className="flex justify-between text-xs text-[#6b6f82]">
+              <span>Service Fee ({SERVICE_FEE_PERCENT}%)</span>
               <span>{formatPrice(serviceFee)}</span>
             </div>
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>PPN ({TAX_PERCENT}%)</span>
+            <div className="flex justify-between text-xs text-[#6b6f82]">
+              <span>VAT ({TAX_PERCENT}%)</span>
               <span>{formatPrice(tax)}</span>
             </div>
-            <div className="flex justify-between text-sm font-bold text-gray-900 pt-1.5 border-t border-gray-100">
+            <div className="flex justify-between text-sm font-bold text-white pt-1.5 border-t border-rim">
               <span>Total</span>
-              <span className="text-violet-700">{formatPrice(invoice.subtotal + serviceFee + tax)}</span>
+              <span className="text-accent-bright">{formatPrice(invoice.subtotal + serviceFee + tax)}</span>
             </div>
           </div>
         </div>
@@ -87,18 +93,18 @@ function InvoiceModal({ invoice, onClose, onDownload, downloading }: {
           <button
             onClick={onDownload}
             disabled={downloading}
-            className="flex-1 py-2.5 border border-violet-200 text-violet-600 text-sm font-medium rounded-xl hover:bg-violet-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+            className="flex-1 py-2.5 border border-accent/30 text-accent-bright text-sm font-medium rounded-xl hover:bg-accent/10 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            {downloading ? 'Mengunduh...' : 'Download PDF'}
+            {downloading ? 'Downloading...' : 'Download PDF'}
           </button>
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 bg-violet-600 text-white text-sm font-medium rounded-xl hover:bg-violet-700 transition-colors"
+            className="flex-1 py-2.5 btn-accent text-sm font-medium rounded-xl  transition-colors"
           >
-            Lihat Purchase History
+            View Purchase History
           </button>
         </div>
       </div>
@@ -155,12 +161,12 @@ export default function CheckoutPage() {
           onPending: () => {
             router.push(`/orders/${result.orderId}/success?status=pending`);
           },
-          onError: () => { setError('Pembayaran gagal. Silakan coba lagi.'); setLoading(false); },
+          onError: () => { setError('Payment failed. Please try again.'); setLoading(false); },
           onClose: () => setLoading(false),
         });
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Gagal membuat order');
+      setError(err.response?.data?.message || 'Failed to create order');
       setLoading(false);
     }
   };
@@ -175,11 +181,11 @@ export default function CheckoutPage() {
   if (items.length === 0 && !invoice) {
     return (
       <div className="max-w-lg mx-auto px-4 py-20 text-center">
-        <p className="text-xl font-medium text-gray-900 mb-2">Cart kamu kosong</p>
-        <p className="text-gray-400 mb-6">Tambahkan sound effect dari halaman browse</p>
+        <p className="text-xl font-medium text-white mb-2">Your cart is empty</p>
+        <p className="text-[#6b6f82] mb-6">Add sound effects from the browse page</p>
         <button
           onClick={() => router.push('/browse')}
-          className="px-5 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors"
+          className="px-5 py-2.5 btn-accent rounded-xl text-sm font-medium  transition-colors"
         >
           Browse Sound Effects
         </button>
@@ -200,10 +206,10 @@ export default function CheckoutPage() {
       )}
 
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-6">Cart</h1>
+        <h1 className="text-2xl font-semibold text-white mb-6">Cart</h1>
 
         {/* Items */}
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-4">
+        <div className="card rounded-2xl overflow-hidden mb-4">
           {items.map((item, i) => {
             const price = item.licenseType === 'commercial'
               ? item.sound.price * 2
@@ -220,8 +226,8 @@ export default function CheckoutPage() {
                     </svg>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{item.sound.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{item.sound.category.name}</p>
+                    <p className="text-sm font-medium text-white">{item.sound.title}</p>
+                    <p className="text-xs text-[#6b6f82] mt-0.5">{item.sound.category.name}</p>
                     <div className="flex gap-2 mt-2">
                       {(['personal', 'commercial'] as const).map((type) => (
                         <button
@@ -229,22 +235,22 @@ export default function CheckoutPage() {
                           onClick={() => updateLicense(item.sound.id, type)}
                           className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${
                             item.licenseType === type
-                              ? 'border-violet-400 bg-violet-50 text-violet-700 font-medium'
-                              : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                              ? 'border-violet-400 bg-accent/10 text-accent-bright font-medium'
+                              : 'border-rim text-[#6b6f82] hover:border-gray-300'
                           }`}
                         >
                           {type === 'personal' ? 'Personal' : 'Commercial (2×)'}
                         </button>
                       ))}
                     </div>
-                    <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
+                    <p className="text-xs text-[#6b6f82] mt-1.5 leading-relaxed">
                       {item.licenseType === 'personal'
-                        ? 'Personal: YouTube, media sosial, proyek non-komersial.'
-                        : 'Commercial: Iklan, film, game, produk berbayar. Lisensi seumur hidup.'}
+                        ? 'Personal: YouTube, social media, non-commercial projects.'
+                        : 'Commercial: Ads, films, games, paid products. Lifetime license.'}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-sm font-medium text-gray-900">{formatPrice(price)}</span>
+                    <span className="text-sm font-medium text-white">{formatPrice(price)}</span>
                     <button onClick={() => removeItem(item.sound.id)} className="text-gray-300 hover:text-red-400 transition-colors">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                         <path d="M1 1l12 12M13 1L1 13"/>
@@ -258,40 +264,40 @@ export default function CheckoutPage() {
         </div>
 
         {/* Invoice Breakdown */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">Rincian Pembayaran</h2>
+        <div className="card rounded-2xl p-4 mb-4">
+          <h2 className="text-sm font-semibold text-[#c4c6d8] mb-3">Payment Summary</h2>
           <div className="space-y-2.5">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500">Subtotal</span>
-              <span className="text-gray-800">{formatPrice(subtotal)}</span>
+              <span className="text-[#6b6f82]">Subtotal</span>
+              <span className="text-[#c4c6d8]">{formatPrice(subtotal)}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500">Biaya Layanan ({SERVICE_FEE_PERCENT}%)</span>
-              <span className="text-gray-800">{formatPrice(serviceFee)}</span>
+              <span className="text-[#6b6f82]">Biaya Layanan ({SERVICE_FEE_PERCENT}%)</span>
+              <span className="text-[#c4c6d8]">{formatPrice(serviceFee)}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500">PPN ({TAX_PERCENT}%)</span>
-              <span className="text-gray-800">{formatPrice(tax)}</span>
+              <span className="text-[#6b6f82]">PPN ({TAX_PERCENT}%)</span>
+              <span className="text-[#c4c6d8]">{formatPrice(tax)}</span>
             </div>
-            <div className="border-t border-gray-100 pt-2.5 flex items-center justify-between">
-              <span className="text-sm font-semibold text-gray-900">Total</span>
-              <span className="text-xl font-bold text-gray-900">{formatPrice(grandTotal)}</span>
+            <div className="border-t border-rim pt-2.5 flex items-center justify-between">
+              <span className="text-sm font-semibold text-white">Total</span>
+              <span className="text-xl font-bold text-white">{formatPrice(grandTotal)}</span>
             </div>
           </div>
         </div>
 
         {/* Checkout button */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="card rounded-2xl p-4">
           {error && <div className="mb-3 p-3 bg-red-50 text-red-700 text-sm rounded-xl">{error}</div>}
           <button
             onClick={handleCheckout}
             disabled={loading}
-            className="w-full py-3 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 btn-accent rounded-xl text-sm font-medium  transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Memproses...' : `Bayar ${formatPrice(grandTotal)}`}
+            {loading ? 'Processing...' : `Pay ${formatPrice(grandTotal)}`}
           </button>
-          <p className="text-xs text-center text-gray-400 mt-3">
-            Pembayaran aman via Midtrans · QRIS · Transfer Bank · Kartu Kredit
+          <p className="text-xs text-center text-[#6b6f82] mt-3">
+            Secure payment via Midtrans · QRIS · Bank Transfer · Credit Card
           </p>
         </div>
 

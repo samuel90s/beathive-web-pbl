@@ -1,7 +1,20 @@
 // src/app/providers.tsx
 'use client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import ToastContainer from '@/components/ToastContainer';
+import { useThemeStore } from '@/lib/store/theme.store';
+
+function ThemeInitializer() {
+  const { theme } = useThemeStore();
+  useEffect(() => {
+    const html = document.documentElement;
+    html.classList.remove('dark', 'light');
+    html.classList.add(theme);
+  }, [theme]);
+  return null;
+}
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
@@ -14,8 +27,12 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   }));
 
   return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeInitializer />
+        {children}
+        <ToastContainer />
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

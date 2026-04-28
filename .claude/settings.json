@@ -83,7 +83,14 @@
       "Bash(sed -n '43,62p' beathive-frontend/src/app/dashboard/page.tsx)",
       "Bash(rtk prisma *)",
       "Bash(node_modules/.bin/prisma db *)",
-      "Bash(rtk ls *)"
+      "Bash(rtk ls *)",
+      "Bash(rtk wc *)",
+      "Bash(rtk tsc *)",
+      "Bash(rtk curl *)",
+      "Bash(rtk read *)",
+      "Bash(./node_modules/.bin/prisma db *)",
+      "Bash(./node_modules/.bin/prisma migrate *)",
+      "Bash(./node_modules/.bin/prisma generate *)"
     ],
     "additionalDirectories": [
       "d:\\d\\project\\beathive\\beathive-frontend",

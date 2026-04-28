@@ -13,6 +13,7 @@ const midtransClient = require('midtrans-client');
 @Injectable()
 export class SubscriptionsService {
   private coreApi: any;
+  private snap: any;
 
   constructor(
     private prisma: PrismaService,
@@ -21,6 +22,11 @@ export class SubscriptionsService {
     this.coreApi = new midtransClient.CoreApi({
       isProduction: config.get('MIDTRANS_IS_PRODUCTION') === 'true',
       serverKey: config.get('MIDTRANS_SERVER_KEY'),
+    });
+    this.snap = new midtransClient.Snap({
+      isProduction: config.get('MIDTRANS_IS_PRODUCTION') === 'true',
+      serverKey: config.get('MIDTRANS_SERVER_KEY'),
+      clientKey: config.get('MIDTRANS_CLIENT_KEY'),
     });
   }
 
@@ -32,12 +38,11 @@ export class SubscriptionsService {
       include: { plan: true },
     });
 
-    if (!sub) throw new NotFoundException('Subscription tidak ditemukan');
+    if (!sub) throw new NotFoundException('Subscription not found');
 
-    // Hitung sisa kuota download bulan ini
-    const thisMonth = new Date();
-    thisMonth.setDate(1);
-    thisMonth.setHours(0, 0, 0, 0);
+    // Hitung sisa kuota download bulan ini (UTC agar konsisten lintas timezone)
+    const now = new Date();
+    const thisMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 
     const downloadsThisMonth = await this.prisma.download.count({
       where: {
@@ -68,7 +73,7 @@ export class SubscriptionsService {
     billingCycle: 'monthly' | 'yearly',
   ) {
     const plan = await this.prisma.plan.findUnique({ where: { slug: planSlug } });
-    if (!plan) throw new NotFoundException('Plan tidak ditemukan');
+    if (!plan) throw new NotFoundException('Plan not found');
 
     if (plan.slug === 'free') {
       throw new BadRequestException('Tidak bisa upgrade ke free plan');
@@ -84,12 +89,7 @@ export class SubscriptionsService {
     const totalAmount = basePrice + serviceFee + tax;
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-
-    const snap = new midtransClient.Snap({
-      isProduction: this.config.get('MIDTRANS_IS_PRODUCTION') === 'true',
-      serverKey: this.config.get('MIDTRANS_SERVER_KEY'),
-      clientKey: this.config.get('MIDTRANS_CLIENT_KEY'),
-    });
+    if (!user) throw new NotFoundException('User not found');
 
     const ts = Date.now().toString(36).toUpperCase();
     const rnd = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -99,7 +99,7 @@ export class SubscriptionsService {
       data: { orderId, userId, planSlug, billingCycle },
     });
 
-    const transaction = await snap.createTransaction({
+    const transaction = await this.snap.createTransaction({
       transaction_details: {
         order_id: orderId,
         gross_amount: totalAmount,
@@ -125,8 +125,8 @@ export class SubscriptionsService {
         },
       ],
       customer_details: {
-        first_name: user!.name,
-        email: user!.email,
+        first_name: user.name,
+        email: user.email,
       },
     });
 
@@ -149,7 +149,7 @@ export class SubscriptionsService {
     gatewaySubId: string,
   ) {
     const plan = await this.prisma.plan.findUnique({ where: { slug: planSlug } });
-    if (!plan) return;
+    if (!plan) throw new NotFoundException(`Plan '${planSlug}' not found`);
 
     const now = new Date();
     const periodEnd = new Date(now);
@@ -196,11 +196,11 @@ export class SubscriptionsService {
         include: { plan: true },
       });
       if (sub?.status === 'ACTIVE') return { activated: true, alreadyActive: true };
-      throw new BadRequestException('Intent pembayaran tidak ditemukan');
+      throw new BadRequestException('Payment intent not found');
     }
 
     if (intent.userId !== userId) {
-      throw new BadRequestException('Order bukan milik user ini');
+      throw new BadRequestException('Order does not belong to this user');
     }
 
     // Cek status transaksi langsung ke Midtrans
@@ -245,11 +245,11 @@ export class SubscriptionsService {
     });
 
     if (!sub || sub.status !== 'ACTIVE') {
-      throw new BadRequestException('Tidak ada subscription aktif');
+      throw new BadRequestException('No active subscription found');
     }
 
     if (sub.plan.slug === 'free') {
-      throw new BadRequestException('Free plan tidak bisa di-cancel');
+      throw new BadRequestException('Free plan cannot be cancelled');
     }
 
     // Set cancelled — akses tetap aktif sampai currentPeriodEnd

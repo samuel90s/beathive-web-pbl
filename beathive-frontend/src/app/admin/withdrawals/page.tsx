@@ -2,6 +2,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api/client';
+import { toast } from '@/lib/store/toast.store';
 
 interface WithdrawalItem {
   id: string;
@@ -17,9 +18,9 @@ interface WithdrawalItem {
 }
 
 const STATUS_COLORS = {
-  PENDING: 'bg-amber-50 text-amber-700',
-  PAID: 'bg-teal-50 text-teal-700',
-  REJECTED: 'bg-red-50 text-red-600',
+  PENDING: 'bg-amber-500/10 text-amber-400',
+  PAID: 'bg-teal/10 text-teal',
+  REJECTED: 'bg-red-500/10 text-red-400',
 };
 
 export default function AdminWithdrawalsPage() {
@@ -49,9 +50,10 @@ export default function AdminWithdrawalsPage() {
     setActionLoading(id);
     try {
       await apiClient.patch(`/admin/withdrawals/${id}`, { status, note });
+      toast.success(status === 'PAID' ? 'Withdrawal approved' : 'Withdrawal rejected');
       await load();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Action failed');
+      toast.error(err.response?.data?.message || 'Failed to process withdrawal');
     } finally {
       setActionLoading(null);
     }
@@ -61,8 +63,8 @@ export default function AdminWithdrawalsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Withdrawal Requests</h1>
-          <p className="text-sm text-gray-400 mt-0.5">{total} total requests</p>
+          <h1 className="text-xl font-semibold text-white">Withdrawal Requests</h1>
+          <p className="text-sm text-[#6b6f82] mt-0.5">{total} total requests</p>
         </div>
         <div className="flex gap-2">
           {(['ALL', 'PENDING', 'PAID', 'REJECTED'] as const).map((s) => (
@@ -71,8 +73,8 @@ export default function AdminWithdrawalsPage() {
               onClick={() => setStatusFilter(s)}
               className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                 statusFilter === s
-                  ? 'bg-violet-600 text-white'
-                  : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                  ? 'btn-accent'
+                  : 'bg-surface border border-rim text-[#8b8fa8] hover:bg-white/[0.03]'
               }`}
             >
               {s === 'ALL' ? 'All' : s.charAt(0) + s.slice(1).toLowerCase()}
@@ -86,43 +88,43 @@ export default function AdminWithdrawalsPage() {
           <div className="w-6 h-6 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
+        <div className="card rounded-2xl border border-rim p-12 text-center text-[#6b6f82] text-sm">
           No withdrawal requests found.
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div className="card rounded-2xl border border-rim overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100">
+            <thead className="bg-white/[0.03] border-b border-rim">
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Creator</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Amount</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Bank</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Date</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Actions</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[#6b6f82]">Creator</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[#6b6f82]">Amount</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[#6b6f82]">Bank</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[#6b6f82]">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[#6b6f82]">Date</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[#6b6f82]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-white/[0.04]">
               {items.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={item.id} className="hover:bg-white/[0.03] transition-colors">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-gray-900">{item.wallet.user.name}</p>
-                    <p className="text-xs text-gray-400">{item.wallet.user.email}</p>
+                    <p className="font-medium text-white">{item.wallet.user.name}</p>
+                    <p className="text-xs text-[#6b6f82]">{item.wallet.user.email}</p>
                   </td>
-                  <td className="px-4 py-3 font-semibold text-gray-900">
+                  <td className="px-4 py-3 font-semibold text-white">
                     Rp {item.amountRp.toLocaleString('id-ID')}
                   </td>
                   <td className="px-4 py-3">
                     {item.bankName ? (
                       <>
-                        <p className="text-gray-700 font-medium">{item.bankName}</p>
-                        <p className="text-xs font-mono text-gray-500">{item.accountNo}</p>
+                        <p className="text-[#c4c6d8] font-medium">{item.bankName}</p>
+                        <p className="text-xs font-mono text-[#6b6f82]">{item.accountNo}</p>
                         {item.note?.startsWith('Account holder:') && (
-                          <p className="text-xs text-gray-400">{item.note.replace('Account holder: ', '')}</p>
+                          <p className="text-xs text-[#6b6f82]">{item.note.replace('Account holder: ', '')}</p>
                         )}
                       </>
                     ) : (
-                      <span className="text-gray-400">—</span>
+                      <span className="text-[#6b6f82]">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -130,10 +132,10 @@ export default function AdminWithdrawalsPage() {
                       {item.status}
                     </span>
                     {item.note && (
-                      <p className="text-xs text-gray-400 mt-0.5">{item.note}</p>
+                      <p className="text-xs text-[#6b6f82] mt-0.5">{item.note}</p>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-400">
+                  <td className="px-4 py-3 text-xs text-[#6b6f82]">
                     {new Date(item.createdAt).toLocaleDateString('en-GB')}
                   </td>
                   <td className="px-4 py-3">
@@ -152,19 +154,19 @@ export default function AdminWithdrawalsPage() {
                             placeholder="Rejection note..."
                             value={rejectNote[item.id] ?? ''}
                             onChange={(e) => setRejectNote((p) => ({ ...p, [item.id]: e.target.value }))}
-                            className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-400 min-w-0"
+                            className="flex-1 text-xs px-2 py-1.5 border border-rim rounded-lg focus:outline-none focus:ring-1 focus:ring-red-400 min-w-0"
                           />
                           <button
                             onClick={() => updateStatus(item.id, 'REJECTED', rejectNote[item.id])}
                             disabled={actionLoading === item.id}
-                            className="px-2 py-1.5 bg-red-50 text-red-600 text-xs font-medium rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50 whitespace-nowrap"
+                            className="px-2 py-1.5 bg-red-500/10 text-red-400 text-xs font-medium rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50 whitespace-nowrap"
                           >
                             Reject
                           </button>
                         </div>
                       </div>
                     ) : (
-                      <span className="text-xs text-gray-400">—</span>
+                      <span className="text-xs text-[#6b6f82]">—</span>
                     )}
                   </td>
                 </tr>

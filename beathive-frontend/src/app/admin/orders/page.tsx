@@ -16,10 +16,10 @@ interface Order {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  PENDING: 'bg-amber-50 text-amber-700',
-  PAID:    'bg-teal-50 text-teal-700',
-  FAILED:  'bg-red-50 text-red-700',
-  REFUNDED:'bg-gray-100 text-gray-600',
+  PENDING: 'bg-amber-500/10 text-amber-400',
+  PAID:    'bg-teal/10 text-teal',
+  FAILED:  'bg-red-500/10 text-red-400',
+  REFUNDED:'bg-white/[0.05] text-[#8b8fa8]',
 };
 
 export default function AdminOrdersPage() {
@@ -39,8 +39,8 @@ export default function AdminOrdersPage() {
   return (
     <div>
       <div className="mb-5">
-        <h1 className="text-xl font-semibold text-gray-900">Orders</h1>
-        <p className="text-sm text-gray-400 mt-0.5">{total} total order</p>
+        <h1 className="text-xl font-semibold text-white">Orders</h1>
+        <p className="text-sm text-[#6b6f82] mt-0.5">{total} total orders</p>
       </div>
 
       {loading ? (
@@ -48,46 +48,46 @@ export default function AdminOrdersPage() {
           <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div className="card rounded-2xl border border-rim overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">User</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Items</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Invoice</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Total</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Tanggal</th>
+              <tr className="border-b border-rim bg-white/[0.03]">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[#6b6f82] uppercase tracking-wider">User</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[#6b6f82] uppercase tracking-wider">Items</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[#6b6f82] uppercase tracking-wider">Invoice</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-[#6b6f82] uppercase tracking-wider">Total</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-[#6b6f82] uppercase tracking-wider">Status</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-[#6b6f82] uppercase tracking-wider">Date</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-white/[0.04]">
               {orders.map(o => (
-                <tr key={o.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={o.id} className="hover:bg-white/[0.03] transition-colors">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-gray-800">{o.user.name}</p>
-                    <p className="text-xs text-gray-400">{o.user.email}</p>
+                    <p className="font-medium text-[#c4c6d8]">{o.user.name}</p>
+                    <p className="text-xs text-[#6b6f82]">{o.user.email}</p>
                   </td>
                   <td className="px-4 py-3">
                     {o.items.map((item, i) => (
-                      <p key={i} className="text-xs text-gray-600 truncate max-w-[180px]">
+                      <p key={i} className="text-xs text-[#8b8fa8] truncate max-w-[180px]">
                         {item.soundEffect.title}
-                        <span className="text-gray-400"> ({item.licenseType})</span>
+                        <span className="text-[#6b6f82]"> ({item.licenseType})</span>
                       </p>
                     ))}
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-500">
+                  <td className="px-4 py-3 text-xs text-[#6b6f82]">
                     {o.invoice?.invoiceNumber || '—'}
                   </td>
-                  <td className="px-4 py-3 text-right font-medium text-gray-800">
+                  <td className="px-4 py-3 text-right font-medium text-[#c4c6d8]">
                     Rp {(o.totalAmount / 1000).toFixed(0)}rb
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[o.status] || 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[o.status] || 'bg-white/[0.05] text-[#8b8fa8]'}`}>
                       {o.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right text-xs text-gray-400">
-                    {new Date(o.createdAt).toLocaleDateString('id-ID')}
+                  <td className="px-4 py-3 text-right text-xs text-[#6b6f82]">
+                    {new Date(o.createdAt).toLocaleDateString('en-GB')}
                   </td>
                 </tr>
               ))}

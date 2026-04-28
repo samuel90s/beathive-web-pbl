@@ -4,37 +4,34 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePlayerStore } from '@/lib/store/player.store';
 import { useCartStore } from '@/lib/store/cart.store';
+import { useAuthStore } from '@/lib/store/auth.store';
 import { useDownload } from '@/lib/hooks/useDownload';
 import { useWishlist } from '@/lib/hooks/useWishlist';
 import { formatDuration } from '@/lib/utils';
+import { toast } from '@/lib/store/toast.store';
 import type { SoundEffect } from '@/types';
 import WaveformBar from './WaveformBar';
 import clsx from 'clsx';
 
-interface Props {
-  sound: SoundEffect;
-}
+interface Props { sound: SoundEffect }
 
 export default function SoundRow({ sound }: Props) {
   const { currentTrack, isPlaying, play, pause } = usePlayerStore();
   const { addItem, removeItem, hasItem } = useCartStore();
+  const { user } = useAuthStore();
   const { download, downloading } = useDownload();
   const { toggle: toggleWishlist, loadingId } = useWishlist();
-
   const [liked, setLiked] = useState<boolean>(sound.isLiked ?? false);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const isActive = currentTrack?.id === sound.id;
   const isCurrentlyPlaying = isActive && isPlaying;
   const inCart = hasItem(sound.id);
   const wishlistLoading = loadingId === sound.id;
+  const isOwner = !!(user?.id && sound.author?.id && sound.author.id === user.id);
 
   const togglePlay = () => {
-    if (isActive) {
-      isPlaying ? pause() : usePlayerStore.getState().resume();
-    } else {
-      play(sound);
-    }
+    if (isActive) isPlaying ? pause() : usePlayerStore.getState().resume();
+    else play(sound);
   };
 
   const handleBuy = (e: React.MouseEvent) => {
@@ -45,11 +42,10 @@ export default function SoundRow({ sound }: Props) {
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    setDownloadError(null);
     try {
       await download(sound.id, sound.slug, sound.format);
     } catch (err: any) {
-      setDownloadError(err.message || 'Gagal download');
+      toast.error(err.message || 'Download failed');
     }
   };
 
@@ -59,9 +55,9 @@ export default function SoundRow({ sound }: Props) {
   };
 
   const accessBadge = {
-    FREE: null,
-    PRO: { label: 'Pro', cls: 'bg-amber-50 text-amber-700' },
-    BUSINESS: { label: 'Business', cls: 'bg-purple-50 text-purple-700' },
+    FREE:     null,
+    PRO:      { label: 'PRO',      cls: 'bg-violet-500/15 text-violet-400 border-violet-500/20' },
+    BUSINESS: { label: 'BUSINESS', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
     PURCHASE: null,
   }[sound.accessLevel];
 
@@ -69,29 +65,40 @@ export default function SoundRow({ sound }: Props) {
     <div
       onClick={togglePlay}
       className={clsx(
-        'flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer group transition-all',
+        'flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer group transition-all duration-150',
         isActive
-          ? 'border-violet-200 bg-violet-50'
-          : 'border-gray-100 bg-white hover:border-violet-100 hover:bg-gray-50',
+          ? 'border-accent/40 bg-accent/8'
+          : 'border-rim bg-surface hover:border-white/[0.12] hover:bg-lift',
       )}
+      style={isActive ? { backgroundColor: 'rgba(139,92,246,0.08)' } : undefined}
     >
       {/* Play button */}
       <button
         onClick={(e) => { e.stopPropagation(); togglePlay(); }}
         className={clsx(
-          'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors',
-          isActive ? 'bg-violet-600' : 'bg-gray-100 group-hover:bg-violet-100',
+          'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-150 relative',
+          isActive
+            ? 'bg-accent shadow-[0_0_12px_rgba(139,92,246,0.4)]'
+            : 'bg-white/[0.06] group-hover:bg-accent/20',
         )}
       >
         {isCurrentlyPlaying ? (
-          <svg width="10" height="10" viewBox="0 0 10 10" fill={isActive ? 'white' : '#7c3aed'}>
-            <rect x="1" y="0" width="3" height="10" rx="1"/>
-            <rect x="6" y="0" width="3" height="10" rx="1"/>
+          <svg width="9" height="9" viewBox="0 0 10 10" fill={isActive ? 'white' : '#8b5cf6'}>
+            <rect x="1" y="0" width="3" height="10" rx="1.5"/>
+            <rect x="6" y="0" width="3" height="10" rx="1.5"/>
           </svg>
         ) : (
-          <svg width="10" height="12" viewBox="0 0 10 12" fill={isActive ? 'white' : '#9ca3af'}>
+          <svg width="9" height="11" viewBox="0 0 10 12" fill={isActive ? 'white' : '#6b6f82'}>
             <polygon points="0,0 10,6 0,12"/>
           </svg>
+        )}
+        {/* Lock badge for restricted sounds (not shown for owner) */}
+        {sound.accessLevel !== 'FREE' && !isActive && !isOwner && (
+          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#0c0d16] border border-rim flex items-center justify-center">
+            <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="#6b6f82" strokeWidth="2.5" strokeLinecap="round">
+              <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          </span>
         )}
       </button>
 
@@ -101,23 +108,20 @@ export default function SoundRow({ sound }: Props) {
           <Link
             href={`/sounds/${sound.slug}`}
             onClick={(e) => e.stopPropagation()}
-            className="text-sm font-medium text-gray-900 truncate hover:text-violet-600 transition-colors"
+            className="text-sm font-medium text-[#c4c6d8] truncate hover:text-accent-bright transition-colors"
           >
             {sound.title}
           </Link>
           {accessBadge && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${accessBadge.cls}`}>
+            <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium flex-shrink-0 ${accessBadge.cls}`}>
               {accessBadge.label}
             </span>
           )}
         </div>
-        <p className="text-xs text-gray-400 truncate">
+        <p className="text-xs text-[#5a5d72] truncate mt-0.5">
           {sound.category.name}
           {sound.tags?.slice(0, 2).map((t) => ` · ${t.name}`)}
         </p>
-        {downloadError && (
-          <p className="text-xs text-red-500 mt-0.5 truncate">{downloadError}</p>
-        )}
       </div>
 
       {/* Waveform */}
@@ -130,81 +134,88 @@ export default function SoundRow({ sound }: Props) {
       </div>
 
       {/* Duration */}
-      <span className="text-xs text-gray-400 w-10 text-right flex-shrink-0 tabular-nums">
+      <span className="text-xs text-[#5a5d72] w-10 text-right flex-shrink-0 tabular-nums">
         {formatDuration(sound.durationMs)}
       </span>
 
-      {/* Wishlist button */}
-      <button
-        onClick={handleWishlist}
-        disabled={wishlistLoading}
-        title={liked ? 'Hapus dari wishlist' : 'Tambah ke wishlist'}
-        className={clsx(
-          'flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-colors',
-          liked
-            ? 'text-rose-500 hover:text-rose-400'
-            : 'text-gray-300 hover:text-rose-400',
-          wishlistLoading && 'opacity-50 cursor-not-allowed',
-        )}
-      >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill={liked ? 'currentColor' : 'none'}
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+      {/* Wishlist — hidden for own sounds */}
+      {!isOwner && (
+        <button
+          onClick={handleWishlist}
+          disabled={wishlistLoading}
+          title={liked ? 'Remove from wishlist' : 'Add to wishlist'}
+          className={clsx(
+            'flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-150',
+            liked ? 'text-rose-400' : 'text-[#3a3c4e] hover:text-rose-400',
+            wishlistLoading && 'opacity-50',
+          )}
         >
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-        </svg>
-      </button>
+          <svg width="15" height="15" viewBox="0 0 24 24"
+            fill={liked ? 'currentColor' : 'none'}
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+        </button>
+      )}
 
       {/* Price / Action */}
       <div className="flex items-center gap-2 flex-shrink-0 w-28 justify-end">
-        {sound.accessLevel !== 'PURCHASE' ? (
+
+        {/* Owner badge — replaces all actions */}
+        {isOwner ? (
+          <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-violet-500/10 text-violet-400 border border-violet-500/20">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+            </svg>
+            Your Sound
+          </span>
+        ) : sound.accessLevel !== 'PURCHASE' ? (
           <>
-            {sound.accessLevel === 'FREE' && <span className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium">Free</span>}
+            {sound.accessLevel === 'FREE' && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-teal/10 text-teal border border-teal/20 font-medium">Free</span>
+            )}
             {sound.accessLevel === 'PRO' && sound.price > 0 && (
-              <span className="text-xs text-gray-500 font-medium">Rp {(sound.price / 1000).toFixed(0)}k</span>
+              <span className="text-xs text-[#5a5d72] font-medium">Rp {(sound.price / 1000).toFixed(0)}k</span>
             )}
             <button
               onClick={handleDownload}
               disabled={downloading === sound.id}
               title="Download"
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-teal-200 text-teal-700 hover:bg-teal-50 transition-colors disabled:opacity-50"
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-teal/20 text-teal/70 hover:bg-teal/10 hover:text-teal hover:border-teal/40 transition-all disabled:opacity-40"
             >
               {downloading === sound.id ? (
-                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" /></svg>
+                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" strokeOpacity=".2"/><path d="M12 2a10 10 0 0 1 10 10"/>
+                </svg>
               ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
               )}
             </button>
           </>
         ) : (
           <>
-            <span className="text-xs text-gray-500 font-medium">
+            <span className="text-xs text-[#5a5d72] font-medium">
               Rp {(sound.price / 1000).toFixed(0)}k
             </span>
             <button
               onClick={handleBuy}
               title={inCart ? 'Remove from cart' : 'Add to cart'}
               className={clsx(
-                'w-8 h-8 flex items-center justify-center rounded-lg transition-colors',
+                'w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150',
                 inCart
-                  ? 'bg-violet-100 text-violet-700 hover:bg-violet-200'
-                  : 'bg-violet-600 text-white hover:bg-violet-700',
+                  ? 'bg-accent/20 text-accent-bright hover:bg-accent/30'
+                  : 'bg-accent text-white hover:bg-accent-dim shadow-glow-sm',
               )}
             >
               {inCart ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12"/>
                 </svg>
               ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
                   <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
                 </svg>

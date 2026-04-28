@@ -47,12 +47,20 @@ export class OrdersService {
     });
 
     if (sounds.length !== dto.items.length) {
-      throw new NotFoundException('Satu atau lebih sound effect tidak ditemukan');
+      throw new NotFoundException('One or more sound effects were not found');
     }
 
     const nonPurchaseSounds = sounds.filter(s => s.accessLevel !== 'PURCHASE');
     if (nonPurchaseSounds.length > 0) {
-      throw new BadRequestException('Hanya sound effect berlabel "Purchase" yang dapat dibeli');
+      throw new BadRequestException('Only sounds with "Purchase" access level can be bought');
+    }
+
+    // Block self-purchase: creators cannot buy their own sounds
+    const ownSounds = sounds.filter(s => s.authorId === userId);
+    if (ownSounds.length > 0) {
+      throw new BadRequestException(
+        `You cannot purchase your own sound${ownSounds.length > 1 ? 's' : ''}: "${ownSounds.map(s => s.title).join('", "')}"`
+      );
     }
 
     // 2. Hitung total (harga lisensi commercial = 2x personal)
@@ -73,14 +81,15 @@ export class OrdersService {
     const totalAmount = subtotal + serviceFee + tax;
 
     if (subtotal === 0) {
-      throw new BadRequestException('Semua item gratis — tidak perlu checkout');
+      throw new BadRequestException('All items are free — no checkout needed');
     }
     if (totalAmount > 1_000_000_000) {
-      throw new BadRequestException('Total order melebihi batas maksimum');
+      throw new BadRequestException('Order total exceeds maximum limit');
     }
 
     // 3. Ambil data user
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
 
     // 4. Buat order di database (cek duplikat di dalam transaction agar atomic)
     const order = await this.prisma.$transaction(async (tx) => {
@@ -95,7 +104,7 @@ export class OrdersService {
         });
         if (existing) {
           throw new BadRequestException(
-            `Kamu sudah memiliki lisensi ${item.licenseType} untuk sound effect ini`,
+            `You already own a ${item.licenseType} license for this sound effect`,
           );
         }
       }
@@ -175,8 +184,8 @@ export class OrdersService {
         user: { select: { name: true, email: true } },
       },
     });
-    if (!order) throw new NotFoundException('Order tidak ditemukan');
-    if (!order.invoice) throw new NotFoundException('Invoice belum tersedia. Selesaikan pembayaran terlebih dahulu.');
+    if (!order) throw new NotFoundException('Order not found');
+    if (!order.invoice) throw new NotFoundException('Invoice not available. Complete your payment first.');
     return {
       invoiceNumber: order.invoice.invoiceNumber,
       issuedAt: order.invoice.issuedAt,
@@ -286,7 +295,7 @@ export class OrdersService {
       where: { gatewayOrderId: orderId, userId },
     });
 
-    if (!order) throw new NotFoundException('Order tidak ditemukan');
+    if (!order) throw new NotFoundException('Order not found');
     if (order.status === 'PAID') return { activated: true, alreadyActive: true };
 
     // Cek status ke Midtrans
@@ -305,29 +314,31 @@ export class OrdersService {
 
     const isPaid = midtransStatus === 'settlement' || midtransStatus === 'capture';
     if (!isPaid) {
-      throw new BadRequestException('Pembayaran belum selesai. Coba lagi setelah pembayaran dikonfirmasi.');
+      throw new BadRequestException('Payment not yet complete. Try again after payment is confirmed.');
     }
 
-    // Aktifkan via webhook service logic — update order jadi PAID
-    await this.prisma.order.update({
-      where: { id: order.id },
-      data: { status: 'PAID', paidAt: new Date() },
-    });
+    // Atomic gate: only one concurrent request (frontend or webhook) will transition PENDING → PAID
+    const activated = await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.order.updateMany({
+        where: { id: order.id, status: 'PENDING' },
+        data: { status: 'PAID', paidAt: new Date() },
+      });
+      if (count === 0) return false; // webhook already processed it
 
-    // Buat invoice jika belum ada (idempotent — webhook mungkin belum fire)
-    const existingInvoice = await this.prisma.invoice.findUnique({
-      where: { orderId: order.id },
-    });
-    if (!existingInvoice) {
-      const count = await this.prisma.invoice.count();
-      const invoiceNumber = `INV-${new Date().getFullYear()}-${String(count + 1).padStart(5, '0')}`;
-      await this.prisma.invoice.create({
+      // Generate invoice number — derived from orderId, unique by construction
+      const year = new Date().getFullYear();
+      const shortId = order.id.replace(/-/g, '').substring(0, 8).toUpperCase();
+      const invoiceNumber = `INV-${year}-${shortId}`;
+      await tx.invoice.create({
         data: { orderId: order.id, invoiceNumber },
       });
-    }
+      return true;
+    });
 
-    // Record purchase earnings (idempotent — safe to call even if webhook already fired)
-    this.earnings.recordOrderEarnings(order.id).catch(() => {});
+    // Record purchase earnings (idempotent via dedup key 'order:<itemId>')
+    if (activated) {
+      await this.earnings.recordOrderEarnings(order.id);
+    }
 
     return { activated: true };
   }
@@ -338,9 +349,9 @@ export class OrdersService {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId },
     });
-    if (!order) throw new NotFoundException('Order tidak ditemukan');
+    if (!order) throw new NotFoundException('Order not found');
     if (order.status !== 'PENDING') {
-      throw new BadRequestException('Hanya order dengan status PENDING yang bisa dibatalkan');
+      throw new BadRequestException('Only PENDING orders can be cancelled');
     }
     await this.prisma.order.update({
       where: { id: orderId },
@@ -356,9 +367,9 @@ export class OrdersService {
       where: { id: orderId, userId },
       include: { items: { include: { soundEffect: true } } },
     });
-    if (!order) throw new NotFoundException('Order tidak ditemukan');
+    if (!order) throw new NotFoundException('Order not found');
     if (order.status !== 'PENDING') {
-      throw new BadRequestException('Order sudah tidak bisa dibayar');
+      throw new BadRequestException('This order can no longer be paid');
     }
 
     // Kembalikan token lama jika masih ada, atau buat baru

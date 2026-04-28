@@ -79,9 +79,9 @@ export default function WishlistPage() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Wishlist Saya</h1>
-        <p className="text-sm text-gray-400 mt-1">
-          Sound effect yang kamu sukai
+        <h1 className="text-2xl font-bold text-white">My Wishlist</h1>
+        <p className="text-sm text-[#6b6f82] mt-1">
+          Sound effects you have liked
           {data && ` · ${data.pagination.total} sound`}
         </p>
       </div>
@@ -90,7 +90,7 @@ export default function WishlistPage() {
       {isLoading && (
         <div className="space-y-2">
           {Array(6).fill(0).map((_, i) => (
-            <div key={i} className="h-16 bg-white rounded-xl border border-gray-100 animate-pulse" />
+            <div key={i} className="h-16 card rounded-xl border border-rim animate-pulse" />
           ))}
         </div>
       )}
@@ -103,13 +103,13 @@ export default function WishlistPage() {
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
             </svg>
           </div>
-          <p className="text-gray-500 font-medium">Belum ada sound di wishlist</p>
-          <p className="text-sm text-gray-400 mt-1">
-            Tekan ikon ♡ pada sound manapun untuk menyimpannya di sini
+          <p className="text-[#6b6f82] font-medium">Your wishlist is empty</p>
+          <p className="text-sm text-[#6b6f82] mt-1">
+            Press the ♡ icon on any sound to save it here
           </p>
           <button
             onClick={() => router.push('/browse')}
-            className="mt-4 px-5 py-2.5 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 transition-colors"
+            className="mt-4 px-5 py-2.5 btn-accent text-sm font-medium rounded-lg hover:bg-violet-700 transition-colors"
           >
             Browse Sound Effects
           </button>
@@ -133,7 +133,7 @@ export default function WishlistPage() {
                     'flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer group transition-all',
                     isActive
                       ? 'border-violet-200 bg-violet-50'
-                      : 'border-gray-100 bg-white hover:border-violet-100 hover:bg-gray-50',
+                      : 'border-rim bg-surface hover:border-violet-100 hover:bg-white/[0.03]',
                   )}
                 >
                   {/* Play button */}
@@ -141,7 +141,7 @@ export default function WishlistPage() {
                     onClick={(e) => { e.stopPropagation(); togglePlay(sound); }}
                     className={clsx(
                       'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors',
-                      isActive ? 'bg-violet-600' : 'bg-gray-100 group-hover:bg-violet-100',
+                      isActive ? 'bg-violet-600' : 'bg-white/[0.05] group-hover:bg-violet-100',
                     )}
                   >
                     {isCurrentlyPlaying ? (
@@ -158,29 +158,29 @@ export default function WishlistPage() {
 
                   {/* Info */}
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900 truncate">{sound.title}</p>
-                    <p className="text-xs text-gray-400 truncate">
+                    <p className="text-sm font-medium text-white truncate">{sound.title}</p>
+                    <p className="text-xs text-[#6b6f82] truncate">
                       {sound.category.name}
                       {sound.tags.slice(0, 2).map((t) => ` · ${t.name}`)}
                     </p>
                   </div>
 
                   {/* Duration */}
-                  <span className="text-xs text-gray-400 flex-shrink-0 tabular-nums hidden sm:block">
+                  <span className="text-xs text-[#6b6f82] flex-shrink-0 tabular-nums hidden sm:block">
                     {formatDuration(sound.durationMs)}
                   </span>
 
                   {/* Format badge */}
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-mono flex-shrink-0 uppercase">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.05] text-[#6b6f82] font-mono flex-shrink-0 uppercase">
                     {sound.format}
                   </span>
 
                   {/* Price */}
                   <span className={clsx(
                     'text-xs font-medium flex-shrink-0',
-                    sound.isFree ? 'text-teal-600' : 'text-gray-600',
+                    sound.isFree ? 'text-teal' : 'text-[#8b8fa8]',
                   )}>
-                    {sound.isFree ? 'Gratis' : `Rp ${(sound.price / 1000).toFixed(0)}rb`}
+                    {sound.isFree ? 'Free' : `Rp ${(sound.price / 1000).toFixed(0)}k`}
                   </span>
 
                   {/* Download */}
@@ -201,7 +201,7 @@ export default function WishlistPage() {
                   <button
                     onClick={(e) => { e.stopPropagation(); handleRemove(sound); }}
                     disabled={removing}
-                    title="Hapus dari wishlist"
+                    title="Remove from wishlist"
                     className={clsx(
                       'flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-colors text-rose-400 hover:text-rose-600 hover:bg-rose-50',
                       removing && 'opacity-50 cursor-not-allowed',
@@ -222,19 +222,19 @@ export default function WishlistPage() {
               <button
                 disabled={page === 1}
                 onClick={() => fetchWishlist(page - 1)}
-                className="px-4 py-2 text-sm rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 text-sm rounded-lg border border-rim disabled:opacity-40 hover:bg-white/[0.03] transition-colors"
               >
-                Sebelumnya
+                Previous
               </button>
-              <span className="px-4 py-2 text-sm text-gray-500">
+              <span className="px-4 py-2 text-sm text-[#6b6f82]">
                 {page} / {data.pagination.totalPages}
               </span>
               <button
                 disabled={page === data.pagination.totalPages}
                 onClick={() => fetchWishlist(page + 1)}
-                className="px-4 py-2 text-sm rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 text-sm rounded-lg border border-rim disabled:opacity-40 hover:bg-white/[0.03] transition-colors"
               >
-                Berikutnya
+                Next
               </button>
             </div>
           )}

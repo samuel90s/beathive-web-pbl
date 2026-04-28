@@ -252,15 +252,21 @@ export class EarningsService {
 
   // ─── Get wallet + earning history ────────────────────────
 
-  async getWallet(userId: string) {
+  async getWallet(userId: string, earningsPage = 1, earningsLimit = 20) {
+    const skip = (Math.max(1, earningsPage) - 1) * earningsLimit;
+
     const wallet = await this.prisma.creatorWallet.findUnique({
       where: { userId },
       include: {
         earnings: {
           orderBy: { earnedAt: 'desc' },
-          take: 20,
-          include: {
-            wallet: { select: { userId: true } },
+          skip,
+          take: earningsLimit,
+          select: {
+            id: true,
+            soundId: true,
+            amountRp: true,
+            earnedAt: true,
           },
         },
         withdrawals: {
@@ -271,8 +277,11 @@ export class EarningsService {
     });
 
     if (!wallet) {
-      return { balance: 0, totalEarned: 0, earnings: [], withdrawals: [] };
+      return { balance: 0, totalEarned: 0, earnings: [], withdrawals: [], earningsPagination: { total: 0, page: earningsPage, limit: earningsLimit, totalPages: 0 } };
     }
+
+    // Total earnings count untuk pagination
+    const totalEarnings = await this.prisma.creatorEarning.count({ where: { walletId: wallet.id } });
 
     // Enrich earnings dengan sound title
     const soundIds = [...new Set(wallet.earnings.map(e => e.soundId))];
@@ -292,6 +301,12 @@ export class EarningsService {
         earnedAt: e.earnedAt,
       })),
       withdrawals: wallet.withdrawals,
+      earningsPagination: {
+        total: totalEarnings,
+        page: earningsPage,
+        limit: earningsLimit,
+        totalPages: Math.ceil(totalEarnings / earningsLimit),
+      },
     };
   }
 

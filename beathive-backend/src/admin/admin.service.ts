@@ -54,7 +54,9 @@ export class AdminService {
         where,
         include: {
           category: true,
-          author: { select: { id: true, name: true, email: true } },
+          author: { select: { id: true, name: true, email: true, createdAt: true, _count: { select: { uploadedSounds: true } } } },
+          tags: { include: { tag: { select: { name: true, slug: true } } } },
+          _count: { select: { downloads: true, ratings: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip,
@@ -72,7 +74,7 @@ export class AdminService {
 
   async approveSound(soundId: string, adminId: string) {
     const sound = await this.prisma.soundEffect.findUnique({ where: { id: soundId } });
-    if (!sound) throw new NotFoundException('Sound tidak ditemukan');
+    if (!sound) throw new NotFoundException('Sound not found');
 
     const updated = await this.prisma.soundEffect.update({
       where: { id: soundId },
@@ -101,7 +103,7 @@ export class AdminService {
 
   async rejectSound(soundId: string, adminId: string, reason: string) {
     const sound = await this.prisma.soundEffect.findUnique({ where: { id: soundId } });
-    if (!sound) throw new NotFoundException('Sound tidak ditemukan');
+    if (!sound) throw new NotFoundException('Sound not found');
 
     const updated = await this.prisma.soundEffect.update({
       where: { id: soundId },

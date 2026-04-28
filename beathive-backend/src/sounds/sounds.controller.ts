@@ -4,6 +4,7 @@ import {
   Get,
   Post,
   Delete,
+  Patch,
   Param,
   Query,
   Body,
@@ -17,6 +18,9 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
   Optional,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -27,7 +31,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const archiver = require('archiver');
-import { SoundsService, SoundFilterDto, UploadSoundDto } from './sounds.service';
+import { SoundsService, SoundFilterDto, UploadSoundDto, UpdateSoundDto } from './sounds.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -43,6 +47,7 @@ export class SoundsController {
 
   // ─── GET /sounds ──────────────────────────────────────────
   @Get()
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
   async findAll(
     @Query() filters: SoundFilterDto,
     @Req() req: any,
@@ -102,7 +107,7 @@ export class SoundsController {
         if (allowed.includes(file.mimetype) || file.originalname.match(/\.(wav|mp3|ogg|flac)$/i)) {
           cb(null, true);
         } else {
-          cb(new Error(`MIME type tidak didukung: ${file.mimetype}`), false);
+          cb(new Error(`Unsupported MIME type: ${file.mimetype}`), false);
         }
       },
     }),
@@ -113,7 +118,7 @@ export class SoundsController {
     @CurrentUser() uploaderId: string,
   ) {
     if (!file) {
-      return { success: false, message: 'File audio wajib diupload' };
+      throw new BadRequestException('File audio wajib diupload');
     }
     return this.soundsService.uploadSound(file, dto, uploaderId);
   }
@@ -135,7 +140,7 @@ export class SoundsController {
     const info = await this.soundsService.getPreviewInfo(id);
 
     if (!info) {
-      return res.status(HttpStatus.NOT_FOUND).json({ message: 'Sound tidak ditemukan' });
+      return res.status(HttpStatus.NOT_FOUND).json({ message: 'Sound not found' });
     }
 
     // Jika previewUrl adalah URL eksternal (CDN/S3 public) → redirect
@@ -198,20 +203,44 @@ export class SoundsController {
     @Res() res: Response,
   ) {
     const sound = await this.soundsService.findById(id);
-    if (!sound) {
-      return res.status(HttpStatus.NOT_FOUND).json({ message: 'Sound not found' });
-    }
+    if (!sound) throw new NotFoundException('Sound not found');
 
-    const filePath = this.soundsService.getLocalDownloadPath(sound.fileUrl);
-    if (!filePath || !fs.existsSync(filePath)) {
-      return res.status(HttpStatus.NOT_FOUND).json({ message: 'Audio file not available' });
-    }
-
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    // Verifikasi akses — user harus punya download record (dari requestDownload)
     const lastDownload = await this.prisma.download.findFirst({
       where: { userId, soundEffectId: id },
       orderBy: { downloadedAt: 'desc' },
     });
+    if (!lastDownload) {
+      throw new ForbiddenException('Akses ditolak. Gunakan tombol Download untuk mengunduh.');
+    }
+
+    // Cek apakah download link sudah expired
+    if (lastDownload.expiresAt && lastDownload.expiresAt < new Date()) {
+      throw new ForbiddenException('Download link has expired. Click the Download button again to get a new link.');
+    }
+
+    // Subscription downloads diblokir kalau sound sudah unpublished; purchase tetap boleh
+    if (!sound.isPublished && lastDownload.source === 'subscription') {
+      throw new ForbiddenException('Sound ini sudah tidak tersedia untuk diunduh.');
+    }
+
+    // Untuk subscription downloads, re-verify bahwa subscription masih aktif
+    if (lastDownload.source === 'subscription') {
+      const subscription = await this.prisma.subscription.findUnique({
+        where: { userId },
+        include: { plan: true },
+      });
+      if (!subscription || subscription.status !== 'ACTIVE' || subscription.currentPeriodEnd < new Date()) {
+        throw new ForbiddenException('Subscription kamu sudah tidak aktif. Perbarui plan untuk download ulang.');
+      }
+    }
+
+    const filePath = this.soundsService.getLocalDownloadPath(sound.fileUrl);
+    if (!filePath || !fs.existsSync(filePath)) {
+      throw new NotFoundException('Audio file not available');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
     let licenseType = 'free';
     let invoiceNumber = `DL-${Date.now()}`;
@@ -256,85 +285,145 @@ export class SoundsController {
     licenseType: string;
     invoiceNumber: string;
   }): string {
-    const date = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
-    const sep = '='.repeat(50);
+    const now = new Date();
+    const date = now.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+    const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
 
-    const header = [
-      'BEATHIVE — LICENSE CERTIFICATE',
-      sep,
-      `Sound       : ${data.soundTitle}`,
-      `Sound ID    : ${data.soundId}`,
-      `Licensee    : ${data.buyerName} <${data.buyerEmail}>`,
-      `Invoice     : ${data.invoiceNumber}`,
-      `Date        : ${date}`,
-      sep,
-      '',
-    ].join('\n');
+    const W = 60;
+    const line  = '─'.repeat(W);
+    const dline = '═'.repeat(W);
 
-    const bodies: Record<string, string> = {
-      free: [
-        'LICENSE TYPE: FREE',
-        '',
-        'YOU MAY:',
-        '  + Use in personal, non-commercial projects',
-        '  + Use in YouTube / social media (non-monetized)',
-        '',
-        'YOU MAY NOT:',
-        '  - Use in commercial or paid projects',
-        '  - Resell or redistribute this file',
-        '  - Claim as your own original work',
-        '',
-        'Attribution to BeatHive is appreciated.',
-      ].join('\n'),
-
-      subscription: [
-        'LICENSE TYPE: SUBSCRIPTION',
-        '',
-        'YOU MAY:',
-        '  + Use in commercial projects',
-        '  + Use in ads, films, podcasts, and games',
-        '  + Modify and adapt as needed',
-        '',
-        'YOU MAY NOT:',
-        '  - Resell or redistribute this file',
-        '  - Claim as your own original work',
-        '',
-        'This license is valid while your BeatHive subscription is active.',
-      ].join('\n'),
-
-      commercial: [
-        'LICENSE TYPE: COMMERCIAL (SINGLE PURCHASE)',
-        '',
-        'YOU MAY:',
-        '  + Use in commercial projects with no time limit',
-        '  + Use in ads, films, and paid products',
-        '  + Modify and adapt as needed',
-        '',
-        'YOU MAY NOT:',
-        '  - Resell or redistribute this file',
-        '  - Claim as your own original work',
-        '',
-        'This license is perpetual (lifetime).',
-      ].join('\n'),
-
-      personal: [
-        'LICENSE TYPE: PERSONAL (SINGLE PURCHASE)',
-        '',
-        'YOU MAY:',
-        '  + Use in personal, non-commercial projects',
-        '  + Use in YouTube / social media (non-monetized)',
-        '',
-        'YOU MAY NOT:',
-        '  - Use in commercial or paid projects',
-        '  - Resell or redistribute this file',
-        '  - Claim as your own original work',
-        '',
-        'This license is perpetual (lifetime).',
-      ].join('\n'),
+    const center = (s: string) => {
+      const pad = Math.max(0, Math.floor((W - s.length) / 2));
+      return ' '.repeat(pad) + s;
     };
 
-    const body = bodies[data.licenseType] ?? bodies.personal;
-    return header + body + '\n\n' + sep + '\nGenerated by BeatHive. beathive.com\n';
+    const field = (label: string, value: string) => {
+      const labelPart = `  ${label.padEnd(14)}`;
+      return `${labelPart}  ${value}`;
+    };
+
+    const licenseConfigs: Record<string, {
+      tag: string; scope: string; validity: string;
+      grant: string[]; restrict: string[];
+    }> = {
+      free: {
+        tag:      'FREE COMMUNITY LICENSE',
+        scope:    'Personal & Non-Commercial Use',
+        validity: 'Perpetual',
+        grant: [
+          'Personal and educational projects',
+          'YouTube / social media (non-monetized)',
+          'Live streaming (non-commercial)',
+          'Student films and portfolios',
+        ],
+        restrict: [
+          'Commercial advertising or paid campaigns',
+          'Resale, redistribution, or sub-licensing',
+          'Claiming authorship of the original work',
+        ],
+      },
+      subscription: {
+        tag:      'SUBSCRIPTION COMMERCIAL LICENSE',
+        scope:    'Full Commercial Use',
+        validity: 'Valid while BeatHive subscription is active',
+        grant: [
+          'Commercial advertising and branded content',
+          'Films, TV, podcasts, and broadcast media',
+          'Mobile apps, games, and software products',
+          'Social media (monetized)',
+          'Modification and adaptation for your projects',
+        ],
+        restrict: [
+          'Resale or redistribution as a standalone file',
+          'Claiming authorship of the original work',
+          'Use after subscription expiration (re-download required)',
+        ],
+      },
+      commercial: {
+        tag:      'COMMERCIAL SINGLE-USE LICENSE',
+        scope:    'Full Commercial Use — Perpetual',
+        validity: 'Perpetual (lifetime)',
+        grant: [
+          'Commercial advertising and branded content',
+          'Films, TV, podcasts, and broadcast media',
+          'Mobile apps, games, and software products',
+          'Social media (monetized)',
+          'Modification and adaptation for your projects',
+        ],
+        restrict: [
+          'Resale or redistribution as a standalone file',
+          'Claiming authorship of the original work',
+        ],
+      },
+      personal: {
+        tag:      'PERSONAL SINGLE-USE LICENSE',
+        scope:    'Personal & Non-Commercial Use — Perpetual',
+        validity: 'Perpetual (lifetime)',
+        grant: [
+          'Personal and educational projects',
+          'YouTube / social media (non-monetized)',
+          'Live streaming (non-commercial)',
+          'Student films and portfolios',
+        ],
+        restrict: [
+          'Commercial advertising or paid campaigns',
+          'Resale, redistribution, or sub-licensing',
+          'Claiming authorship of the original work',
+        ],
+      },
+    };
+
+    const cfg = licenseConfigs[data.licenseType] ?? licenseConfigs.personal;
+
+    const lines: string[] = [
+      '',
+      center('╔' + '═'.repeat(W) + '╗'),
+      center('║' + ' '.repeat(W) + '║'),
+      center('║' + center('B E A T H I V E').padEnd(W) + '║'),
+      center('║' + center('LICENSE CERTIFICATE').padEnd(W) + '║'),
+      center('║' + ' '.repeat(W) + '║'),
+      center('╚' + '═'.repeat(W) + '╝'),
+      '',
+      dline,
+      center(`[ ${cfg.tag} ]`),
+      dline,
+      '',
+      field('SOUND TITLE', data.soundTitle),
+      field('SOUND ID', data.soundId),
+      field('SCOPE', cfg.scope),
+      field('VALIDITY', cfg.validity),
+      '',
+      line,
+      center('LICENSEE DETAILS'),
+      line,
+      '',
+      field('NAME', data.buyerName),
+      field('EMAIL', data.buyerEmail),
+      field('INVOICE', data.invoiceNumber),
+      field('ISSUED ON', `${date}  ${time}`),
+      '',
+      line,
+      center('USAGE RIGHTS'),
+      line,
+      '',
+      '  YOU MAY:',
+      ...cfg.grant.map(g => `    ✓  ${g}`),
+      '',
+      '  YOU MAY NOT:',
+      ...cfg.restrict.map(r => `    ✗  ${r}`),
+      '',
+      dline,
+      '',
+      '  This certificate was automatically generated by BeatHive and serves as',
+      '  proof of license for the above-named asset. Keep this file for your',
+      '  records. For support: support@beathive.com | beathive.com',
+      '',
+      dline,
+      '',
+    ];
+
+    return lines.join('\n');
   }
 
   // ─── POST /sounds/:id/recalculate-duration  (admin/author only) ──
@@ -395,5 +484,18 @@ export class SoundsController {
       return this.soundsService.toggleWishlist(id, userId);
     }
     return result;
+  }
+
+  // ─── PATCH /sounds/:id ────────────────────────────────────
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  async updateSound(
+    @Param('id') id: string,
+    @CurrentUser() userId: string,
+    @Req() req: any,
+    @Body() body: UpdateSoundDto,
+  ) {
+    const isAdmin = req.user?.role === 'ADMIN';
+    return this.soundsService.updateSound(userId, id, body, isAdmin);
   }
 }

@@ -68,13 +68,13 @@ function OrderSuccessContent() {
               <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Pembayaran Diproses</h1>
-          <p className="text-gray-500 mb-8">Pembayaranmu sedang dikonfirmasi. Download akan tersedia setelah pembayaran selesai.</p>
+          <h1 className="text-2xl font-bold text-white mb-2">Payment Processing</h1>
+          <p className="text-[#6b6f82] mb-8">Your payment is being confirmed. Downloads will be available once the payment is complete.</p>
           <button
             onClick={() => router.push('/dashboard')}
-            className="w-full py-3 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors"
+            className="w-full py-3 btn-accent rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors"
           >
-            Lihat Riwayat Pembelian
+            View Purchase History
           </button>
         </div>
       </div>
@@ -95,17 +95,17 @@ function OrderSuccessContent() {
               <polyline points="20 6 9 17 4 12"/>
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Pembayaran Berhasil!</h1>
-          <p className="text-sm text-gray-400 mt-1">Sound effect kamu siap didownload</p>
+          <h1 className="text-2xl font-bold text-white">Payment Successful!</h1>
+          <p className="text-sm text-[#6b6f82] mt-1">Your sound effects are ready to download</p>
         </div>
 
         {/* Invoice card */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-4">
+        <div className="card rounded-2xl border border-rim shadow-sm overflow-hidden mb-4">
           {/* Invoice header */}
           <div className="bg-violet-600 px-5 py-4 text-white">
             <div className="flex items-center justify-between mb-0.5">
               <span className="font-bold">BeatHive</span>
-              <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">Pembayaran Berhasil ✓</span>
+              <span className="text-xs bg-surface/20 px-2 py-0.5 rounded-full">Payment Successful ✓</span>
             </div>
             <p className="text-sm text-violet-200">{invoice.invoiceNumber}</p>
             <p className="text-xs text-violet-300 mt-0.5">{formatDate(invoice.issuedAt)}</p>
@@ -114,9 +114,9 @@ function OrderSuccessContent() {
           <div className="px-5 py-4">
             {/* Customer */}
             <div className="mb-4 pb-3 border-b border-gray-50">
-              <p className="text-xs text-gray-400 mb-1">Pembeli</p>
-              <p className="text-sm font-medium text-gray-800">{invoice.customer.name}</p>
-              <p className="text-xs text-gray-400">{invoice.customer.email}</p>
+              <p className="text-xs text-[#6b6f82] mb-1">Customer</p>
+              <p className="text-sm font-medium text-[#c4c6d8]">{invoice.customer.name}</p>
+              <p className="text-xs text-[#6b6f82]">{invoice.customer.email}</p>
             </div>
 
             {/* Items */}
@@ -124,31 +124,31 @@ function OrderSuccessContent() {
               {invoice.items.map((item, i) => (
                 <div key={i} className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-sm text-gray-800 font-medium truncate">{item.title}</p>
-                    <p className="text-xs text-gray-400 capitalize">{item.licenseType} license</p>
+                    <p className="text-sm text-[#c4c6d8] font-medium truncate">{item.title}</p>
+                    <p className="text-xs text-[#6b6f82] capitalize">{item.licenseType} license</p>
                   </div>
-                  <span className="text-sm text-gray-700 flex-shrink-0">{formatPrice(item.price)}</span>
+                  <span className="text-sm text-[#c4c6d8] flex-shrink-0">{formatPrice(item.price)}</span>
                 </div>
               ))}
             </div>
 
             {/* Breakdown */}
-            <div className="border-t border-gray-100 pt-3 space-y-1.5">
-              <div className="flex justify-between text-xs text-gray-500">
+            <div className="border-t border-rim pt-3 space-y-1.5">
+              <div className="flex justify-between text-xs text-[#6b6f82]">
                 <span>Subtotal</span>
                 <span>{formatPrice(invoice.subtotal)}</span>
               </div>
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>Biaya Layanan ({SERVICE_FEE_PERCENT}%)</span>
+              <div className="flex justify-between text-xs text-[#6b6f82]">
+                <span>Service Fee ({SERVICE_FEE_PERCENT}%)</span>
                 <span>{formatPrice(serviceFee)}</span>
               </div>
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>PPN ({TAX_PERCENT}%)</span>
+              <div className="flex justify-between text-xs text-[#6b6f82]">
+                <span>VAT ({TAX_PERCENT}%)</span>
                 <span>{formatPrice(tax)}</span>
               </div>
-              <div className="flex justify-between text-sm font-bold text-gray-900 pt-2 border-t border-gray-100">
-                <span>Total Dibayar</span>
-                <span className="text-violet-700">{formatPrice(grandTotal)}</span>
+              <div className="flex justify-between text-sm font-bold text-white pt-2 border-t border-rim">
+                <span>Total Paid</span>
+                <span className="text-accent-bright">{formatPrice(grandTotal)}</span>
               </div>
             </div>
           </div>
@@ -159,18 +159,18 @@ function OrderSuccessContent() {
           <button
             onClick={handleDownloadPdf}
             disabled={downloadingPdf}
-            className="flex-1 py-2.5 border border-violet-200 text-violet-600 text-sm font-medium rounded-xl hover:bg-violet-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+            className="flex-1 py-2.5 border border-violet-200 text-accent-bright text-sm font-medium rounded-xl hover:bg-violet-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            {downloadingPdf ? 'Mengunduh...' : 'Invoice PDF'}
+            {downloadingPdf ? 'Downloading...' : 'Invoice PDF'}
           </button>
           <button
             onClick={() => router.push('/dashboard')}
-            className="flex-1 py-2.5 bg-violet-600 text-white text-sm font-medium rounded-xl hover:bg-violet-700 transition-colors"
+            className="flex-1 py-2.5 btn-accent text-sm font-medium rounded-xl hover:bg-violet-700 transition-colors"
           >
-            Lihat Pembelian
+            View Purchases
           </button>
         </div>
       </div>

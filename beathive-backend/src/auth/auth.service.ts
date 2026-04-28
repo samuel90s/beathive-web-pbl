@@ -32,7 +32,7 @@ export class AuthService {
       where: { email: dto.email },
     });
     if (existing) {
-      throw new ConflictException('Email sudah terdaftar');
+      throw new ConflictException('Email is already registered');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
@@ -118,7 +118,7 @@ export class AuthService {
       const tokens = await this.generateTokens(user.id, user.email);
       return tokens;
     } catch {
-      throw new UnauthorizedException('Refresh token tidak valid atau expired');
+      throw new UnauthorizedException('Refresh token is invalid or expired');
     }
   }
 
@@ -247,7 +247,7 @@ export class AuthService {
           id: true, title: true, slug: true, accessLevel: true, price: true,
           durationMs: true, downloadCount: true, playCount: true, previewUrl: true, waveformData: true,
           category: { select: { name: true, slug: true } },
-          tags: { select: { tag: { select: { name: true, slug: true } } } },
+          tags: { take: 10, select: { tag: { select: { name: true, slug: true } } } },
         },
       }),
     ]);

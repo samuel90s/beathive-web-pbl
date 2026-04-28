@@ -16,6 +16,7 @@ import {
   MaxLength,
   Min,
   Max,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { PrismaService } from '../prisma/prisma.service';
@@ -35,6 +36,11 @@ export class SoundFilterDto {
   @IsOptional()
   @IsString()
   categorySlug?: string;
+
+  /** Filter berdasarkan tipe: "sfx" atau "music" */
+  @IsOptional()
+  @IsString()
+  soundType?: string;
 
   /** Filter hanya sound gratis (price = 0) */
   @IsOptional()
@@ -137,6 +143,35 @@ export class UploadSoundDto {
   tags?: string; // comma-separated tag names
 }
 
+export class UpdateSoundDto {
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  price?: number;
+
+  @IsOptional()
+  @IsEnum(['FREE', 'PRO', 'BUSINESS', 'PURCHASE'])
+  accessLevel?: string;
+
+  @IsOptional()
+  @IsString()
+  categorySlug?: string;
+
+  @IsOptional()
+  @IsString({ each: true })
+  @ArrayMaxSize(20)
+  tags?: string[];
+}
+
 // ─── Service ──────────────────────────────────────────────
 
 @Injectable()
@@ -180,7 +215,11 @@ export class SoundsService {
       ];
     }
 
-    if (categorySlug) where.category = { slug: categorySlug };
+    if (categorySlug) {
+      where.category = { slug: categorySlug };
+    } else if (filters.soundType) {
+      where.category = { type: filters.soundType };
+    }
 
     if (isFree !== undefined) {
       where.price = String(isFree) === 'true' || isFree === true ? 0 : { gt: 0 };
@@ -269,7 +308,7 @@ export class SoundsService {
         wishlists: userId ? { where: { userId } } : false,
       },
     });
-    if (!sound) throw new NotFoundException('Sound effect tidak ditemukan');
+    if (!sound) throw new NotFoundException('Sound effect not found');
 
     // Cek apakah user sudah membeli sound ini (untuk PURCHASE access level)
     let isPurchased = false;
@@ -321,7 +360,7 @@ export class SoundsService {
       where: { id: soundId },
     });
     if (!sound || !sound.isPublished) {
-      throw new NotFoundException('Sound effect tidak ditemukan');
+      throw new NotFoundException('Sound effect not found');
     }
 
     // ── Cek akses ───────────────────────────────────────────
@@ -349,35 +388,34 @@ export class SoundsService {
       const required = accessReq[sound.accessLevel] ?? 999;
 
       if (required === 999) {
-        throw new ForbiddenException('Sound ini harus dibeli satuan terlebih dahulu');
+        throw new ForbiddenException('This sound must be purchased individually');
       }
 
       // FREE sounds: izinkan jika user login, bahkan tanpa subscription aktif
       if (required > 0) {
         if (!subscription || subscription.status !== 'ACTIVE') {
           throw new ForbiddenException(
-            'Butuh subscription aktif untuk download sound ini. Upgrade plan kamu.',
+            'An active subscription is required to download this sound. Upgrade your plan.',
           );
         }
 
         if (subscription.currentPeriodEnd < new Date()) {
           throw new ForbiddenException(
-            'Subscription kamu sudah expired. Perbarui plan kamu untuk melanjutkan download.',
+            'Your subscription has expired. Renew your plan to continue downloading.',
           );
         }
 
         const userLevel = planHierarchy.indexOf(subscription.plan.slug);
         if (userLevel < required) {
           throw new ForbiddenException(
-            `Sound ini butuh plan ${planHierarchy[required]} ke atas`,
+            `This sound requires a ${planHierarchy[required]} plan or higher`,
           );
         }
 
         // Cek kuota bulanan
         if (!subscription.plan.unlimited) {
-          const thisMonth = new Date();
-          thisMonth.setDate(1);
-          thisMonth.setHours(0, 0, 0, 0);
+          const now = new Date();
+          const thisMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
           const downloadsThisMonth = await this.prisma.download.count({
             where: {
               userId,
@@ -387,7 +425,7 @@ export class SoundsService {
           });
           if (downloadsThisMonth >= subscription.plan.downloadLimit) {
             throw new ForbiddenException(
-              `Kuota download bulan ini sudah habis (${subscription.plan.downloadLimit}x). Tunggu bulan depan atau upgrade plan.`,
+              `Monthly download limit reached (${subscription.plan.downloadLimit}x). Wait until next month or upgrade your plan.`,
             );
           }
         }
@@ -448,18 +486,18 @@ export class SoundsService {
 
   async recalculateDuration(soundId: string, requesterId?: string): Promise<{ durationMs: number }> {
     const sound = await this.prisma.soundEffect.findUnique({ where: { id: soundId } });
-    if (!sound) throw new NotFoundException('Sound tidak ditemukan');
+    if (!sound) throw new NotFoundException('Sound not found');
 
     if (requesterId) {
       const requester = await this.prisma.user.findUnique({ where: { id: requesterId }, select: { role: true } });
       if (requester?.role !== 'ADMIN' && sound.authorId !== requesterId) {
-        throw new ForbiddenException('Hanya pemilik sound atau admin yang bisa melakukan ini');
+        throw new ForbiddenException('Only the sound owner or an admin can do this');
       }
     }
 
     // Baca file dari local storage
     const filePath = this.storage.getLocalFilePath(sound.fileUrl);
-    if (!filePath) throw new BadRequestException('File tidak tersedia di lokal');
+    if (!filePath) throw new BadRequestException('File not available on local storage');
 
     const fs = await import('fs');
     const buffer = fs.readFileSync(filePath);
@@ -487,14 +525,14 @@ export class SoundsService {
     const uploader = await this.prisma.user.findUnique({
       where: { id: uploaderId },
     });
-    if (!uploader) throw new ForbiddenException('User tidak ditemukan');
+    if (!uploader) throw new ForbiddenException('User not found');
 
     // Validasi format
     const ext = (file.originalname.split('.').pop() ?? 'wav').toLowerCase();
     const validFormats = ['wav', 'mp3', 'ogg', 'flac'];
     if (!validFormats.includes(ext)) {
       throw new BadRequestException(
-        `Format tidak didukung: ${ext}. Gunakan WAV, MP3, OGG, atau FLAC.`,
+        `Unsupported format: ${ext}. Use WAV, MP3, OGG, or FLAC.`,
       );
     }
 
@@ -502,15 +540,15 @@ export class SoundsService {
     let categoryId = dto.categoryId;
     if (!categoryId && dto.categorySlug) {
       if (!/^[a-z0-9-]+$/.test(dto.categorySlug)) {
-        throw new BadRequestException('Format category slug tidak valid');
+        throw new BadRequestException('Invalid category slug format');
       }
       const cat = await this.prisma.category.findUnique({
         where: { slug: dto.categorySlug },
       });
-      if (!cat) throw new BadRequestException(`Kategori '${dto.categorySlug}' tidak ditemukan`);
+      if (!cat) throw new BadRequestException(`Kategori '${dto.categorySlug}' not found`);
       categoryId = cat.id;
     }
-    if (!categoryId) throw new BadRequestException('categoryId atau categorySlug harus diisi');
+    if (!categoryId) throw new BadRequestException('categoryId or categorySlug is required');
 
     // Generate slug unik
     const slug = dto.slug
@@ -520,6 +558,7 @@ export class SoundsService {
     const soundId = uuidv4();
 
     // Read file from disk (diskStorage) or memory (memoryStorage fallback)
+    if (!file.buffer && !file.path) throw new BadRequestException('File audio tidak tersedia');
     const fileBuffer: Buffer = file.buffer ?? fs.readFileSync(file.path!);
 
     // Proses audio
@@ -641,7 +680,7 @@ export class SoundsService {
     const sound = await this.prisma.soundEffect.findUnique({
       where: { id: soundId },
     });
-    if (!sound) throw new NotFoundException('Sound effect tidak ditemukan');
+    if (!sound) throw new NotFoundException('Sound effect not found');
 
     const existing = await this.prisma.wishlist.findUnique({
       where: { userId_soundEffectId: { userId, soundEffectId: soundId } },
@@ -781,5 +820,96 @@ export class SoundsService {
     return Array.from({ length: bars }, () =>
       Math.floor(Math.random() * 20) + 4,
     );
+  }
+
+  // ─── Update sound (owner or admin) ───────────────────────
+
+  async updateSound(
+    userId: string,
+    soundId: string,
+    dto: UpdateSoundDto,
+    isAdmin = false,
+  ) {
+    const sound = await this.prisma.soundEffect.findUnique({
+      where: { id: soundId },
+    });
+    if (!sound) throw new NotFoundException('Sound effect not found');
+    if (!isAdmin && sound.authorId !== userId) {
+      throw new ForbiddenException('You do not have permission to edit this sound');
+    }
+
+    const updateData: any = {};
+
+    if (dto.title !== undefined) {
+      const baseSlug = this.toSlug(dto.title);
+      const slug = sound.title === dto.title
+        ? sound.slug
+        : await this.ensureUniqueSlug(baseSlug);
+      updateData.title = dto.title;
+      updateData.slug = slug;
+    }
+    if (dto.description !== undefined) updateData.description = dto.description;
+
+    const priceChanged = dto.price !== undefined && dto.price !== sound.price;
+    const accessLevelChanged = dto.accessLevel !== undefined && dto.accessLevel !== sound.accessLevel;
+
+    if (dto.price !== undefined) updateData.price = dto.price;
+    if (dto.accessLevel !== undefined) updateData.accessLevel = dto.accessLevel;
+
+    if (dto.categorySlug !== undefined) {
+      const cat = await this.prisma.category.findUnique({ where: { slug: dto.categorySlug } });
+      if (!cat) throw new BadRequestException('Kategori not found');
+      updateData.categoryId = cat.id;
+    }
+
+    // Non-admin: reset to pending review only when price or accessLevel actually changed
+    if (!isAdmin && (priceChanged || accessLevelChanged)) {
+      updateData.reviewStatus = 'PENDING';
+      updateData.isPublished = false;
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.soundEffect.update({
+        where: { id: soundId },
+        data: updateData,
+        include: {
+          category: true,
+          tags: { include: { tag: true } },
+        },
+      });
+
+      if (dto.tags !== undefined) {
+        await tx.soundEffectOnTag.deleteMany({ where: { soundEffectId: soundId } });
+        if (dto.tags.length > 0) {
+          // Upsert tags — create if not exists
+          const upserted = await Promise.all(
+            dto.tags.map((slug) =>
+              tx.tag.upsert({
+                where: { slug },
+                update: {},
+                create: {
+                  slug,
+                  name: slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+                },
+              }),
+            ),
+          );
+          await tx.soundEffectOnTag.createMany({
+            data: upserted.map((t) => ({ soundEffectId: soundId, tagId: t.id })),
+          });
+        }
+      }
+
+      // Re-fetch with updated tags after upsert
+      return tx.soundEffect.findUnique({
+        where: { id: soundId },
+        include: {
+          category: true,
+          tags: { include: { tag: true } },
+        },
+      });
+    });
+
+    return updated;
   }
 }

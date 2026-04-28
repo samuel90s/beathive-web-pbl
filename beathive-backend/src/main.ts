@@ -8,7 +8,10 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  app.use(helmet({ crossOriginEmbedderPolicy: false })); // allow audio file serving
+  app.use(helmet({
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false, // allow frontend (port 3001) to load images/audio from backend (port 3000)
+  }));
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
 
   // Global validation pipe — validasi semua DTO otomatis

@@ -30,7 +30,7 @@ export default function CheckoutModal({ sound, onClose }: Props) {
 
   const handleCheckout = async () => {
     if (!user) {
-      toast.error('Login dulu untuk membeli')
+      toast.error('Please log in to make a purchase')
       return
     }
 
@@ -44,7 +44,7 @@ export default function CheckoutModal({ sound, onClose }: Props) {
       // Pastikan script Midtrans sudah di-load di layout.tsx
       const snap = (window as any).snap
       if (!snap) {
-        toast.error('Sistem pembayaran belum siap, coba lagi')
+        toast.error('Payment system not ready, please try again')
         return
       }
 
@@ -55,19 +55,19 @@ export default function CheckoutModal({ sound, onClose }: Props) {
           router.push(`/orders/${data.orderId}/success`)
         },
         onPending: () => {
-          toast('Pembayaran pending, silakan selesaikan pembayaran.', { icon: '⏳' })
+          toast('Payment pending, please complete your payment.', { icon: '⏳' })
           onClose()
           router.push(`/orders/${data.orderId}/success?status=pending`)
         },
         onError: () => {
-          toast.error('Pembayaran gagal, silakan coba lagi.')
+          toast.error('Payment failed, please try again.')
         },
         onClose: () => {
           // User menutup popup tanpa bayar — tidak perlu apa-apa
         },
       })
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Gagal membuat order')
+      toast.error(err.response?.data?.message || 'Failed to create order')
     } finally {
       setIsLoading(false)
     }
@@ -80,7 +80,7 @@ export default function CheckoutModal({ sound, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Beli Sound Effect</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Buy Sound Effect</h2>
             <p className="text-sm text-gray-500 mt-0.5 truncate max-w-xs">{sound.title}</p>
           </div>
           <button
@@ -93,7 +93,7 @@ export default function CheckoutModal({ sound, onClose }: Props) {
 
         {/* Pilih lisensi */}
         <div className="p-6 space-y-3">
-          <p className="text-sm font-medium text-gray-700 mb-3">Pilih jenis lisensi:</p>
+          <p className="text-sm font-medium text-gray-700 mb-3">Select license type:</p>
 
           {/* Personal */}
           <button
@@ -113,16 +113,16 @@ export default function CheckoutModal({ sound, onClose }: Props) {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-gray-900">Lisensi Personal</p>
+                <p className="text-sm font-semibold text-gray-900">Personal License</p>
                 <p className="text-sm font-bold text-violet-700">
                   Rp {personalPrice.toLocaleString('id-ID')}
                 </p>
               </div>
               <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                Untuk proyek personal, konten YouTube non-monetisasi, podcast, dan penggunaan non-komersial.
+                For personal projects, non-monetized YouTube content, podcasts, and non-commercial use.
               </p>
               <ul className="mt-2 space-y-0.5">
-                {['YouTube & media sosial (tanpa monetisasi)', 'Podcast personal', 'Proyek sekolah/kampus'].map((item) => (
+                {['YouTube & social media (non-monetized)', 'Personal podcasts', 'School/university projects'].map((item) => (
                   <li key={item} className="flex items-center gap-1.5 text-xs text-gray-500">
                     <Check size={11} className="text-green-500 shrink-0" />
                     {item}
@@ -156,18 +156,18 @@ export default function CheckoutModal({ sound, onClose }: Props) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-gray-900">Lisensi Komersial</p>
-                  <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">Populer</span>
+                  <p className="text-sm font-semibold text-gray-900">Commercial License</p>
+                  <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">Popular</span>
                 </div>
                 <p className="text-sm font-bold text-violet-700">
                   Rp {commercialPrice.toLocaleString('id-ID')}
                 </p>
               </div>
               <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                Untuk iklan, film, konten berbayar, aplikasi, dan semua penggunaan komersial.
+                For ads, films, paid content, apps, and all commercial uses.
               </p>
               <ul className="mt-2 space-y-0.5">
-                {['Iklan & video komersial', 'Film & konten berbayar', 'Aplikasi & game', 'YouTube dengan monetisasi'].map((item) => (
+                {['Ads & commercial videos', 'Films & paid content', 'Apps & games', 'Monetized YouTube'].map((item) => (
                   <li key={item} className="flex items-center gap-1.5 text-xs text-gray-500">
                     <Check size={11} className="text-green-500 shrink-0" />
                     {item}
@@ -186,7 +186,7 @@ export default function CheckoutModal({ sound, onClose }: Props) {
         {/* Footer */}
         <div className="p-6 pt-0">
           <div className="flex items-center justify-between mb-4 px-1">
-            <span className="text-sm text-gray-500">Total pembayaran</span>
+            <span className="text-sm text-gray-500">Total payment</span>
             <span className="text-xl font-bold text-gray-900">
               Rp {selectedPrice.toLocaleString('id-ID')}
             </span>
@@ -202,13 +202,13 @@ export default function CheckoutModal({ sound, onClose }: Props) {
             ) : (
               <>
                 <ShoppingCart size={16} />
-                Lanjut ke Pembayaran
+                Proceed to Payment
               </>
             )}
           </button>
 
           <p className="text-center text-xs text-gray-400 mt-3">
-            Pembayaran aman via Midtrans · QRIS, Transfer Bank, Kartu Kredit
+            Secure payment via Midtrans · QRIS, Bank Transfer, Credit Card
           </p>
         </div>
       </div>

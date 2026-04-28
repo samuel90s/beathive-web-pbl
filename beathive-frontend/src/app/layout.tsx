@@ -11,8 +11,8 @@ import GlobalPlayer from '@/components/player/GlobalPlayer';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'BeatHive — Stock Sound Effects & Music',
-  description: 'BeatHive — Ribuan sound effect premium untuk kreator konten, developer game, dan kreator video.',
+  title: 'BeatHive — Premium Sound Effects & Music',
+  description: 'Thousands of premium sound effects for content creators, game developers, and video creators.',
 };
 
 const isProduction = process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION === 'true';
@@ -23,10 +23,14 @@ const midtransSnapUrl = isProduction
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id">
-      <body className={`${inter.className} bg-gray-50 text-gray-900 antialiased`}>
+      <head>
+        {/* Apply stored theme before first paint to prevent flash */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=JSON.parse(localStorage.getItem('beathive-theme')||'{}').state?.theme||'dark';document.documentElement.classList.add(t);}catch(e){document.documentElement.classList.add('dark');}})();` }} />
+      </head>
+      <body className={`${inter.className} bg-base text-[#e2e3ef] antialiased`}>
         <Providers>
           <Navbar />
-          <main className="min-h-screen pb-24">
+          <main className="min-h-screen pb-28">
             {children}
           </main>
           <Footer />
