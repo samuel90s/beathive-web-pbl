@@ -15,16 +15,50 @@ import clsx from 'clsx';
 
 interface Props { sound: SoundEffect }
 
+const CAT_COLORS: Record<string, string> = {
+  'foley':            'from-rose-500 to-pink-600',
+  'ambience':         'from-amber-400 to-orange-500',
+  'soundscape':       'from-teal-500 to-cyan-600',
+  'nature':           'from-green-500 to-emerald-600',
+  'explosions':       'from-red-500 to-orange-600',
+  'weapons':          'from-slate-600 to-zinc-700',
+  'vehicles':         'from-blue-500 to-indigo-600',
+  'ui-game':          'from-violet-500 to-purple-600',
+  'horror':           'from-purple-900 to-indigo-950',
+  'human':            'from-amber-400 to-yellow-500',
+  'animals':          'from-lime-500 to-green-600',
+  'electronic':       'from-cyan-500 to-blue-600',
+  'comedy':           'from-yellow-400 to-amber-500',
+  'magic':            'from-pink-500 to-violet-600',
+  'sports':           'from-emerald-500 to-green-600',
+  'industrial':       'from-stone-500 to-zinc-600',
+  'sound-scoring':    'from-violet-600 to-indigo-700',
+  'cinematic':        'from-indigo-600 to-blue-800',
+  'electronic-music': 'from-cyan-500 to-teal-600',
+  'acoustic':         'from-amber-500 to-orange-600',
+};
+
 export default function SoundRow({ sound }: Props) {
   const { currentTrack, isPlaying, play, pause } = usePlayerStore();
+  const progress = usePlayerStore(s => s.progress);
   const { addItem, removeItem, hasItem } = useCartStore();
   const { user } = useAuthStore();
   const { download, downloading } = useDownload();
   const { toggle: toggleWishlist, loadingId } = useWishlist();
   const [liked, setLiked] = useState<boolean>(sound.isLiked ?? false);
+  const hoverTimer = useState<ReturnType<typeof setTimeout> | null>(null);
 
   const isActive = currentTrack?.id === sound.id;
   const isCurrentlyPlaying = isActive && isPlaying;
+
+  // Hover-to-preview: mulai play setelah 600ms hover
+  const handleMouseEnter = () => {
+    if (isActive) return;
+    hoverTimer[1](setTimeout(() => play(sound), 600));
+  };
+  const handleMouseLeave = () => {
+    if (hoverTimer[0]) { clearTimeout(hoverTimer[0]); hoverTimer[1](null); }
+  };
   const inCart = hasItem(sound.id);
   const wishlistLoading = loadingId === sound.id;
   const isOwner = !!(user?.id && sound.author?.id && sound.author.id === user.id);
@@ -64,6 +98,8 @@ export default function SoundRow({ sound }: Props) {
   return (
     <div
       onClick={togglePlay}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       className={clsx(
         'flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer group transition-all duration-150',
         isActive
@@ -72,6 +108,12 @@ export default function SoundRow({ sound }: Props) {
       )}
       style={isActive ? { backgroundColor: 'rgba(139,92,246,0.08)' } : undefined}
     >
+      {/* Category color thumbnail */}
+      <div className={clsx(
+        'w-9 h-9 rounded-lg flex-shrink-0 bg-gradient-to-br hidden sm:block opacity-80 group-hover:opacity-100 transition-opacity',
+        CAT_COLORS[sound.category.slug] ?? 'from-slate-600 to-slate-700',
+      )} />
+
       {/* Play button */}
       <button
         onClick={(e) => { e.stopPropagation(); togglePlay(); }}
@@ -120,7 +162,10 @@ export default function SoundRow({ sound }: Props) {
         </div>
         <p className="text-xs text-[#5a5d72] truncate mt-0.5">
           {sound.category.name}
-          {sound.tags?.slice(0, 2).map((t) => ` · ${t.name}`)}
+          {sound.tags?.slice(0, 1).map((t) => ` · ${t.name}`)}
+        </p>
+        <p className="text-[10px] text-[#3a3c4e] mt-0.5 tabular-nums">
+          {sound.playCount.toLocaleString()} plays · {sound.downloadCount.toLocaleString()} dl
         </p>
       </div>
 
@@ -129,7 +174,7 @@ export default function SoundRow({ sound }: Props) {
         <WaveformBar
           data={sound.waveformData}
           isActive={isActive}
-          progress={isActive ? usePlayerStore.getState().progress : 0}
+          progress={isActive ? progress : 0}
         />
       </div>
 
@@ -169,60 +214,83 @@ export default function SoundRow({ sound }: Props) {
             </svg>
             Your Sound
           </span>
-        ) : sound.accessLevel !== 'PURCHASE' ? (
-          <>
-            {sound.accessLevel === 'FREE' && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-teal/10 text-teal border border-teal/20 font-medium">Free</span>
-            )}
-            {sound.accessLevel === 'PRO' && sound.price > 0 && (
-              <span className="text-xs text-[#5a5d72] font-medium">Rp {(sound.price / 1000).toFixed(0)}k</span>
-            )}
-            <button
-              onClick={handleDownload}
-              disabled={downloading === sound.id}
-              title="Download"
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-teal/20 text-teal/70 hover:bg-teal/10 hover:text-teal hover:border-teal/40 transition-all disabled:opacity-40"
-            >
-              {downloading === sound.id ? (
-                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10" strokeOpacity=".2"/><path d="M12 2a10 10 0 0 1 10 10"/>
-                </svg>
-              ) : (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
+        ) : (() => {
+          // Purchasable: PURCHASE type, or PRO/BUSINESS with a price
+          const isPurchasable = sound.accessLevel === 'PURCHASE' ||
+            ((sound.accessLevel === 'PRO' || sound.accessLevel === 'BUSINESS') && sound.price > 0);
+
+          if (isPurchasable) {
+            if (sound.isPurchased) {
+              return (
+                <button
+                  onClick={handleDownload}
+                  disabled={downloading === sound.id}
+                  title="Download"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-teal/20 text-teal/70 hover:bg-teal/10 hover:text-teal transition-all disabled:opacity-40"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                </button>
+              );
+            }
+            return (
+              <>
+                <span className="text-xs text-[#5a5d72] font-medium">
+                  Rp {(sound.price / 1000).toFixed(0)}k
+                </span>
+                <button
+                  onClick={handleBuy}
+                  title={inCart ? 'Remove from cart' : 'Add to cart'}
+                  className={clsx(
+                    'w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150',
+                    inCart
+                      ? 'bg-accent/20 text-accent-bright hover:bg-accent/30'
+                      : 'bg-accent text-white hover:bg-accent-dim shadow-glow-sm',
+                  )}
+                >
+                  {inCart ? (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  ) : (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                    </svg>
+                  )}
+                </button>
+              </>
+            );
+          }
+
+          // Subscription-gated (PRO/BUSINESS price=0) or FREE
+          return (
+            <>
+              {sound.accessLevel === 'FREE' && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-teal/10 text-teal border border-teal/20 font-medium">Free</span>
               )}
-            </button>
-          </>
-        ) : (
-          <>
-            <span className="text-xs text-[#5a5d72] font-medium">
-              Rp {(sound.price / 1000).toFixed(0)}k
-            </span>
-            <button
-              onClick={handleBuy}
-              title={inCart ? 'Remove from cart' : 'Add to cart'}
-              className={clsx(
-                'w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150',
-                inCart
-                  ? 'bg-accent/20 text-accent-bright hover:bg-accent/30'
-                  : 'bg-accent text-white hover:bg-accent-dim shadow-glow-sm',
-              )}
-            >
-              {inCart ? (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              ) : (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-                </svg>
-              )}
-            </button>
-          </>
-        )}
+              <button
+                onClick={handleDownload}
+                disabled={downloading === sound.id}
+                title="Download"
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-teal/20 text-teal/70 hover:bg-teal/10 hover:text-teal hover:border-teal/40 transition-all disabled:opacity-40"
+              >
+                {downloading === sound.id ? (
+                  <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" strokeOpacity=".2"/><path d="M12 2a10 10 0 0 1 10 10"/>
+                  </svg>
+                ) : (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                )}
+              </button>
+            </>
+          );
+        })()}
       </div>
     </div>
   );

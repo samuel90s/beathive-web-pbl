@@ -11,16 +11,12 @@ function AuthCallbackInner() {
   const { setAuth } = useAuthStore();
 
   useEffect(() => {
-    // New secure flow: backend sends a short-lived auth code (not real tokens)
-    // We exchange it for real tokens via a POST request.
+    // Secure flow: backend sends a short-lived code, we exchange for real tokens.
+    // Legacy URL-based token passing was removed (SEC-04) — tokens in URL
+    // can leak via browser history, referrer headers, and server logs.
     const code = params.get('code');
 
-    // Legacy fallback for any old bookmarks — should not happen in normal flow
-    const legacyAccess = params.get('accessToken');
-    const legacyRefresh = params.get('refreshToken');
-
     if (code) {
-      // Secure flow: exchange auth code for tokens via API
       authApi.exchangeCode(code)
         .then((result) => {
           setAuth(result.user, result.accessToken, result.refreshToken);
@@ -28,20 +24,6 @@ function AuthCallbackInner() {
         })
         .catch(() => {
           router.push('/auth/login?error=oauth_failed');
-        });
-    } else if (legacyAccess && legacyRefresh) {
-      // Legacy fallback — maintain backwards compatibility but log warning
-      console.warn('[BeatHive] Using legacy OAuth callback with tokens in URL. This is deprecated.');
-      sessionStorage.setItem('accessToken', legacyAccess);
-      sessionStorage.setItem('refreshToken', legacyRefresh);
-
-      authApi.getMe()
-        .then((user) => {
-          setAuth(user, legacyAccess, legacyRefresh);
-          router.push('/browse');
-        })
-        .catch(() => {
-          router.push('/auth/login?error=fetch_failed');
         });
     } else {
       router.push('/auth/login?error=oauth_failed');

@@ -5,8 +5,8 @@ import Script from 'next/script';
 import './globals.css';
 import Providers from './providers';
 import Navbar from '@/components/layout/Navbar';
-import Footer from '@/components/layout/Footer';
 import GlobalPlayer from '@/components/player/GlobalPlayer';
+import { AppSidebarWrapper } from '@/components/layout/AppSidebarWrapper';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -24,16 +24,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="id">
       <head>
-        {/* Apply stored theme before first paint to prevent flash */}
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=JSON.parse(localStorage.getItem('beathive-theme')||'{}').state?.theme||'dark';document.documentElement.classList.add(t);}catch(e){document.documentElement.classList.add('dark');}})();` }} />
       </head>
       <body className={`${inter.className} bg-base text-[#e2e3ef] antialiased`}>
         <Providers>
           <Navbar />
-          <main className="min-h-screen pb-28">
+          <AppSidebarWrapper>
             {children}
-          </main>
-          <Footer />
+          </AppSidebarWrapper>
           <GlobalPlayer />
         </Providers>
         <Script

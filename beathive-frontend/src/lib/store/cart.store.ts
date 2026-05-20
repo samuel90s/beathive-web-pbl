@@ -1,13 +1,13 @@
 // src/lib/store/cart.store.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { CartItem, SoundEffect } from '@/types';
+import type { CartItem, LicenseType, SoundEffect } from '@/types';
 
 interface CartState {
   items: CartItem[];
-  addItem: (sound: SoundEffect, licenseType: 'personal' | 'commercial') => void;
+  addItem: (sound: SoundEffect, licenseType: LicenseType) => void;
   removeItem: (soundId: string) => void;
-  updateLicense: (soundId: string, licenseType: 'personal' | 'commercial') => void;
+  updateLicense: (soundId: string, licenseType: LicenseType) => void;
   clearCart: () => void;
   totalAmount: () => number;
   hasItem: (soundId: string) => boolean;
@@ -41,8 +41,10 @@ export const useCartStore = create<CartState>()(
       totalAmount: () => {
         return get().items.reduce((sum, item) => {
           const price =
-            item.licenseType === 'commercial'
+            item.licenseType === 'commercial' || item.licenseType === 'sync'
               ? item.sound.price * 2
+              : item.licenseType === 'broadcast'
+              ? item.sound.price * 3
               : item.sound.price;
           return sum + price;
         }, 0);

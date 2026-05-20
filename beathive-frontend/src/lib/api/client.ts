@@ -10,7 +10,6 @@ export const apiClient = axios.create({
 
 function getToken(key: 'accessToken' | 'refreshToken'): string | null {
   if (typeof window === 'undefined') return null;
-  // Try the direct key first (set by setAuth), then fall back to the Zustand persist blob
   const direct = sessionStorage.getItem(key);
   if (direct) return direct;
   try {
@@ -18,6 +17,31 @@ function getToken(key: 'accessToken' | 'refreshToken'): string | null {
     if (raw) return JSON.parse(raw)?.state?.[key] ?? null;
   } catch { /* ignore */ }
   return null;
+}
+
+function updateStoredTokens(accessToken: string, refreshToken: string) {
+  sessionStorage.setItem('accessToken', accessToken);
+  sessionStorage.setItem('refreshToken', refreshToken);
+  try {
+    const raw = sessionStorage.getItem('beathive-auth');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      parsed.state.accessToken = accessToken;
+      parsed.state.refreshToken = refreshToken;
+      sessionStorage.setItem('beathive-auth', JSON.stringify(parsed));
+    }
+  } catch { /* ignore */ }
+}
+
+// FE-01: Mutex to prevent concurrent /auth/refresh calls.
+// When multiple 401s fire simultaneously (e.g. after a 15m access token expires),
+// only the first triggers a refresh; the rest queue up and reuse the same new token.
+let isRefreshing = false;
+let failedQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = [];
+
+function flushQueue(error: unknown, token: string | null = null) {
+  failedQueue.forEach((p) => (error ? p.reject(error) : p.resolve(token!)));
+  failedQueue = [];
 }
 
 // Request interceptor — inject access token
@@ -33,40 +57,52 @@ apiClient.interceptors.response.use(
   async (error) => {
     const original = error.config;
 
-    if (error.response?.status === 401 && !original._retry) {
-      original._retry = true;
-
-      try {
-        const refreshToken = getToken('refreshToken');
-        if (!refreshToken) throw new Error('No refresh token');
-
-        const { data } = await axios.post(`${API_URL}/auth/refresh`, {
-          refreshToken,
-        });
-
-        sessionStorage.setItem('accessToken', data.accessToken);
-        sessionStorage.setItem('refreshToken', data.refreshToken);
-        // Also update the Zustand persist blob so the store stays in sync
-        try {
-          const raw = sessionStorage.getItem('beathive-auth');
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            parsed.state.accessToken = data.accessToken;
-            parsed.state.refreshToken = data.refreshToken;
-            sessionStorage.setItem('beathive-auth', JSON.stringify(parsed));
-          }
-        } catch { /* ignore */ }
-
-        original.headers.Authorization = `Bearer ${data.accessToken}`;
-        return apiClient(original);
-      } catch {
-        sessionStorage.removeItem('accessToken');
-        sessionStorage.removeItem('refreshToken');
-        sessionStorage.removeItem('beathive-auth');
-        window.location.href = '/auth/login';
-      }
+    if (error.response?.status !== 401 || original._retry) {
+      return Promise.reject(error);
     }
 
-    return Promise.reject(error);
+    // If a refresh is already in flight, queue this request
+    if (isRefreshing) {
+      return new Promise<string>((resolve, reject) => {
+        failedQueue.push({ resolve, reject });
+      })
+        .then((token) => {
+          original.headers.Authorization = `Bearer ${token}`;
+          return apiClient(original);
+        })
+        .catch((err) => Promise.reject(err));
+    }
+
+    original._retry = true;
+    isRefreshing = true;
+
+    try {
+      const refreshToken = getToken('refreshToken');
+      if (!refreshToken) throw new Error('No refresh token');
+
+      const { data } = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
+
+      updateStoredTokens(data.accessToken, data.refreshToken);
+      apiClient.defaults.headers.common.Authorization = `Bearer ${data.accessToken}`;
+      flushQueue(null, data.accessToken);
+
+      original.headers.Authorization = `Bearer ${data.accessToken}`;
+      return apiClient(original);
+    } catch (err) {
+      flushQueue(err, null);
+      sessionStorage.removeItem('accessToken');
+      sessionStorage.removeItem('refreshToken');
+      sessionStorage.removeItem('beathive-auth');
+      // Also clear Zustand store so isAuthenticated = false immediately,
+      // preventing any in-flight renders from seeing stale auth state.
+      try {
+        const { useAuthStore } = await import('@/lib/store/auth.store');
+        useAuthStore.getState().logout();
+      } catch { /* ignore if store not available */ }
+      window.location.href = '/auth/login';
+      return Promise.reject(err);
+    } finally {
+      isRefreshing = false;
+    }
   },
 );

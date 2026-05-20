@@ -236,6 +236,25 @@ export class SubscriptionsService {
     return { activated: true, subscription: sub };
   }
 
+  // ─── Downgrade / ganti plan ──────────────────────────────
+
+  async changePlan(userId: string, planSlug: string, billingCycle: 'monthly' | 'yearly') {
+    const plan = await this.prisma.plan.findUnique({ where: { slug: planSlug } });
+    if (!plan) throw new NotFoundException('Plan not found');
+
+    if (planSlug === 'free') return this.cancelSubscription(userId);
+
+    await this.prisma.subscription.update({
+      where: { userId },
+      data: {
+        planId: plan.id,
+        billingCycle: billingCycle === 'yearly' ? 'YEARLY' : 'MONTHLY',
+        status: 'ACTIVE',
+      },
+    });
+    return { message: `Plan berhasil diubah ke ${plan.name}`, plan: plan.name };
+  }
+
   // ─── Cancel subscription ────────────────────────────────
 
   async cancelSubscription(userId: string) {

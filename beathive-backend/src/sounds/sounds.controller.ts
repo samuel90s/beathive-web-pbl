@@ -74,6 +74,21 @@ export class SoundsController {
     return this.soundsService.getUserWishlist(userId, page, limit);
   }
 
+  // ─── GET /sounds/downloads/history  (user's download history) ──
+  @Get('downloads/history')
+  @UseGuards(JwtAuthGuard)
+  async getDownloadHistory(
+    @CurrentUser() userId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('licenseType') licenseType?: string,
+    @Query('categorySlug') categorySlug?: string,
+    @Query('search') search?: string,
+    @Query('source') source?: string,
+  ) {
+    return this.soundsService.getDownloadHistory(userId, page, limit, licenseType, categorySlug, search, source);
+  }
+
   // ─── GET /sounds/mine  (author's own uploads) ────────────
   @Get('mine')
   @UseGuards(JwtAuthGuard)
@@ -121,6 +136,22 @@ export class SoundsController {
       throw new BadRequestException('File audio wajib diupload');
     }
     return this.soundsService.uploadSound(file, dto, uploaderId);
+  }
+
+  // ─── GET /sounds/:slug/related  (public) ────────────────
+  @Get(':slug/related')
+  async getRelated(
+    @Param('slug') slug: string,
+    @Query('limit', new DefaultValuePipe(6), ParseIntPipe) limit: number,
+  ) {
+    return this.soundsService.findRelated(slug, limit);
+  }
+
+  // ─── GET /sounds/creator/analytics  (butuh JWT) ──────────
+  @Get('creator/analytics')
+  @UseGuards(JwtAuthGuard)
+  async getCreatorAnalytics(@CurrentUser() userId: string) {
+    return this.soundsService.getCreatorAnalytics(userId);
   }
 
   // ─── GET /sounds/:slug ────────────────────────────────────
@@ -257,24 +288,22 @@ export class SoundsController {
       licenseType = sound.accessLevel === 'FREE' ? 'free' : 'subscription';
     }
 
-    const licenseText = this.buildLicenseText({
-      buyerName: user?.name ?? 'User',
-      buyerEmail: user?.email ?? '',
-      soundTitle: sound.title,
-      soundId: sound.id,
-      licenseType,
-      invoiceNumber,
-    });
+    // Stream file langsung — license tersedia di Download History page
+    const ext = sound.format || 'wav';
+    const fileName = `${sound.slug}.${ext}`;
+    const mimeMap: Record<string, string> = {
+      mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', flac: 'audio/flac',
+    };
+    const contentType = mimeMap[ext] ?? 'audio/octet-stream';
+    const stat = fs.statSync(filePath);
 
-    const zipName = `${sound.slug}-beathive.zip`;
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Length', stat.size);
+    res.setHeader('X-License-Type', licenseType);
+    res.setHeader('X-Invoice-Number', invoiceNumber);
 
-    const archive = archiver('zip', { zlib: { level: 6 } });
-    archive.pipe(res);
-    archive.file(filePath, { name: `${sound.slug}.${sound.format}` });
-    archive.append(Buffer.from(licenseText, 'utf8'), { name: 'license.txt' });
-    await archive.finalize();
+    fs.createReadStream(filePath).pipe(res);
   }
 
   private buildLicenseText(data: {

@@ -46,7 +46,7 @@ function Stars({ score, interactive = false, onSelect }: { score: number; intera
   );
 }
 
-export default function RatingSection({ soundId }: { soundId: string }) {
+export default function RatingSection({ soundId, canReview = false }: { soundId: string; canReview?: boolean }) {
   const { isAuthenticated } = useAuthStore();
   const [data, setData] = useState<RatingData | null>(null);
   const [myRating, setMyRating] = useState<{ score: number; reviewText?: string } | null>(null);
@@ -138,32 +138,34 @@ export default function RatingSection({ soundId }: { soundId: string }) {
       </div>
 
       {/* My review status / CTA */}
-      {isAuthenticated ? (
+      {isAuthenticated && canReview ? (
         myRating ? (
-          <div className="mb-4 p-3 bg-accent/8 border border-accent/20 rounded-xl flex items-start justify-between gap-3"
-            style={{ backgroundColor: 'rgba(139,92,246,0.08)' }}>
+          <div className="mb-4 p-3 bg-accent/[0.08] border border-accent/20 rounded-xl flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs text-[#6b6f82] mb-1">Your review</p>
+              <p className="text-xs text-[#6b6f82] mb-1">Review kamu</p>
               <Stars score={myRating.score} />
               {myRating.reviewText && <p className="text-sm text-[#8b8fa8] mt-1">{myRating.reviewText}</p>}
             </div>
             <div className="flex gap-3 flex-shrink-0">
               <button onClick={() => setShowForm(true)} className="text-xs text-accent-bright hover:underline">Edit</button>
-              <button onClick={handleDelete} className="text-xs text-red-400 hover:underline">Delete</button>
+              <button onClick={handleDelete} className="text-xs text-red-400 hover:underline">Hapus</button>
             </div>
           </div>
         ) : !showForm ? (
           <button
             onClick={() => setShowForm(true)}
-            className="mb-4 w-full py-2.5 border border-dashed border-accent/30 text-accent-bright text-sm rounded-xl hover:bg-accent/8 transition-colors"
-            style={{}}
+            className="mb-4 w-full py-2.5 border border-dashed border-accent/30 text-accent-bright text-sm rounded-xl hover:bg-accent/[0.08] transition-colors"
           >
-            Write a Review
+            Tulis Review
           </button>
         ) : null
+      ) : isAuthenticated && !canReview ? (
+        <p className="mb-4 text-xs text-[#3a3c4e] text-center py-2">
+          Download atau beli sound ini untuk bisa memberikan review
+        </p>
       ) : (
         <p className="mb-4 text-sm text-[#5a5d72] text-center">
-          <a href="/auth/login" className="text-accent-bright hover:underline">Sign in</a> to leave a review
+          <a href="/auth/login" className="text-accent-bright hover:underline">Login</a> untuk memberikan review
         </p>
       )}
 

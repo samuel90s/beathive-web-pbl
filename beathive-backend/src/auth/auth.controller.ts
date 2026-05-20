@@ -6,6 +6,7 @@ import {
   Patch,
   Body,
   Param,
+  Query,
   UseGuards,
   UseInterceptors,
   UploadedFile,
@@ -21,7 +22,6 @@ import { memoryStorage } from 'multer';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { EmailService } from '../email/email.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -30,10 +30,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('auth')
 export class AuthController {
-  constructor(
-    private authService: AuthService,
-    private emailService: EmailService,
-  ) {}
+  constructor(private authService: AuthService) {}
 
   // POST /auth/register
   @Post('register')
@@ -71,6 +68,26 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async disable2FA(@CurrentUser() userId: string, @Body() body: { password: string }) {
     return this.authService.disable2FA(userId, body.password);
+  }
+
+  // GET /auth/verify-email?token=xxx
+  @Get('verify-email')
+  async verifyEmail(@Query('token') token: string, @Res() res: any) {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    try {
+      await this.authService.verifyEmail(token);
+      return res.redirect(`${frontendUrl}/auth/verify-email?verified=1`);
+    } catch {
+      return res.redirect(`${frontendUrl}/auth/verify-email?verified=error`);
+    }
+  }
+
+  // POST /auth/resend-verification
+  @Post('resend-verification')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async resendVerification(@CurrentUser() userId: string) {
+    return this.authService.resendVerification(userId);
   }
 
   // POST /auth/forgot-password

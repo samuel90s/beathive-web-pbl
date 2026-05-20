@@ -1,639 +1,693 @@
 // src/app/browse/page.tsx
 'use client';
-import { Suspense, useState, useCallback, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { Suspense, useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSounds } from '@/lib/hooks/useSounds';
-import SoundRow from '@/components/sounds/SoundRow';
+import SoundCard from '@/components/sounds/SoundCard';
 import type { SoundFilters } from '@/types';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import clsx from 'clsx';
 
-// ─── Category definitions ─────────────────────────────────────────────────
+// ─── Category + Subcategory data ──────────────────────────────────────────────
 
-const SFX_CATEGORIES = [
+const SFX_CATS = [
   {
-    slug: 'foley', name: 'Foley',
-    gradient: 'from-rose-500 to-pink-600',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <ellipse cx="17" cy="34" rx="7" ry="5" strokeWidth="2"/>
-        <ellipse cx="31" cy="38" rx="7" ry="4" strokeWidth="2"/>
-        <path d="M10 34V18c0-3 2-5 5-5h2l5 8 5-12h2c3 0 5 2 5 5v20"/>
-      </svg>
-    ),
+    slug: 'foley', name: 'Foley', gradient: 'from-rose-500 to-pink-600',
+    desc: 'Everyday objects & materials',
+    subcats: ['Footsteps', 'Clothing', 'Impact', 'Paper', 'Glass', 'Wood', 'Metal', 'Liquid'],
   },
   {
-    slug: 'ambience', name: 'Ambience',
-    gradient: 'from-amber-400 to-orange-500',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-        <path d="M4 20 Q12 10 20 20 Q28 30 36 20 Q44 10 48 16"/>
-        <path d="M4 30 Q12 20 20 30 Q28 40 36 30 Q44 20 48 26" opacity="0.6"/>
-      </svg>
-    ),
+    slug: 'ambience', name: 'Ambience', gradient: 'from-amber-400 to-orange-500',
+    desc: 'Background atmospheres',
+    subcats: ['Indoor', 'Outdoor', 'Urban', 'Underwater', 'Weather'],
   },
   {
-    slug: 'soundscape', name: 'Soundscape',
-    gradient: 'from-teal-500 to-cyan-600',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="currentColor">
-        <rect x="2"  y="28" width="6"  height="16" rx="2"/>
-        <rect x="11" y="20" width="6"  height="24" rx="2"/>
-        <rect x="20" y="10" width="6"  height="34" rx="2"/>
-        <rect x="29" y="16" width="6"  height="28" rx="2"/>
-        <rect x="38" y="24" width="6"  height="20" rx="2"/>
-      </svg>
-    ),
+    slug: 'soundscape', name: 'Soundscape', gradient: 'from-teal-500 to-cyan-600',
+    desc: 'Immersive environments',
+    subcats: ['Forest', 'Ocean', 'City', 'Space', 'Post-Apocalyptic'],
   },
   {
-    slug: 'nature', name: 'Nature & Weather',
-    gradient: 'from-green-500 to-emerald-600',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-        <path d="M24 8 C12 8 8 16 12 22 C8 22 6 26 10 28 H38 C42 26 40 22 36 22 C40 16 36 8 24 8Z" strokeLinejoin="round"/>
-        <line x1="16" y1="33" x2="14" y2="40"/>
-        <line x1="24" y1="33" x2="22" y2="40"/>
-        <line x1="32" y1="33" x2="30" y2="40"/>
-      </svg>
-    ),
+    slug: 'nature', name: 'Nature', gradient: 'from-green-500 to-emerald-600',
+    desc: 'Outdoor & weather',
+    subcats: ['Rain', 'Wind', 'Thunder', 'Fire', 'Birds', 'Insects', 'Water'],
   },
   {
-    slug: 'explosions', name: 'Explosions',
-    gradient: 'from-red-500 to-orange-600',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="currentColor">
-        <path d="M24 4 L28 18 L40 12 L32 22 L46 24 L32 26 L40 36 L28 30 L24 44 L20 30 L8 36 L16 26 L2 24 L16 22 L8 12 L20 18 Z"/>
-      </svg>
-    ),
+    slug: 'explosions', name: 'Explosions', gradient: 'from-red-500 to-orange-600',
+    desc: 'Blasts, impacts & debris',
+    subcats: ['Small', 'Large', 'Impact', 'Debris', 'Distant', 'Designed'],
   },
   {
-    slug: 'weapons', name: 'Weapons & Combat',
-    gradient: 'from-slate-600 to-zinc-700',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="24" cy="24" r="18"/>
-        <circle cx="24" cy="24" r="4"/>
-        <line x1="24" y1="6" x2="24" y2="14"/>
-        <line x1="24" y1="34" x2="24" y2="42"/>
-        <line x1="6" y1="24" x2="14" y2="24"/>
-        <line x1="34" y1="24" x2="42" y2="24"/>
-      </svg>
-    ),
+    slug: 'weapons', name: 'Weapons', gradient: 'from-slate-600 to-zinc-700',
+    desc: 'Combat & action',
+    subcats: ['Guns', 'Blades', 'Bows', 'Futuristic', 'Impact', 'Reload'],
   },
   {
-    slug: 'vehicles', name: 'Vehicles',
-    gradient: 'from-blue-500 to-indigo-600',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M6 30 L10 18 Q12 14 16 14 H32 Q36 14 38 18 L42 30 V36 H6 Z"/>
-        <circle cx="14" cy="36" r="5" fill="currentColor" strokeWidth="0"/>
-        <circle cx="34" cy="36" r="5" fill="currentColor" strokeWidth="0"/>
-        <circle cx="14" cy="36" r="2.5" stroke="currentColor" strokeWidth="2" fill="none"/>
-        <circle cx="34" cy="36" r="2.5" stroke="currentColor" strokeWidth="2" fill="none"/>
-        <path d="M16 14 L20 24 H28 L32 14"/>
-      </svg>
-    ),
+    slug: 'vehicles', name: 'Vehicles', gradient: 'from-blue-500 to-indigo-600',
+    desc: 'Cars, planes & more',
+    subcats: ['Car', 'Motorcycle', 'Truck', 'Aircraft', 'Boat', 'Train'],
   },
   {
-    slug: 'ui-game', name: 'UI & Game',
-    gradient: 'from-violet-500 to-purple-600',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="4" y="14" width="40" height="24" rx="8"/>
-        <line x1="16" y1="22" x2="16" y2="30"/>
-        <line x1="12" y1="26" x2="20" y2="26"/>
-        <circle cx="32" cy="22" r="2" fill="currentColor" strokeWidth="0"/>
-        <circle cx="38" cy="26" r="2" fill="currentColor" strokeWidth="0"/>
-        <circle cx="32" cy="30" r="2" fill="currentColor" strokeWidth="0"/>
-        <circle cx="26" cy="26" r="2" fill="currentColor" strokeWidth="0"/>
-      </svg>
-    ),
+    slug: 'ui-game', name: 'UI & Game', gradient: 'from-violet-500 to-purple-600',
+    desc: 'Interface & game sounds',
+    subcats: ['Click', 'Notification', 'Alert', 'Power-up', 'Game Over', 'Menu', 'Glitch'],
   },
   {
-    slug: 'horror', name: 'Horror',
-    gradient: 'from-purple-900 to-indigo-950',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="currentColor">
-        <path d="M24 4 C14 4 8 12 8 22 V38 L12 34 L16 38 L20 34 L24 38 L28 34 L32 38 L36 34 L40 38 V22 C40 12 34 4 24 4Z"/>
-        <circle cx="18" cy="22" r="3" fill="white"/>
-        <circle cx="30" cy="22" r="3" fill="white"/>
-        <circle cx="19" cy="22" r="1.5" fill="#1e1b4b"/>
-        <circle cx="31" cy="22" r="1.5" fill="#1e1b4b"/>
-      </svg>
-    ),
+    slug: 'horror', name: 'Horror', gradient: 'from-purple-900 to-violet-900',
+    desc: 'Scary & suspenseful',
+    subcats: ['Suspense', 'Jump Scare', 'Ambient', 'Monster', 'Breathing'],
   },
   {
-    slug: 'human', name: 'Human & Crowd',
-    gradient: 'from-amber-400 to-yellow-500',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="currentColor">
-        <circle cx="24" cy="10" r="6"/>
-        <path d="M14 44 V32 C14 26 18 22 24 22 C30 22 34 26 34 32 V44"/>
-        <circle cx="10" cy="14" r="4" opacity="0.6"/>
-        <path d="M4 40 V30 C4 25 7 22 10 22" opacity="0.6" strokeWidth="2" stroke="currentColor" fill="none" strokeLinecap="round"/>
-        <circle cx="38" cy="14" r="4" opacity="0.6"/>
-        <path d="M44 40 V30 C44 25 41 22 38 22" opacity="0.6" strokeWidth="2" stroke="currentColor" fill="none" strokeLinecap="round"/>
-      </svg>
-    ),
+    slug: 'human', name: 'Human', gradient: 'from-amber-400 to-yellow-500',
+    desc: 'Body & crowd sounds',
+    subcats: ['Footsteps', 'Breathing', 'Crowd', 'Laughter', 'Voice'],
   },
   {
-    slug: 'animals', name: 'Animals',
-    gradient: 'from-lime-500 to-green-600',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="currentColor">
-        <ellipse cx="24" cy="30" rx="12" ry="10"/>
-        <ellipse cx="14" cy="14" rx="5" ry="7" transform="rotate(-15 14 14)"/>
-        <ellipse cx="34" cy="14" rx="5" ry="7" transform="rotate(15 34 14)"/>
-        <ellipse cx="10" cy="26" rx="4" ry="6" transform="rotate(-30 10 26)"/>
-        <ellipse cx="38" cy="26" rx="4" ry="6" transform="rotate(30 38 26)"/>
-        <circle cx="21" cy="30" r="2.5" fill="white" opacity="0.4"/>
-        <circle cx="27" cy="30" r="2.5" fill="white" opacity="0.4"/>
-      </svg>
-    ),
+    slug: 'animals', name: 'Animals', gradient: 'from-lime-500 to-green-600',
+    desc: 'Wildlife & pets',
+    subcats: ['Dog', 'Cat', 'Bird', 'Wild', 'Insects'],
   },
   {
-    slug: 'electronic', name: 'Electronic & Sci-Fi',
-    gradient: 'from-cyan-500 to-blue-600',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <rect x="14" y="14" width="20" height="20" rx="3"/>
-        <circle cx="19" cy="19" r="2" fill="currentColor" strokeWidth="0"/>
-        <circle cx="29" cy="19" r="2" fill="currentColor" strokeWidth="0"/>
-        <circle cx="19" cy="29" r="2" fill="currentColor" strokeWidth="0"/>
-        <circle cx="29" cy="29" r="2" fill="currentColor" strokeWidth="0"/>
-        <line x1="14" y1="24" x2="6" y2="24"/>
-        <line x1="34" y1="24" x2="42" y2="24"/>
-        <line x1="24" y1="14" x2="24" y2="6"/>
-        <line x1="24" y1="34" x2="24" y2="42"/>
-      </svg>
-    ),
+    slug: 'electronic', name: 'Electronic & Sci-Fi', gradient: 'from-cyan-500 to-blue-600',
+    desc: 'Futuristic & digital',
+    subcats: ['Robot', 'Computer', 'Glitch', 'Machine', 'Sci-Fi'],
   },
   {
-    slug: 'comedy', name: 'Comedy & Cartoon',
-    gradient: 'from-yellow-400 to-amber-500',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M8 6 H34 Q40 6 40 12 V28 Q40 34 34 34 H28 L20 42 V34 H14 Q8 34 8 28 V12 Q8 6 14 6"/>
-        <circle cx="18" cy="20" r="2" fill="currentColor" strokeWidth="0"/>
-        <circle cx="30" cy="20" r="2" fill="currentColor" strokeWidth="0"/>
-        <path d="M17 26 Q24 32 31 26"/>
-      </svg>
-    ),
+    slug: 'comedy', name: 'Comedy', gradient: 'from-yellow-400 to-amber-500',
+    desc: 'Cartoon & funny sounds',
+    subcats: ['Cartoon', 'Boing', 'Pop', 'Slide Whistle'],
   },
   {
-    slug: 'magic', name: 'Magic & Fantasy',
-    gradient: 'from-pink-500 to-violet-600',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="currentColor">
-        <path d="M24 4 L26.4 16 L36 10 L30 20 L42 22 L30 24 L36 34 L26.4 28 L24 40 L21.6 28 L12 34 L18 24 L6 22 L18 20 L12 10 L21.6 16 Z" opacity="0.9"/>
-        <circle cx="10" cy="10" r="3" opacity="0.6"/>
-        <circle cx="38" cy="8" r="2" opacity="0.5"/>
-        <circle cx="42" cy="36" r="2.5" opacity="0.6"/>
-        <circle cx="8" cy="38" r="2" opacity="0.5"/>
-      </svg>
-    ),
+    slug: 'magic', name: 'Magic & Fantasy', gradient: 'from-pink-500 to-violet-600',
+    desc: 'Spells & enchantments',
+    subcats: ['Spell', 'Enchant', 'Fantasy', 'Mystical'],
   },
   {
-    slug: 'sports', name: 'Sports & Action',
-    gradient: 'from-emerald-500 to-green-600',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="currentColor">
-        <path d="M30 4 L20 20 H28 L18 44 L36 22 H26 Z"/>
-      </svg>
-    ),
+    slug: 'sports', name: 'Sports', gradient: 'from-emerald-500 to-green-600',
+    desc: 'Athletic & action',
+    subcats: ['Ball', 'Whistle', 'Crowd', 'Impact'],
   },
   {
-    slug: 'industrial', name: 'Industrial',
-    gradient: 'from-stone-500 to-zinc-600',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="24" cy="24" r="8"/>
-        <circle cx="24" cy="24" r="3" fill="currentColor" strokeWidth="0"/>
-        <path d="M24 6 V12 M24 36 V42 M6 24 H12 M36 24 H42"/>
-        <path d="M11.5 11.5 L15.7 15.7 M32.3 32.3 L36.5 36.5"/>
-        <path d="M36.5 11.5 L32.3 15.7 M15.7 32.3 L11.5 36.5"/>
-      </svg>
-    ),
+    slug: 'industrial', name: 'Industrial', gradient: 'from-stone-500 to-zinc-600',
+    desc: 'Factory & machinery',
+    subcats: ['Factory', 'Machine', 'Metal', 'Construction'],
   },
 ];
 
-const MUSIC_CATEGORIES = [
+const MUSIC_CATS = [
   {
-    slug: 'sound-scoring', name: 'Sound Scoring',
-    gradient: 'from-violet-600 to-indigo-700',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M9 18V5l12-2v13"/>
-        <circle cx="6" cy="18" r="3" fill="currentColor" strokeWidth="0"/>
-        <circle cx="18" cy="16" r="3" fill="currentColor" strokeWidth="0"/>
-        <rect x="24" y="10" width="4" height="28" rx="1" fill="currentColor" strokeWidth="0"/>
-        <rect x="30" y="16" width="4" height="22" rx="1" fill="currentColor" strokeWidth="0"/>
-        <rect x="36" y="6" width="4" height="32" rx="1" fill="currentColor" strokeWidth="0"/>
-      </svg>
-    ),
+    slug: 'sound-scoring', name: 'Sound Scoring', gradient: 'from-violet-600 to-indigo-700',
+    desc: 'Film & game scores',
+    subcats: ['Dramatic', 'Tense', 'Emotional', 'Action'],
   },
   {
-    slug: 'cinematic', name: 'Cinematic',
-    gradient: 'from-indigo-600 to-blue-800',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="4" y="14" width="40" height="26" rx="3"/>
-        <path d="M4 20 H44 M12 14 L16 8 M24 14 L28 8 M36 14 L40 8"/>
-        <circle cx="24" cy="30" r="6"/>
-        <polygon points="22,27 22,33 29,30" fill="currentColor" strokeWidth="0"/>
-      </svg>
-    ),
+    slug: 'cinematic', name: 'Cinematic', gradient: 'from-indigo-600 to-blue-800',
+    desc: 'Epic orchestral tracks',
+    subcats: ['Epic', 'Orchestral', 'Ambient', 'Trailer'],
   },
   {
-    slug: 'electronic-music', name: 'Electronic Music',
-    gradient: 'from-cyan-500 to-teal-600',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-        <rect x="4" y="28" width="40" height="12" rx="3"/>
-        <line x1="8" y1="28" x2="8" y2="40"/>
-        <line x1="16" y1="28" x2="16" y2="40"/>
-        <line x1="24" y1="28" x2="24" y2="40"/>
-        <line x1="32" y1="28" x2="32" y2="40"/>
-        <line x1="40" y1="28" x2="40" y2="40"/>
-        <circle cx="8" cy="22" r="3" fill="currentColor" strokeWidth="0"/>
-        <circle cx="20" cy="18" r="3" fill="currentColor" strokeWidth="0"/>
-        <circle cx="32" cy="14" r="3" fill="currentColor" strokeWidth="0"/>
-        <path d="M8 22 Q14 18 20 18 Q26 18 32 14"/>
-      </svg>
-    ),
+    slug: 'electronic-music', name: 'Electronic Music', gradient: 'from-cyan-500 to-teal-600',
+    desc: 'Electronic & beats',
+    subcats: ['EDM', 'Lo-fi', 'Ambient', 'Bass', 'Synth'],
   },
   {
-    slug: 'acoustic', name: 'Acoustic',
-    gradient: 'from-amber-500 to-orange-600',
-    icon: (
-      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M28 8 V28 C30 28 36 30 36 36 C36 40 33 43 28 43 C23 43 20 40 20 36 C20 30 26 28 28 28"/>
-        <line x1="28" y1="8" x2="38" y2="6"/>
-        <line x1="28" y1="12" x2="38" y2="10"/>
-        <path d="M8 20 C6 18 6 16 10 16 S14 18 12 20" fill="currentColor" strokeWidth="0" opacity="0.5"/>
-        <path d="M4 24 C1 20 1 16 7 16 S13 20 10 24" opacity="0.4"/>
-      </svg>
-    ),
+    slug: 'acoustic', name: 'Acoustic', gradient: 'from-amber-500 to-orange-600',
+    desc: 'Organic instruments',
+    subcats: ['Guitar', 'Piano', 'Folk', 'Jazz'],
   },
 ];
 
-const TYPE_MENU = [
-  { type: 'sfx',   label: 'SFX',   sub: SFX_CATEGORIES },
-  { type: 'music', label: 'Music', sub: MUSIC_CATEGORIES },
-];
+const FEATURED_SFX = SFX_CATS.slice(0, 8);
+const FEATURED_MUSIC = MUSIC_CATS;
+
+// ─── Category Icons (SVG paths) ───────────────────────────────────────────────
+
+const CAT_ICONS: Record<string, React.ReactNode> = {
+  'foley': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <ellipse cx="20" cy="52" rx="8" ry="4" fill="white"/>
+      <path d="M20 52 L26 20 Q28 10 32 8 Q38 6 40 12 L38 26" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+      <ellipse cx="40" cy="54" rx="6" ry="3" fill="white"/>
+      <path d="M40 54 L44 28" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+      <circle cx="32" cy="20" r="6" stroke="white" strokeWidth="2.5"/>
+      <path d="M14 30 Q20 26 26 30" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  'ambience': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <circle cx="32" cy="32" r="6" fill="white"/>
+      <circle cx="32" cy="32" r="14" stroke="white" strokeWidth="2" strokeDasharray="4 3"/>
+      <circle cx="32" cy="32" r="22" stroke="white" strokeWidth="1.5" strokeDasharray="3 4"/>
+      <path d="M32 8 Q40 16 40 24" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M56 32 Q48 40 40 40" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  'soundscape': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <path d="M4 48 L18 24 L28 36 L38 16 L48 30 L60 48 Z" fill="white" opacity="0.6"/>
+      <path d="M4 48 L18 24 L28 36 L38 16 L48 30 L60 48" stroke="white" strokeWidth="2" strokeLinejoin="round"/>
+      <circle cx="48" cy="14" r="5" fill="white" opacity="0.8"/>
+      <path d="M4 48 H60" stroke="white" strokeWidth="1.5" opacity="0.5"/>
+    </svg>
+  ),
+  'nature': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <path d="M32 56 L32 28" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+      <path d="M32 28 Q32 12 20 8 Q16 20 24 28 Q28 32 32 28Z" fill="white" opacity="0.7"/>
+      <path d="M32 36 Q32 20 44 16 Q48 28 40 36 Q36 40 32 36Z" fill="white" opacity="0.7"/>
+      <path d="M18 56 Q20 48 32 50 Q44 48 46 56" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
+    </svg>
+  ),
+  'explosions': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <path d="M32 32 L32 8 L38 20 L52 16 L44 28 L58 32 L44 36 L52 50 L38 44 L32 56 L26 44 L12 50 L20 36 L6 32 L20 28 L12 16 L26 20 Z" fill="white" opacity="0.6"/>
+      <circle cx="32" cy="32" r="8" fill="white" opacity="0.8"/>
+    </svg>
+  ),
+  'weapons': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <path d="M8 56 L44 20 L50 14 L54 10" stroke="white" strokeWidth="3.5" strokeLinecap="round"/>
+      <path d="M50 14 L56 14 L56 20 L50 20 Z" fill="white"/>
+      <path d="M8 56 L8 50 L14 50 Z" fill="white" opacity="0.7"/>
+      <circle cx="54" cy="12" r="3" fill="white" opacity="0.5"/>
+    </svg>
+  ),
+  'vehicles': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <rect x="6" y="28" width="52" height="18" rx="4" fill="white" opacity="0.5"/>
+      <path d="M12 28 L18 14 L46 14 L52 28" fill="white" opacity="0.7"/>
+      <circle cx="16" cy="48" r="6" fill="white"/>
+      <circle cx="48" cy="48" r="6" fill="white"/>
+      <rect x="32" y="18" width="10" height="8" rx="1" fill="white" opacity="0.3"/>
+    </svg>
+  ),
+  'ui-game': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <rect x="8" y="20" width="48" height="30" rx="8" stroke="white" strokeWidth="2.5"/>
+      <circle cx="22" cy="35" r="5" stroke="white" strokeWidth="2"/>
+      <line x1="22" y1="30" x2="22" y2="40" stroke="white" strokeWidth="2"/>
+      <line x1="17" y1="35" x2="27" y2="35" stroke="white" strokeWidth="2"/>
+      <circle cx="44" cy="30" r="3" fill="white" opacity="0.8"/>
+      <circle cx="50" cy="36" r="3" fill="white" opacity="0.8"/>
+      <circle cx="44" cy="42" r="3" fill="white" opacity="0.8"/>
+      <circle cx="38" cy="36" r="3" fill="white" opacity="0.8"/>
+    </svg>
+  ),
+  'horror': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <path d="M32 6 Q48 6 52 20 L52 42 Q52 48 46 48 L40 48 L36 56 L32 48 L28 56 L24 48 L18 48 Q12 48 12 42 L12 20 Q16 6 32 6Z" fill="white" opacity="0.5"/>
+      <circle cx="24" cy="26" r="4" fill="white"/>
+      <circle cx="40" cy="26" r="4" fill="white"/>
+      <path d="M22 36 Q32 44 42 36" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  'human': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <circle cx="32" cy="14" r="8" fill="white" opacity="0.7"/>
+      <path d="M16 28 Q20 22 32 22 Q44 22 48 28 L50 48 L38 48 L36 36 L28 36 L26 48 L14 48 Z" fill="white" opacity="0.5"/>
+      <path d="M16 28 L8 44" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+      <path d="M48 28 L56 44" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+    </svg>
+  ),
+  'animals': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <circle cx="24" cy="16" r="6" fill="white" opacity="0.6"/>
+      <circle cx="40" cy="16" r="6" fill="white" opacity="0.6"/>
+      <circle cx="16" cy="28" r="5" fill="white" opacity="0.6"/>
+      <circle cx="48" cy="28" r="5" fill="white" opacity="0.6"/>
+      <ellipse cx="32" cy="38" rx="14" ry="12" fill="white" opacity="0.7"/>
+      <circle cx="28" cy="36" r="2" fill="white" opacity="0.4"/>
+      <circle cx="36" cy="36" r="2" fill="white" opacity="0.4"/>
+      <path d="M26 42 Q32 46 38 42" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.4"/>
+    </svg>
+  ),
+  'electronic': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <rect x="14" y="14" width="36" height="36" rx="4" stroke="white" strokeWidth="2"/>
+      <rect x="22" y="22" width="20" height="20" rx="2" fill="white" opacity="0.4"/>
+      <line x1="14" y1="24" x2="6" y2="24" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="14" y1="32" x2="6" y2="32" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="14" y1="40" x2="6" y2="40" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="50" y1="24" x2="58" y2="24" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="50" y1="32" x2="58" y2="32" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="50" y1="40" x2="58" y2="40" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+      <circle cx="32" cy="32" r="4" fill="white"/>
+    </svg>
+  ),
+  'comedy': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <circle cx="32" cy="32" r="22" stroke="white" strokeWidth="2.5"/>
+      <circle cx="24" cy="26" r="3" fill="white"/>
+      <circle cx="40" cy="26" r="3" fill="white"/>
+      <path d="M20 38 Q26 46 32 46 Q38 46 44 38" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+      <path d="M28 12 L32 6 L36 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  'magic': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <path d="M10 54 L40 24" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+      <path d="M38 22 L50 10" stroke="white" strokeWidth="4" strokeLinecap="round"/>
+      <circle cx="50" cy="10" r="4" fill="white"/>
+      <path d="M28 8 L32 14 L36 8 L32 12 Z" fill="white" opacity="0.8"/>
+      <path d="M52 30 L56 36 L60 30 L56 34 Z" fill="white" opacity="0.8"/>
+      <path d="M14 14 L18 20 L22 14 L18 18 Z" fill="white" opacity="0.6"/>
+      <path d="M48 48 L52 54 L56 48 L52 52 Z" fill="white" opacity="0.6"/>
+      <circle cx="24" cy="44" r="2" fill="white" opacity="0.5"/>
+    </svg>
+  ),
+  'sports': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <circle cx="32" cy="32" r="20" stroke="white" strokeWidth="2.5"/>
+      <path d="M32 12 Q40 20 40 32 Q40 44 32 52" stroke="white" strokeWidth="2"/>
+      <path d="M32 12 Q24 20 24 32 Q24 44 32 52" stroke="white" strokeWidth="2"/>
+      <path d="M12 32 H52" stroke="white" strokeWidth="2"/>
+      <path d="M14 22 Q24 18 40 22" stroke="white" strokeWidth="1.5"/>
+      <path d="M14 42 Q24 46 40 42" stroke="white" strokeWidth="1.5"/>
+    </svg>
+  ),
+  'industrial': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <circle cx="32" cy="32" r="16" stroke="white" strokeWidth="2.5"/>
+      <circle cx="32" cy="32" r="6" fill="white" opacity="0.7"/>
+      <path d="M32 10 L32 16" stroke="white" strokeWidth="4" strokeLinecap="round"/>
+      <path d="M32 48 L32 54" stroke="white" strokeWidth="4" strokeLinecap="round"/>
+      <path d="M10 32 L16 32" stroke="white" strokeWidth="4" strokeLinecap="round"/>
+      <path d="M48 32 L54 32" stroke="white" strokeWidth="4" strokeLinecap="round"/>
+      <path d="M16 16 L20 20" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+      <path d="M44 44 L48 48" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+      <path d="M48 16 L44 20" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+      <path d="M20 44 L16 48" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Music
+  'sound-scoring': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <rect x="8" y="14" width="48" height="36" rx="3" stroke="white" strokeWidth="2"/>
+      <rect x="8" y="14" width="48" height="8" fill="white" opacity="0.3"/>
+      <circle cx="32" cy="40" r="8" stroke="white" strokeWidth="2"/>
+      <path d="M32 36 L36 40 L32 44 L28 40 Z" fill="white" opacity="0.7"/>
+      <line x1="14" y1="18" x2="18" y2="18" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="22" y1="18" x2="26" y2="18" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  'cinematic': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <rect x="8" y="18" width="40" height="28" rx="3" fill="white" opacity="0.3" stroke="white" strokeWidth="2"/>
+      <path d="M48 26 L56 22 L56 42 L48 38 Z" fill="white" opacity="0.6"/>
+      <rect x="14" y="24" width="12" height="8" rx="2" fill="white" opacity="0.5"/>
+      <line x1="8" y1="12" x2="48" y2="12" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+      <line x1="14" y1="12" x2="14" y2="18" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="24" y1="12" x2="24" y2="18" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="34" y1="12" x2="34" y2="18" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  'electronic-music': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <rect x="8" y="40" width="6" height="16" rx="2" fill="white"/>
+      <rect x="18" y="28" width="6" height="28" rx="2" fill="white" opacity="0.9"/>
+      <rect x="28" y="14" width="6" height="42" rx="2" fill="white"/>
+      <rect x="38" y="22" width="6" height="34" rx="2" fill="white" opacity="0.9"/>
+      <rect x="48" y="32" width="6" height="24" rx="2" fill="white" opacity="0.8"/>
+      <path d="M8 12 Q20 6 32 12 Q44 18 56 8" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.5"/>
+    </svg>
+  ),
+  'acoustic': (
+    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full opacity-20">
+      <path d="M22 48 Q10 44 10 32 Q10 20 20 16 Q26 13 32 14 L46 6" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+      <path d="M42 10 L50 6 L52 14 L44 18 Z" fill="white" opacity="0.6"/>
+      <ellipse cx="24" cy="44" rx="12" ry="10" stroke="white" strokeWidth="2"/>
+      <circle cx="24" cy="44" r="3" fill="white" opacity="0.6"/>
+      <line x1="20" y1="44" x2="28" y2="44" stroke="white" strokeWidth="1.5" opacity="0.4"/>
+    </svg>
+  ),
+};
 
 const SORT_OPTIONS = [
-  { value: 'newest',     label: 'Newest' },
+  { value: 'newest',     label: 'Terbaru' },
+  { value: 'popular',    label: 'Terpopuler' },
   { value: 'trending',   label: 'Trending' },
-  { value: 'popular',    label: 'Most Downloaded' },
-  { value: 'mostplayed', label: 'Most Played' },
-  { value: 'price_asc',  label: 'Price: Low to High' },
-  { value: 'price_desc', label: 'Price: High to Low' },
+  { value: 'mostplayed', label: 'Paling Diputar' },
 ];
 
-const ACCESS_OPTIONS = [
-  { value: '',         label: 'All' },
-  { value: 'FREE',     label: 'Free' },
+const ACCESS_FILTERS = [
+  { value: '',         label: 'Semua' },
+  { value: 'FREE',     label: 'Gratis' },
   { value: 'PRO',      label: 'Pro' },
-  { value: 'PURCHASE', label: 'Buy Single' },
+  { value: 'PURCHASE', label: 'Beli Satuan' },
 ];
 
-// ─── Category Grid ────────────────────────────────────────────────────────
+// ─── Category Card ────────────────────────────────────────────────────────────
 
-function CategoryGrid({ type, onSelect }: { type: string; onSelect: (slug: string) => void }) {
-  const group = TYPE_MENU.find((g) => g.type === type);
-  if (!group) return null;
+function CategoryCard({ cat, onClick }: {
+  cat: { slug: string; name: string; gradient: string; desc: string; subcats: string[] };
+  onClick: () => void;
+}) {
+  const icon = CAT_ICONS[cat.slug];
+  return (
+    <button
+      onClick={onClick}
+      className={`relative rounded-2xl overflow-hidden group cursor-pointer bg-gradient-to-br ${cat.gradient} flex flex-col justify-end p-5 transition-all duration-200 hover:scale-[1.02] hover:shadow-2xl text-left`}
+      style={{ aspectRatio: '16/10' }}
+    >
+      {/* Decorative background icon */}
+      {icon && (
+        <div className="absolute top-1/2 right-4 -translate-y-1/2 w-28 h-28 pointer-events-none">
+          {icon}
+        </div>
+      )}
+
+      {/* Gradient overlay at bottom */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+
+      {/* Hover glow */}
+      <div className="absolute inset-0 bg-white/0 group-hover:bg-white/[0.06] transition-colors rounded-2xl" />
+
+      {/* Text */}
+      <div className="relative z-10">
+        <p className="text-base font-bold text-white leading-tight">{cat.name}</p>
+        <p className="text-[12px] text-white/70 mt-0.5 font-medium">{cat.desc}</p>
+      </div>
+    </button>
+  );
+}
+
+// ─── Category Landing (no category selected) ─────────────────────────────────
+
+function CategoryLanding({ soundType, onCategoryClick, onSubcatClick }: {
+  soundType: string;
+  onCategoryClick: (slug: string) => void;
+  onSubcatClick: (catSlug: string, subcat: string) => void;
+}) {
+  const allCats = soundType === 'music' ? MUSIC_CATS : soundType === 'sfx' ? SFX_CATS : [...SFX_CATS, ...MUSIC_CATS];
 
   return (
-    <div>
-      <h2 className="text-lg font-semibold text-white mb-4">
-        {group.label} — Categories
-        <span className="ml-2 text-sm font-normal text-[#5a5d72]">{group.sub.length} categories</span>
-      </h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {group.sub.map((cat) => (
-          <button
-            key={cat.slug}
-            onClick={() => onSelect(cat.slug)}
+    <div className="px-6 py-6 pb-28">
+
+      {/* Type selector */}
+      <div className="flex items-center gap-1 mb-8">
+        {[
+          { value: '', label: 'Semua' },
+          { value: 'sfx', label: 'Sound Effects' },
+          { value: 'music', label: 'Music' },
+        ].map(opt => (
+          <button key={opt.value}
+            onClick={() => opt.value === '' ? onCategoryClick('') : onSubcatClick('__type__', opt.value)}
             className={clsx(
-              'relative rounded-2xl p-5 flex flex-col justify-between cursor-pointer overflow-hidden group',
-              'hover:scale-[1.03] hover:shadow-elevated transition-all duration-200',
-              'bg-gradient-to-br',
-              cat.gradient,
-            )}
-            style={{ aspectRatio: '4/3' }}
-          >
-            {/* Glow overlay on hover */}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity bg-white rounded-2xl" />
-
-            {/* Subtle radial highlight */}
-            <div className="absolute inset-0 opacity-15"
-              style={{ background: 'radial-gradient(circle at 25% 25%, rgba(255,255,255,0.4) 0%, transparent 60%)' }}
-            />
-
-            {/* Icon */}
-            <div className="relative text-white/90 group-hover:text-white transition-colors">
-              {cat.icon}
-            </div>
-
-            {/* Name */}
-            <p className="relative text-left text-sm font-bold text-white leading-tight mt-2">
-              {cat.name}
-            </p>
+              'px-4 py-2 rounded-lg text-sm font-medium transition-all',
+              soundType === opt.value ? 'bg-white text-black' : 'text-[#6b6f82] hover:text-white hover:bg-white/[0.06]',
+            )}>
+            {opt.label}
           </button>
         ))}
+      </div>
+
+      {/* Sound Effects section */}
+      {soundType !== 'music' && (
+        <section className="mb-10">
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-[11px] font-bold text-[#5a5d72] uppercase tracking-[0.12em]">Sound Effects</h2>
+            <div className="flex-1 h-px bg-[#1e2030]" />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {FEATURED_SFX.map(cat => (
+              <CategoryCard key={cat.slug} cat={cat} onClick={() => onCategoryClick(cat.slug)} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Music section */}
+      {soundType !== 'sfx' && (
+        <section className="mb-10">
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-[11px] font-bold text-[#5a5d72] uppercase tracking-[0.12em]">Music</h2>
+            <div className="flex-1 h-px bg-[#1e2030]" />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {FEATURED_MUSIC.map(cat => (
+              <CategoryCard key={cat.slug} cat={cat} onClick={() => onCategoryClick(cat.slug)} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* All categories + subcategories */}
+      <section>
+        <div className="flex items-center gap-3 mb-4">
+          <h2 className="text-[11px] font-bold text-[#5a5d72] uppercase tracking-[0.12em]">Semua Kategori</h2>
+          <div className="flex-1 h-px bg-[#1e2030]" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-px bg-[#1a1b2e] rounded-2xl overflow-hidden border border-[#1a1b2e]">
+          {allCats.map(cat => (
+            <div key={cat.slug} className="bg-[#0d0e18] p-4 hover:bg-[#111220] transition-colors group">
+              {/* Category header */}
+              <button
+                onClick={() => onCategoryClick(cat.slug)}
+                className="flex items-center gap-2 mb-3 w-full text-left">
+                <div className={`w-3 h-3 rounded flex-shrink-0 bg-gradient-to-br ${cat.gradient}`} />
+                <span className="text-[13px] font-semibold text-[#c4c6d8] group-hover:text-white transition-colors">
+                  {cat.name}
+                </span>
+              </button>
+
+              {/* Subcategory list */}
+              <div className="space-y-1">
+                {cat.subcats.map(sub => (
+                  <button
+                    key={sub}
+                    onClick={() => onSubcatClick(cat.slug, sub)}
+                    className="block text-left text-xs text-[#4a4d5e] hover:text-[#a0a3b8] transition-colors py-0.5 w-full leading-relaxed">
+                    {sub}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ─── Sound List (category selected) ───────────────────────────────────────────
+
+function SoundList({ category, filters, onBack }: {
+  category: { slug: string; name: string; subcats: string[] } | null;
+  filters: SoundFilters;
+  onBack: () => void;
+}) {
+  const [sort, setSort] = useState('newest');
+  const [access, setAccess] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [subcat, setSubcat] = useState('');
+  const debouncedSearch = useDebounce(searchInput, 400);
+
+  const activeFilters: SoundFilters = {
+    ...filters,
+    sortBy: sort,
+    accessLevel: access || undefined,
+    search: debouncedSearch || (subcat ? subcat : undefined),
+    page: 1,
+    limit: 40,
+  };
+
+  const { data, isLoading, isError } = useSounds(activeFilters, true);
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-20 bg-[#0c0d16] border-b border-[#1a1b2e] px-6 py-3">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-2 text-sm mb-3">
+          <button onClick={onBack} className="text-[#5a5d72] hover:text-white transition-colors flex items-center gap-1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Browse
+          </button>
+          <span className="text-[#2a2c3e]">/</span>
+          <span className="text-white font-medium">{category?.name ?? 'Sounds'}</span>
+          {data && <span className="text-[#3a3c4e] text-xs ml-auto">{data.pagination.total} sounds</span>}
+        </div>
+
+        {/* Subcategory chips */}
+        {category && category.subcats.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 mb-3">
+            <button
+              onClick={() => setSubcat('')}
+              className={clsx('px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all',
+                !subcat ? 'bg-white text-black' : 'bg-white/[0.06] text-[#8b8fa8] hover:bg-white/10 hover:text-white')}>
+              Semua
+            </button>
+            {category.subcats.map(s => (
+              <button key={s}
+                onClick={() => setSubcat(s === subcat ? '' : s)}
+                className={clsx('px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all',
+                  subcat === s ? 'bg-white text-black' : 'bg-white/[0.06] text-[#8b8fa8] hover:bg-white/10 hover:text-white')}>
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Filter bar */}
+        <div className="flex items-center gap-2">
+          {/* Search */}
+          <div className="relative flex-1 max-w-xs">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-[#3a3c4e]" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              type="text"
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              placeholder="Cari dalam kategori..."
+              className="w-full pl-9 pr-3 py-1.5 input-dark rounded-lg text-sm"
+            />
+          </div>
+
+          {/* Access filter */}
+          <div className="flex items-center gap-1">
+            {ACCESS_FILTERS.map(f => (
+              <button key={f.value}
+                onClick={() => setAccess(f.value)}
+                className={clsx('px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
+                  access === f.value ? 'bg-white text-black' : 'text-[#6b6f82] hover:text-white hover:bg-white/[0.06]')}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort */}
+          <select
+            value={sort}
+            onChange={e => setSort(e.target.value)}
+            className="px-3 py-1.5 input-dark rounded-lg text-xs text-[#c4c6d8] cursor-pointer ml-auto">
+            {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Sound list */}
+      <div className="px-6 py-4 pb-28 flex-1">
+        {isLoading && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {Array(20).fill(0).map((_, i) => (
+              <div key={i} className="rounded-xl bg-[#13141f] border border-[#1e2030] animate-pulse h-40" />
+            ))}
+          </div>
+        )}
+
+        {isError && (
+          <div className="text-center py-16">
+            <p className="text-sm text-[#5a5d72]">Gagal memuat sounds. Coba lagi.</p>
+          </div>
+        )}
+
+        {!isLoading && !isError && data?.items.length === 0 && (
+          <div className="text-center py-20 card rounded-2xl">
+            <p className="text-base font-semibold text-[#c4c6d8]">Belum ada sound</p>
+            <p className="text-sm text-[#5a5d72] mt-1">
+              {subcat ? `Tidak ada sound "${subcat}" di kategori ini` : 'Belum ada sound di kategori ini'}
+            </p>
+          </div>
+        )}
+
+        {!isLoading && !isError && data && data.items.length > 0 && (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              {data.items.map(sound => <SoundCard key={sound.id} sound={sound} />)}
+            </div>
+
+            {data.pagination.totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-8">
+                <span className="text-sm text-[#5a5d72]">
+                  Halaman {data.pagination.page} dari {data.pagination.totalPages}
+                </span>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-// ─── Main Browse ──────────────────────────────────────────────────────────
+// ─── Main Browse ──────────────────────────────────────────────────────────────
 
 function BrowseContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [viewMode, setViewMode] = useState<'default' | 'grid' | 'list'>('default');
-  const [activeType, setActiveType] = useState<string>('');
-  const [filters, setFilters] = useState<SoundFilters>({ sortBy: 'newest', page: 1, limit: 30 });
-  const [soundType, setSoundType] = useState<string>('');
-  const [searchInput, setSearchInput] = useState('');
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-  const debouncedSearch = useDebounce(searchInput, 400);
-  const debouncedMinPrice = useDebounce(minPrice, 500);
-  const debouncedMaxPrice = useDebounce(maxPrice, 500);
+  const [categorySlug, setCategorySlug] = useState(searchParams.get('categorySlug') ?? '');
+  const [soundType, setSoundType] = useState(searchParams.get('soundType') ?? '');
 
+  // Sync with URL
   useEffect(() => {
-    const category = searchParams.get('categorySlug');
-    const search = searchParams.get('search');
-    const page = searchParams.get('page');
-    if (category) { setFilters((f) => ({ ...f, categorySlug: category })); setViewMode('list'); }
-    if (search) setSearchInput(search);
-    if (page) {
-      const p = Math.max(1, Math.min(1000, parseInt(page, 10) || 1));
-      setFilters((f) => ({ ...f, page: p }));
-    }
-  }, []);
+    const cat = searchParams.get('categorySlug') ?? '';
+    const type = searchParams.get('soundType') ?? '';
+    setCategorySlug(cat);
+    setSoundType(type);
+  }, [searchParams]);
 
-  const activeFilters: SoundFilters = {
-    ...filters,
-    search: debouncedSearch || undefined,
-    minPrice: debouncedMinPrice ? parseInt(debouncedMinPrice) : undefined,
-    maxPrice: debouncedMaxPrice ? parseInt(debouncedMaxPrice) : undefined,
-    soundType: soundType || undefined,
+  const updateUrl = (params: Record<string, string>) => {
+    const p = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v) p.set(k, v); });
+    router.push(`/browse?${p.toString()}`);
   };
 
-  const showSoundList = viewMode === 'default' || viewMode === 'list';
-  const { data, isLoading, isError } = useSounds(activeFilters, showSoundList);
+  const handleCategoryClick = (slug: string) => {
+    if (!slug) {
+      updateUrl({ soundType });
+    } else {
+      updateUrl({ categorySlug: slug });
+    }
+  };
 
-  const handleSelectType = useCallback((type: string) => {
-    setActiveType(type);
-    setSoundType('');
-    setFilters((f) => ({ ...f, categorySlug: undefined, page: 1 }));
-    setViewMode('grid');
-  }, []);
+  const handleSubcatClick = (catSlug: string, sub: string) => {
+    if (catSlug === '__type__') {
+      updateUrl({ soundType: sub });
+    } else {
+      updateUrl({ categorySlug: catSlug, search: sub });
+    }
+  };
 
-  const handleSelectCategory = useCallback((slug: string) => {
-    setSoundType('');
-    setFilters((f) => ({ ...f, categorySlug: slug, page: 1 }));
-    setViewMode('list');
-    const parent = TYPE_MENU.find((g) => g.sub.some((s) => s.slug === slug));
-    if (parent) setActiveType(parent.type);
-  }, []);
+  const allCats = [...SFX_CATS, ...MUSIC_CATS];
+  const activeCategory = categorySlug ? allCats.find(c => c.slug === categorySlug) ?? null : null;
 
-  const setAccess = useCallback((value: string) => {
-    setFilters((f) => ({
-      ...f,
-      accessLevel: (value || undefined) as SoundFilters['accessLevel'],
-      isFree: undefined,
-      page: 1,
-    }));
-  }, []);
+  const filters: SoundFilters = {
+    categorySlug: categorySlug || undefined,
+    soundType: soundType || undefined,
+    sortBy: 'newest',
+    page: 1,
+    limit: 40,
+  };
 
-  const activeCatName = TYPE_MENU.flatMap((g) => g.sub).find((s) => s.slug === filters.categorySlug)?.name;
+  if (activeCategory || (categorySlug && !activeCategory)) {
+    return (
+      <SoundList
+        category={activeCategory}
+        filters={filters}
+        onBack={() => updateUrl({ soundType })}
+      />
+    );
+  }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6">
-
-      {/* Search bar */}
-      <div className="relative mb-6">
-        <svg className="absolute left-4 top-1/2 -translate-y-1/2 text-[#4a4d5e] w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="6.5" cy="6.5" r="5"/><path d="M10.5 10.5L14 14" strokeLinecap="round"/>
-        </svg>
-        <input
-          type="text"
-          placeholder="Search sound effects..."
-          value={searchInput}
-          onChange={(e) => { setSearchInput(e.target.value); if (e.target.value) setViewMode('default'); }}
-          className="w-full pl-11 pr-4 py-3 input-dark rounded-xl text-sm"
-        />
-      </div>
-
-      <div className="flex gap-6">
-
-        {/* Sidebar */}
-        <aside className="w-48 flex-shrink-0 hidden md:block">
-          <div className="card rounded-xl p-4 space-y-5 sticky top-20 max-h-[calc(100vh-7rem)] overflow-y-auto scrollbar-none">
-
-            {/* Menu */}
-            <div>
-              <p className="text-[10px] font-semibold text-[#4a4d5e] uppercase tracking-widest mb-2">Menu</p>
-              <div className="space-y-0.5">
-                {TYPE_MENU.map((group) => (
-                  <div key={group.type}>
-                    {/* Parent type button */}
-                    <button
-                      onClick={() => handleSelectType(group.type)}
-                      className={clsx(
-                        'w-full text-left px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-150',
-                        activeType === group.type && viewMode === 'grid'
-                          ? 'bg-accent/15 text-accent-bright'
-                          : 'text-[#8b8fa8] hover:text-white hover:bg-white/[0.05]',
-                      )}
-                    >
-                      {group.label}
-                    </button>
-                    {/* Sub categories */}
-                    <div className="ml-2 mt-0.5 space-y-0.5">
-                      {group.sub.map((sub) => (
-                        <button
-                          key={sub.slug}
-                          onClick={() => handleSelectCategory(sub.slug)}
-                          className={clsx(
-                            'w-full text-left px-3 py-1 rounded-lg text-xs transition-all duration-150',
-                            filters.categorySlug === sub.slug && viewMode === 'list'
-                              ? 'bg-accent/15 text-accent-bright font-medium'
-                              : 'text-[#5a5d72] hover:text-[#c4c6d8] hover:bg-white/[0.04]',
-                          )}
-                        >
-                          {sub.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Filters — only in list mode */}
-            {showSoundList && (
-              <>
-                <div>
-                  <p className="text-[10px] font-semibold text-[#4a4d5e] uppercase tracking-widest mb-2">Access</p>
-                  <div className="space-y-0.5">
-                    {ACCESS_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        onClick={() => setAccess(opt.value)}
-                        className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all duration-150 ${
-                          (filters.accessLevel ?? '') === opt.value
-                            ? 'bg-accent/15 text-accent-bright font-medium'
-                            : 'text-[#6b6f82] hover:text-[#c4c6d8] hover:bg-white/[0.05]'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-[10px] font-semibold text-[#4a4d5e] uppercase tracking-widest mb-2">Price (Rp)</p>
-                  <div className="space-y-1.5">
-                    <input type="number" min="0" value={minPrice} onChange={e => setMinPrice(e.target.value)} placeholder="Min"
-                      className="w-full px-2.5 py-1.5 input-dark rounded-lg text-xs" />
-                    <input type="number" min="0" value={maxPrice} onChange={e => setMaxPrice(e.target.value)} placeholder="Max"
-                      className="w-full px-2.5 py-1.5 input-dark rounded-lg text-xs" />
-                    {(minPrice || maxPrice) && (
-                      <button onClick={() => { setMinPrice(''); setMaxPrice(''); }} className="text-xs text-accent-bright hover:underline">Clear</button>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-[10px] font-semibold text-[#4a4d5e] uppercase tracking-widest mb-2">Sort By</p>
-                  <div className="space-y-0.5">
-                    {SORT_OPTIONS.map((opt) => (
-                      <button key={opt.value} onClick={() => setFilters((f) => ({ ...f, sortBy: opt.value as any }))}
-                        className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all duration-150 ${
-                          filters.sortBy === opt.value
-                            ? 'bg-accent/15 text-accent-bright font-medium'
-                            : 'text-[#6b6f82] hover:text-[#c4c6d8] hover:bg-white/[0.05]'
-                        }`}>
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </aside>
-
-        {/* Main content */}
-        <div className="flex-1 min-w-0">
-
-          {/* Category grid */}
-          {viewMode === 'grid' && (
-            <CategoryGrid type={activeType} onSelect={handleSelectCategory} />
-          )}
-
-          {/* Sound list */}
-          {showSoundList && (
-            <>
-              <div className="flex items-center gap-3 mb-3">
-                {activeCatName && viewMode === 'list' && (
-                  <button
-                    onClick={() => handleSelectType(activeType)}
-                    className="flex items-center gap-1 text-sm text-[#6b6f82] hover:text-accent-bright transition-colors"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                      <polyline points="9 2 4 7 9 12"/>
-                    </svg>
-                    {TYPE_MENU.find((g) => g.type === activeType)?.label ?? 'Back'}
-                  </button>
-                )}
-                <p className="text-sm text-[#5a5d72]">
-                  {isLoading ? 'Loading...' : `${data?.pagination.total ?? 0} sound effects${activeCatName ? ` · ${activeCatName}` : ''}`}
-                </p>
-              </div>
-
-              {isLoading && (
-                <div className="space-y-2">
-                  {Array(8).fill(0).map((_, i) => (
-                    <div key={i} className="h-16 card rounded-xl animate-pulse" />
-                  ))}
-                </div>
-              )}
-
-              {isError && (
-                <div className="text-center py-16 text-[#5a5d72]">
-                  <p className="text-base font-medium text-[#8b8fa8]">Failed to load sounds</p>
-                  <p className="text-sm mt-1">Check your connection and try again</p>
-                </div>
-              )}
-
-              {!isLoading && !isError && (
-                <>
-                  {data?.items.length === 0 ? (
-                    <div className="text-center py-20 card rounded-2xl">
-                      <div className="w-12 h-12 rounded-full bg-white/[0.04] flex items-center justify-center mx-auto mb-3">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5a5d72" strokeWidth="1.5" strokeLinecap="round">
-                          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                        </svg>
-                      </div>
-                      <p className="text-sm font-medium text-[#8b8fa8]">No sounds found</p>
-                      <p className="text-xs text-[#5a5d72] mt-1">Try different keywords or filters</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {data?.items.map((sound) => (
-                        <SoundRow key={sound.id} sound={sound} />
-                      ))}
-                    </div>
-                  )}
-
-                  {(data?.pagination.totalPages ?? 0) > 1 && (
-                    <div className="flex justify-center gap-2 mt-6">
-                      <button disabled={filters.page === 1}
-                        onClick={() => setFilters((f) => ({ ...f, page: (f.page ?? 1) - 1 }))}
-                        className="px-4 py-2 text-sm rounded-lg border border-rim text-[#8b8fa8] disabled:opacity-30 hover:bg-white/[0.05] hover:text-white transition-colors">
-                        Previous
-                      </button>
-                      <span className="px-4 py-2 text-sm text-[#5a5d72]">
-                        Page {filters.page} of {data?.pagination.totalPages}
-                      </span>
-                      <button disabled={filters.page === data?.pagination.totalPages}
-                        onClick={() => setFilters((f) => ({ ...f, page: (f.page ?? 1) + 1 }))}
-                        className="px-4 py-2 text-sm rounded-lg border border-rim text-[#8b8fa8] disabled:opacity-30 hover:bg-white/[0.05] hover:text-white transition-colors">
-                        Next
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+    <CategoryLanding
+      soundType={soundType}
+      onCategoryClick={handleCategoryClick}
+      onSubcatClick={handleSubcatClick}
+    />
   );
 }
 
 export default function BrowsePage() {
   return (
     <Suspense fallback={
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="h-12 bg-surface rounded-xl border border-rim animate-pulse mb-6" />
-        <div className="flex gap-6">
-          <div className="w-48 hidden md:block">
-            <div className="card rounded-xl h-64 animate-pulse" />
-          </div>
-          <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {Array(8).fill(0).map((_, i) => (
-              <div key={i} className="card rounded-2xl animate-pulse" style={{ aspectRatio: '4/3' }} />
-            ))}
-          </div>
+      <div className="px-6 py-6">
+        <div className="grid grid-cols-4 gap-3 mb-8">
+          {Array(8).fill(0).map((_, i) => <div key={i} className="aspect-video rounded-xl bg-white/[0.04] animate-pulse" />)}
+        </div>
+        <div className="grid grid-cols-4 gap-px bg-[#1a1b2e] rounded-xl overflow-hidden">
+          {Array(8).fill(0).map((_, i) => <div key={i} className="bg-[#0e0f1a] p-4 h-40 animate-pulse" />)}
         </div>
       </div>
     }>

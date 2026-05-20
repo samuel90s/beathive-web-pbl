@@ -20,6 +20,7 @@ model User {
   bankName        String?
   bankAccount     String?
   bankAccountName String?
+  // TODO (BE-03): migrate to Prisma Enum `enum UserRole { USER ADMIN }` to get type safety and prevent typos
   role         String   @default("USER") // "USER" | "ADMIN"
   provider     String   @default("email") // "email" | "google"
   providerId   String?  // ID dari Google OAuth
@@ -28,6 +29,9 @@ model User {
 
   totpSecret         String?
   isTwoFactorEnabled Boolean  @default(false)
+
+  emailVerified      Boolean  @default(true)  // true untuk user lama, false untuk register baru
+  emailVerifyToken   String?
 
   subscription   Subscription?
   orders         Order[]
@@ -132,10 +136,15 @@ model SoundEffect {
   licenseType  String      @default("personal") // "personal" | "commercial" | "both"
   isPublished   Boolean     @default(false)
   publishedAt   DateTime?
-  reviewStatus  String      @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
+  // TODO (BE-04): migrate to Prisma Enum for type safety (PENDING|APPROVED|REJECTED|NEEDS_RE_REVIEW)
+  reviewStatus  String      @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED" | "NEEDS_RE_REVIEW"
   reviewNote    String?     // alasan reject dari admin
   reviewedAt    DateTime?
   reviewedById  String?     // admin user ID
+  bpm          Int?        // beats per minute (music only)
+  mood         String?     // "upbeat"|"calm"|"epic"|"sad"|"dark"|"happy"|"neutral"|"tense"
+  musicalKey   String?     // "C"|"D"|"Em" etc.
+  hasStems     Boolean     @default(false)
   playCount     Int         @default(0)
   downloadCount Int        @default(0)
   createdAt    DateTime    @default(now())
@@ -149,7 +158,10 @@ model SoundEffect {
   wishlists  Wishlist[]
   ratings    Rating[]
 
-  // Indexes applied via scripts/add-indexes.js (idx_sound_effects_*)
+  @@index([isPublished, categoryId])
+  @@index([authorId])
+  @@index([accessLevel])
+  @@index([isPublished, accessLevel])
   @@map("sound_effects")
 }
 
@@ -188,7 +200,8 @@ model Order {
   items     OrderItem[]
   invoice   Invoice?
 
-  // Indexes applied via scripts/add-indexes.js (idx_orders_*)
+  @@index([userId])
+  @@index([status])
   @@map("orders")
 }
 
@@ -242,7 +255,8 @@ model Download {
   user        User        @relation(fields: [userId], references: [id])
   soundEffect SoundEffect @relation(fields: [soundEffectId], references: [id])
 
-  // Indexes applied via scripts/add-indexes.js (idx_downloads_*)
+  @@index([userId])
+  @@index([soundEffectId])
   @@map("downloads")
 }
 
@@ -288,7 +302,7 @@ model CreatorEarning {
   wallet CreatorWallet @relation(fields: [walletId], references: [id])
 
   @@unique([walletId, downloadId]) // prevents duplicate earnings from race conditions
-  // Indexes applied via scripts/add-indexes.js (idx_creator_earnings_*)
+  @@index([walletId])
   @@map("creator_earnings")
 }
 

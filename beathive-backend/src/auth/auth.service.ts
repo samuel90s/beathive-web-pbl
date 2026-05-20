@@ -13,6 +13,7 @@ import * as path from 'path';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -22,6 +23,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwt: JwtService,
     private config: ConfigService,
+    private email: EmailService,
   ) {}
 
   // ─── Register dengan email ──────────────────────────────
@@ -68,8 +70,69 @@ export class AuthService {
       return newUser;
     });
 
+    // Kirim email verifikasi (fire-and-forget)
+    const verifyToken = this.jwt.sign(
+      { sub: user.id, type: 'email-verify' },
+      { expiresIn: '24h' },
+    );
+    // Update token di DB (gunakan $executeRaw agar backward-compatible)
+    try {
+      await this.prisma.$executeRaw`
+        UPDATE users SET email_verified = false, email_verify_token = ${verifyToken} WHERE id = ${user.id}
+      `;
+    } catch { /* kolom mungkin belum ada — migration diperlukan */ }
+
+    const frontendUrl = this.config.get('FRONTEND_URL') || 'http://localhost:3001';
+    const verifyUrl = `${frontendUrl}/auth/verify-email?token=${verifyToken}`;
+
+    // Fire-and-forget: send verification email
+    this.email.sendEmailVerification(user.email, user.name, verifyUrl).catch(() => {});
+
     const tokens = await this.generateTokens(user.id, user.email);
-    return { user: this.sanitizeUser(user), ...tokens };
+    return {
+      user: this.sanitizeUser(user),
+      ...tokens,
+      emailVerified: false,
+      message: 'Pendaftaran berhasil! Cek email untuk verifikasi akun.',
+    };
+  }
+
+  // ─── Verify email ────────────────────────────────────────
+
+  async verifyEmail(token: string) {
+    try {
+      const payload = this.jwt.verify(token) as any;
+      if (payload.type !== 'email-verify') throw new Error('Invalid token type');
+
+      await this.prisma.$executeRaw`
+        UPDATE users SET email_verified = true, email_verify_token = NULL WHERE id = ${payload.sub}
+      `;
+      return { message: 'Email berhasil diverifikasi!' };
+    } catch {
+      throw new BadRequestException('Token verifikasi tidak valid atau sudah expired.');
+    }
+  }
+
+  // ─── Resend email verification ────────────────────────────
+
+  async resendVerification(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new BadRequestException('User not found');
+    if ((user as any).emailVerified) throw new BadRequestException('Email sudah terverifikasi');
+
+    const verifyToken = this.jwt.sign(
+      { sub: user.id, type: 'email-verify' },
+      { expiresIn: '24h' },
+    );
+    await this.prisma.$executeRaw`
+      UPDATE users SET email_verify_token = ${verifyToken} WHERE id = ${userId}
+    `;
+
+    const frontendUrl = this.config.get('FRONTEND_URL') || 'http://localhost:3001';
+    const verifyUrl = `${frontendUrl}/auth/verify-email?token=${verifyToken}`;
+    await this.email.sendEmailVerification(user.email, user.name, verifyUrl).catch(() => {});
+
+    return { message: 'Email verifikasi telah dikirim ulang.' };
   }
 
   // ─── Login dengan email ─────────────────────────────────
@@ -237,7 +300,7 @@ export class AuthService {
     });
     if (!user) return null;
 
-    const [soundCount, sounds] = await Promise.all([
+    const [soundCount, sounds, aggregates] = await Promise.all([
       this.prisma.soundEffect.count({ where: { authorId: userId, isPublished: true } }),
       this.prisma.soundEffect.findMany({
         where: { authorId: userId, isPublished: true },
@@ -246,9 +309,14 @@ export class AuthService {
         select: {
           id: true, title: true, slug: true, accessLevel: true, price: true,
           durationMs: true, downloadCount: true, playCount: true, previewUrl: true, waveformData: true,
+          format: true,
           category: { select: { name: true, slug: true } },
           tags: { take: 10, select: { tag: { select: { name: true, slug: true } } } },
         },
+      }),
+      this.prisma.soundEffect.aggregate({
+        where: { authorId: userId, isPublished: true },
+        _sum: { playCount: true, downloadCount: true },
       }),
     ]);
 
@@ -257,7 +325,13 @@ export class AuthService {
       tags: s.tags?.map((t: any) => t.tag) ?? [],
     }));
 
-    return { ...user, soundCount, sounds: flatSounds };
+    return {
+      ...user,
+      soundCount,
+      totalPlays: aggregates._sum.playCount ?? 0,
+      totalDownloads: aggregates._sum.downloadCount ?? 0,
+      sounds: flatSounds,
+    };
   }
 
   // ─── Update profile (name + bio) ───────────────────────
@@ -434,7 +508,7 @@ export class AuthService {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwt.signAsync(payload, {
         secret: this.config.get('JWT_SECRET'),
-        expiresIn: this.config.get('JWT_EXPIRES_IN', '7d'),
+        expiresIn: this.config.get('JWT_EXPIRES_IN', '15m'),
       }),
       this.jwt.signAsync(payload, {
         secret: this.config.get('JWT_REFRESH_SECRET'),

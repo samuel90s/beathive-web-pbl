@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { EarningsService } from '../earnings/earnings.service';
+import { EmailService } from '../email/email.service';
 
 // Midtrans tidak punya tipe resmi, pakai require
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -27,6 +28,7 @@ export class OrdersService {
     private prisma: PrismaService,
     private config: ConfigService,
     private earnings: EarningsService,
+    private email: EmailService,
   ) {
     this.snap = new midtransClient.Snap({
       isProduction: config.get('MIDTRANS_IS_PRODUCTION') === 'true',
@@ -50,9 +52,13 @@ export class OrdersService {
       throw new NotFoundException('One or more sound effects were not found');
     }
 
-    const nonPurchaseSounds = sounds.filter(s => s.accessLevel !== 'PURCHASE');
+    // Allow PURCHASE items, and PRO/BUSINESS items that carry a price > 0
+    const nonPurchaseSounds = sounds.filter(s =>
+      s.accessLevel !== 'PURCHASE' &&
+      !((s.accessLevel === 'PRO' || s.accessLevel === 'BUSINESS') && s.price > 0),
+    );
     if (nonPurchaseSounds.length > 0) {
-      throw new BadRequestException('Only sounds with "Purchase" access level can be bought');
+      throw new BadRequestException('Only purchasable sounds can be ordered');
     }
 
     // Block self-purchase: creators cannot buy their own sounds
@@ -67,8 +73,10 @@ export class OrdersService {
     const itemsWithPrice = dto.items.map((item) => {
       const sound = sounds.find((s) => s.id === item.soundEffectId)!;
       const price =
-        item.licenseType === 'commercial'
+        item.licenseType === 'commercial' || item.licenseType === 'sync'
           ? sound.price * 2
+          : item.licenseType === 'broadcast'
+          ? sound.price * 3
           : sound.price;
       return { ...item, sound, price };
     });
@@ -173,13 +181,50 @@ export class OrdersService {
     });
   }
 
+  // ─── Get pending order detail (for payment page) ────────
+
+  async getOrderForPayment(userId: string, orderId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId },
+      include: {
+        items: {
+          include: { soundEffect: { select: { id: true, title: true, slug: true } } },
+        },
+      },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+
+    const subtotal = order.items.reduce((s, i) => s + i.priceSnapshot, 0);
+    const SERVICE_FEE_PERCENT = 5;
+    const TAX_PERCENT = 11;
+    const serviceFee = Math.round(subtotal * SERVICE_FEE_PERCENT / 100);
+    const tax = Math.round((subtotal + serviceFee) * TAX_PERCENT / 100);
+
+    return {
+      orderId: order.id,
+      status: order.status,
+      snapToken: order.snapToken,
+      totalAmount: order.totalAmount,
+      subtotal,
+      serviceFee,
+      tax,
+      grandTotal: order.totalAmount,
+      items: order.items.map((i) => ({
+        title: i.soundEffect.title,
+        slug: i.soundEffect.slug,
+        licenseType: i.licenseType,
+        price: i.priceSnapshot,
+      })),
+    };
+  }
+
   // ─── Get invoice detail ─────────────────────────────────
 
   async getInvoice(userId: string, orderId: string) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId },
       include: {
-        items: { include: { soundEffect: { select: { title: true, format: true } } } },
+        items: { include: { soundEffect: { select: { id: true, title: true, slug: true, format: true } } } },
         invoice: true,
         user: { select: { name: true, email: true } },
       },
@@ -195,6 +240,9 @@ export class OrdersService {
       customer: { name: order.user.name, email: order.user.email },
       items: order.items.map((i) => ({
         title: i.soundEffect.title,
+        soundId: i.soundEffectId,
+        slug: (i.soundEffect as any).slug ?? null,
+        format: (i.soundEffect as any).format ?? 'wav',
         licenseType: i.licenseType,
         price: i.priceSnapshot,
       })),
@@ -338,9 +386,42 @@ export class OrdersService {
     // Record purchase earnings (idempotent via dedup key 'order:<itemId>')
     if (activated) {
       await this.earnings.recordOrderEarnings(order.id);
+      // Notify creators (fire-and-forget)
+      this.notifyCreatorsOnSale(order.id).catch(() => {});
     }
 
     return { activated: true };
+  }
+
+  // ─── Notify creators when their sound is sold ───────────
+
+  private async notifyCreatorsOnSale(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: {
+            soundEffect: {
+              include: { author: { select: { id: true, name: true, email: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!order) return;
+
+    for (const item of order.items) {
+      const author = (item.soundEffect as any).author;
+      if (!author?.email) continue;
+      const creatorEarning = Math.round(item.priceSnapshot * 0.7);
+      await this.email.sendSoundSold(
+        author.email,
+        author.name,
+        item.soundEffect.title,
+        creatorEarning,
+        item.licenseType,
+      ).catch(() => {});
+    }
   }
 
   // ─── Cancel order PENDING ───────────────────────────────
@@ -418,7 +499,17 @@ export class OrdersService {
         email: user.email,
       },
       callbacks: {
+        // Midtrans appends ?transaction_status=settlement/pending/deny/cancel/expire
+        // to this URL — success page reads that param to determine the state
         finish: `${this.config.get('FRONTEND_URL')}/orders/${order.id}/success`,
+      },
+      credit_card: {
+        secure: true,
+      },
+      custom_colors: {
+        primary_color:     '#8b5cf6',
+        secondary_color:   '#7c3aed',
+        button_link_color: '#a78bfa',
       },
     };
 

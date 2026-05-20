@@ -47,6 +47,16 @@ export class SubscriptionsController {
     return this.subscriptionsService.verifyAndActivate(userId, body.orderId);
   }
 
+  // POST /subscriptions/change-plan  — downgrade / ganti plan
+  @Post('change-plan')
+  @UseGuards(JwtAuthGuard)
+  async changePlan(
+    @CurrentUser() userId: string,
+    @Body() body: { planSlug: string; billingCycle: 'monthly' | 'yearly' },
+  ) {
+    return this.subscriptionsService.changePlan(userId, body.planSlug, body.billingCycle ?? 'monthly');
+  }
+
   // DELETE /subscriptions/me  — cancel subscription
   @Delete('me')
   @UseGuards(JwtAuthGuard)

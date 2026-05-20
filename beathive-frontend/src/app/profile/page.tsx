@@ -131,7 +131,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+    <div className="px-8 py-8 pb-28 max-w-3xl space-y-6">
       <h1 className="text-xl font-semibold text-white">Edit Profile</h1>
 
       {/* Avatar + basic info */}

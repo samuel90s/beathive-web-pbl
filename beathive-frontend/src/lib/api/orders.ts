@@ -2,7 +2,24 @@
 import { apiClient } from './client';
 import type { Order, CartItem } from '@/types';
 
+export interface PendingOrderDetail {
+  orderId: string;
+  status: string;
+  snapToken: string | null;
+  totalAmount: number;
+  subtotal: number;
+  serviceFee: number;
+  tax: number;
+  grandTotal: number;
+  items: { title: string; slug: string; licenseType: string; price: number }[];
+}
+
 export const ordersApi = {
+  getOrder: async (orderId: string): Promise<PendingOrderDetail> => {
+    const { data } = await apiClient.get(`/orders/${orderId}`);
+    return data;
+  },
+
   create: async (items: CartItem[]) => {
     const { data } = await apiClient.post('/orders', {
       items: items.map((i) => ({

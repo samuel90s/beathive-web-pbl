@@ -84,6 +84,23 @@ export class SoundFilterDto {
   @Min(0)
   maxPrice?: number;
 
+  // Music-specific filters
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  minBpm?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  maxBpm?: number;
+
+  @IsOptional()
+  @IsString()
+  mood?: string;
+
   @IsOptional()
   @IsString()
   sortBy?: string;
@@ -141,6 +158,27 @@ export class UploadSoundDto {
   @IsOptional()
   @IsString()
   tags?: string; // comma-separated tag names
+
+  // Music metadata
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(300)
+  bpm?: number;
+
+  @IsOptional()
+  @IsString()
+  mood?: string;
+
+  @IsOptional()
+  @IsString()
+  musicalKey?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  hasStems?: boolean;
 }
 
 export class UpdateSoundDto {
@@ -170,6 +208,27 @@ export class UpdateSoundDto {
   @IsString({ each: true })
   @ArrayMaxSize(20)
   tags?: string[];
+
+  // Music metadata
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(300)
+  bpm?: number;
+
+  @IsOptional()
+  @IsString()
+  mood?: string;
+
+  @IsOptional()
+  @IsString()
+  musicalKey?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  hasStems?: boolean;
 }
 
 // ─── Service ──────────────────────────────────────────────
@@ -248,18 +307,31 @@ export class SoundsService {
       }
     }
 
-    // "trending" = most downloaded in last 7 days; fall back to downloadCount
+    if (filters.minBpm !== undefined) {
+      where.bpm = { ...(where.bpm ?? {}), gte: filters.minBpm };
+    }
+    if (filters.maxBpm !== undefined) {
+      where.bpm = { ...(where.bpm ?? {}), lte: filters.maxBpm };
+    }
+    if (filters.mood) {
+      where.mood = filters.mood;
+    }
+
+    // Saat ada search query, urutkan by relevance (exact match dulu, lalu downloadCount)
+    // Untuk sort lainnya, gunakan field sort biasa
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const orderBy: any =
-      {
-        newest: { createdAt: 'desc' },
-        oldest: { createdAt: 'asc' },
-        popular: { downloadCount: 'desc' },
-        mostplayed: { playCount: 'desc' },
-        price_asc: { price: 'asc' },
-        price_desc: { price: 'desc' },
-        trending: { downloads: { _count: 'desc' } },
-      }[sortBy] ?? { createdAt: 'desc' };
+    const isSearchMode = !!search && sortBy === 'newest';
+    const orderBy: any = isSearchMode
+      ? [{ downloadCount: 'desc' }, { playCount: 'desc' }, { createdAt: 'desc' }]
+      : ({
+          newest:     { createdAt: 'desc' },
+          oldest:     { createdAt: 'asc' },
+          popular:    { downloadCount: 'desc' },
+          mostplayed: { playCount: 'desc' },
+          price_asc:  { price: 'asc' },
+          price_desc: { price: 'desc' },
+          trending:   { downloads: { _count: 'desc' } },
+        }[sortBy] ?? { createdAt: 'desc' });
 
     const trendingWhere = sortBy === 'trending'
       ? { downloads: { some: { downloadedAt: { gte: sevenDaysAgo } } } }
@@ -285,8 +357,25 @@ export class SoundsService {
       }),
     ]);
 
+    // Batch-check which returned sounds the user has already purchased
+    let purchasedIds = new Set<string>();
+    if (userId && items.length > 0) {
+      const soundIds = items.map(s => s.id);
+      const purchases = await this.prisma.orderItem.findMany({
+        where: {
+          soundEffectId: { in: soundIds },
+          order: { userId, status: 'PAID' },
+        },
+        select: { soundEffectId: true },
+      });
+      purchasedIds = new Set(purchases.map(p => p.soundEffectId));
+    }
+
     return {
-      items: items.map((s) => this.formatSound(s, userId, false, true)),
+      items: items.map((s) => ({
+        ...this.formatSound(s, userId, false, false),
+        isPurchased: purchasedIds.has(s.id),
+      })),
       pagination: {
         total,
         page: Number(page),
@@ -412,23 +501,7 @@ export class SoundsService {
           );
         }
 
-        // Cek kuota bulanan
-        if (!subscription.plan.unlimited) {
-          const now = new Date();
-          const thisMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-          const downloadsThisMonth = await this.prisma.download.count({
-            where: {
-              userId,
-              source: 'subscription',
-              downloadedAt: { gte: thisMonth },
-            },
-          });
-          if (downloadsThisMonth >= subscription.plan.downloadLimit) {
-            throw new ForbiddenException(
-              `Monthly download limit reached (${subscription.plan.downloadLimit}x). Wait until next month or upgrade your plan.`,
-            );
-          }
-        }
+        // Kuota check dilakukan di dalam transaction (lihat di bawah)
       }
     }
 
@@ -437,15 +510,30 @@ export class SoundsService {
     let downloadUrl: string;
     let requiresAuth = false;
 
-    // Always use the ZIP stream endpoint so download includes license.txt
     const appUrl = this.config.get<string>('APP_URL', 'http://localhost:3000');
     downloadUrl = `${appUrl}/api/v1/sounds/${soundId}/download-stream`;
     requiresAuth = true;
 
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const needsQuotaCheck = !alreadyPurchased && subscription && !subscription.plan.unlimited;
 
-    const [downloadRecord] = await this.prisma.$transaction([
-      this.prisma.download.create({
+    // FIX (BE-LOGIC-02): Count + create dalam satu Serializable transaction
+    // agar tidak bisa race condition bypass download limit.
+    const downloadRecord = await this.prisma.$transaction(async (tx) => {
+      if (needsQuotaCheck) {
+        const now = new Date();
+        const thisMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+        const downloadsThisMonth = await tx.download.count({
+          where: { userId, source: 'subscription', downloadedAt: { gte: thisMonth } },
+        });
+        if (downloadsThisMonth >= subscription.plan.downloadLimit) {
+          throw new ForbiddenException(
+            `Monthly download limit reached (${subscription.plan.downloadLimit}x). Wait until next month or upgrade your plan.`,
+          );
+        }
+      }
+
+      const record = await tx.download.create({
         data: {
           userId,
           soundEffectId: soundId,
@@ -453,12 +541,13 @@ export class SoundsService {
           signedUrl: downloadUrl,
           expiresAt,
         },
-      }),
-      this.prisma.soundEffect.update({
+      });
+      await tx.soundEffect.update({
         where: { id: soundId },
         data: { downloadCount: { increment: 1 } },
-      }),
-    ]);
+      });
+      return record;
+    }, { isolationLevel: 'Serializable' });
 
     // Fire-and-forget: catat earning untuk creator
     // Skip jika user sudah pernah beli (earnings sudah dicatat saat order paid)
@@ -626,6 +715,21 @@ export class SoundsService {
       },
     });
 
+    // TODO (BE-01): Replace with Prisma update after running `prisma generate`.
+    // Using $executeRaw (parameterized — safe from injection) as a temporary
+    // workaround because the Prisma client DLL cannot be regenerated while
+    // the server process holds a lock on it (Windows EPERM).
+    if (dto.bpm !== undefined || dto.mood !== undefined || dto.musicalKey !== undefined || dto.hasStems !== undefined) {
+      await this.prisma.$executeRaw`
+        UPDATE sound_effects
+        SET bpm=${dto.bpm ?? null},
+            mood=${dto.mood ?? null},
+            "musicalKey"=${dto.musicalKey ?? null},
+            "hasStems"=${dto.hasStems ?? false}
+        WHERE id=${soundId}
+      `;
+    }
+
     // Tags
     if (dto.tags) {
       const tagNames = dto.tags.split(',').map((t) => t.trim()).filter(Boolean);
@@ -761,6 +865,173 @@ export class SoundsService {
     };
   }
 
+  // ─── Related sounds ──────────────────────────────────────
+
+  async findRelated(slug: string, limit = 6) {
+    const sound = await this.prisma.soundEffect.findUnique({
+      where: { slug },
+      select: { id: true, categoryId: true },
+    });
+    if (!sound) return [];
+
+    const items = await this.prisma.soundEffect.findMany({
+      where: {
+        isPublished: true,
+        categoryId: sound.categoryId,
+        id: { not: sound.id },
+      },
+      include: {
+        category: true,
+        tags: { include: { tag: true } },
+        author: { select: { id: true, name: true, avatarUrl: true } },
+      },
+      orderBy: { downloadCount: 'desc' },
+      take: Number(limit),
+    });
+
+    return items.map(s => this.formatSound(s));
+  }
+
+  // ─── Creator analytics ────────────────────────────────────
+
+  async getCreatorAnalytics(authorId: string) {
+    const sounds = await this.prisma.soundEffect.findMany({
+      where: { authorId },
+      select: { id: true, title: true, playCount: true, downloadCount: true, createdAt: true },
+      orderBy: { downloadCount: 'desc' },
+      take: 10,
+    });
+
+    // Downloads per bulan (6 bulan terakhir)
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    const soundIds = sounds.map(s => s.id);
+
+    const downloads = soundIds.length > 0 ? await this.prisma.download.findMany({
+      where: {
+        soundEffectId: { in: soundIds },
+        downloadedAt: { gte: sixMonthsAgo },
+      },
+      select: { downloadedAt: true },
+      orderBy: { downloadedAt: 'asc' },
+    }) : [];
+
+    // Group by month
+    const byMonth: Record<string, number> = {};
+    downloads.forEach(d => {
+      const key = `${d.downloadedAt.getFullYear()}-${String(d.downloadedAt.getMonth() + 1).padStart(2, '0')}`;
+      byMonth[key] = (byMonth[key] || 0) + 1;
+    });
+
+    const monthlyData = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - (5 - i));
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' });
+      return { month: key, label, downloads: byMonth[key] || 0 };
+    });
+
+    return { topSounds: sounds, monthlyDownloads: monthlyData };
+  }
+
+  // ─── Download history ─────────────────────────────────────
+
+  async getDownloadHistory(
+    userId: string,
+    page = 1,
+    limit = 20,
+    licenseFilter?: string,
+    categorySlug?: string,
+    search?: string,
+    source?: string,
+  ) {
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const soundWhere: any = {};
+    if (categorySlug) soundWhere.category = { slug: categorySlug };
+    if (search) soundWhere.title = { contains: search, mode: 'insensitive' };
+
+    const where: any = { userId };
+    if (source === 'subscription' || source === 'purchase') where.source = source;
+    if (Object.keys(soundWhere).length > 0) where.soundEffect = soundWhere;
+
+    const [total, downloads] = await Promise.all([
+      this.prisma.download.count({ where }),
+      this.prisma.download.findMany({
+        where,
+        skip,
+        take: Number(limit),
+        orderBy: { downloadedAt: 'desc' },
+        include: {
+          soundEffect: {
+            include: {
+              category: true,
+              author: { select: { id: true, name: true } },
+            },
+          },
+        },
+      }),
+    ]);
+
+    // For purchase downloads, look up licenseType from OrderItem
+    const purchaseSoundIds = [...new Set(
+      downloads.filter(d => d.source === 'purchase').map(d => d.soundEffectId),
+    )];
+
+    const licenseMap: Record<string, string> = {};
+    const priceMap: Record<string, number> = {};
+
+    if (purchaseSoundIds.length > 0) {
+      const orderItems = await this.prisma.orderItem.findMany({
+        where: {
+          soundEffectId: { in: purchaseSoundIds },
+          order: { userId, status: 'PAID' },
+        },
+        select: { soundEffectId: true, licenseType: true, priceSnapshot: true },
+        distinct: ['soundEffectId'],
+      });
+      orderItems.forEach(oi => {
+        licenseMap[oi.soundEffectId] = oi.licenseType;
+        priceMap[oi.soundEffectId] = oi.priceSnapshot;
+      });
+    }
+
+    let items = downloads.map(d => ({
+      id: d.id,
+      soundId: d.soundEffectId,
+      soundTitle: d.soundEffect.title,
+      soundSlug: d.soundEffect.slug,
+      soundFormat: d.soundEffect.format,
+      previewUrl: d.soundEffect.previewUrl,
+      categoryName: d.soundEffect.category.name,
+      categorySlug: d.soundEffect.category.slug,
+      authorName: (d.soundEffect as any).author?.name ?? null,
+      authorId: (d.soundEffect as any).author?.id ?? null,
+      source: d.source,
+      licenseType: d.source === 'subscription'
+        ? 'personal'
+        : (licenseMap[d.soundEffectId] ?? 'personal'),
+      priceAtPurchase: d.source === 'purchase' ? (priceMap[d.soundEffectId] ?? 0) : null,
+      downloadedAt: d.downloadedAt,
+    }));
+
+    // Apply license filter client-side after enrichment
+    if (licenseFilter && licenseFilter !== 'all') {
+      items = items.filter(i => i.licenseType === licenseFilter);
+    }
+
+    return {
+      items,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+    };
+  }
+
   // ─── Format response ──────────────────────────────────────
 
   private formatSound(sound: any, userId?: string, forceIsLiked?: boolean, slimList = false) {
@@ -788,6 +1059,10 @@ export class SoundsService {
       reviewNote: sound.reviewNote,
       playCount: sound.playCount,
       downloadCount: sound.downloadCount,
+      bpm: (sound as any).bpm ?? null,
+      mood: (sound as any).mood ?? null,
+      musicalKey: (sound as any).musicalKey ?? null,
+      hasStems: (sound as any).hasStems ?? false,
       category: sound.category,
       tags: sound.tags?.map((t: any) => t.tag) ?? [],
       author: sound.author ?? null,
@@ -881,7 +1156,6 @@ export class SoundsService {
       if (dto.tags !== undefined) {
         await tx.soundEffectOnTag.deleteMany({ where: { soundEffectId: soundId } });
         if (dto.tags.length > 0) {
-          // Upsert tags — create if not exists
           const upserted = await Promise.all(
             dto.tags.map((slug) =>
               tx.tag.upsert({
@@ -900,7 +1174,6 @@ export class SoundsService {
         }
       }
 
-      // Re-fetch with updated tags after upsert
       return tx.soundEffect.findUnique({
         where: { id: soundId },
         include: {
@@ -909,6 +1182,18 @@ export class SoundsService {
         },
       });
     });
+
+    // TODO (BE-01): Replace with Prisma update after `prisma generate`.
+    if (dto.bpm !== undefined || dto.mood !== undefined || dto.musicalKey !== undefined || dto.hasStems !== undefined) {
+      await this.prisma.$executeRaw`
+        UPDATE sound_effects
+        SET bpm=${dto.bpm ?? null},
+            mood=${dto.mood ?? null},
+            "musicalKey"=${dto.musicalKey ?? null},
+            "hasStems"=${dto.hasStems ?? false}
+        WHERE id=${soundId}
+      `;
+    }
 
     return updated;
   }

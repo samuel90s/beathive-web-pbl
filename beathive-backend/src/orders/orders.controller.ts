@@ -68,6 +68,16 @@ export class OrdersController {
     return this.webhookService.handleMidtransWebhook(payload);
   }
 
+  // GET /orders/:id  — detail order (untuk halaman payment)
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  async getOrder(
+    @CurrentUser() userId: string,
+    @Param('id') orderId: string,
+  ) {
+    return this.ordersService.getOrderForPayment(userId, orderId);
+  }
+
   // GET /orders/:id/invoice  — detail invoice
   @Get(':id/invoice')
   @UseGuards(JwtAuthGuard)

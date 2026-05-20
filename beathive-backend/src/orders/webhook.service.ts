@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LicenseService } from '../common/license/license.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { EarningsService } from '../earnings/earnings.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class WebhookService {
@@ -17,6 +18,7 @@ export class WebhookService {
     private licenseService: LicenseService,
     private subscriptionsService: SubscriptionsService,
     private earnings: EarningsService,
+    private email: EmailService,
   ) {}
 
   // ─── Verifikasi signature dari Midtrans ─────────────────
@@ -141,7 +143,7 @@ export class WebhookService {
     const order = await this.prisma.order.findFirst({
       where: { gatewayOrderId },
       include: {
-        items: { include: { soundEffect: true } },
+        items: { include: { soundEffect: { include: { author: { select: { id: true, name: true, email: true } } } } } },
         user: true,
       },
     });
@@ -193,6 +195,26 @@ export class WebhookService {
 
     // Record purchase earnings — await agar tidak hilang; idempotent via dedup key
     await this.earnings.recordOrderEarnings(order.id);
+
+    // Notify creators (fire-and-forget)
+    this.notifyCreatorsOnSale(order).catch(() => {});
+  }
+
+  // ─── Notify creators when their sound is sold ────────────
+
+  private async notifyCreatorsOnSale(order: any) {
+    for (const item of order.items ?? []) {
+      const author = item.soundEffect?.author;
+      if (!author?.email) continue;
+      const creatorEarning = Math.round(item.priceSnapshot * 0.7);
+      await this.email.sendSoundSold(
+        author.email,
+        author.name,
+        item.soundEffect.title,
+        creatorEarning,
+        item.licenseType,
+      ).catch(() => {});
+    }
   }
 
   // ─── DEV ONLY: Simulate payment berhasil (bypass signature) ─

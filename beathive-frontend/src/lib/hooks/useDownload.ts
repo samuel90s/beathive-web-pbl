@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { soundsApi } from '@/lib/api/sounds';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { toast } from '@/lib/store/toast.store';
 
 /** Extract readable message from axios/fetch errors */
 function extractMessage(err: any): string {
@@ -30,6 +31,20 @@ export function useDownload() {
     if (!isAuthenticated) {
       router.push('/auth/login');
       return;
+    }
+
+    // Warn if approaching or at download limit
+    const sub = useAuthStore.getState().user?.subscription;
+    if (sub && !sub.plan.unlimited && sub.usage) {
+      const { downloadsThisMonth, downloadLimit } = sub.usage;
+      const remaining = downloadLimit - downloadsThisMonth;
+      if (remaining <= 0) {
+        toast.error(`Download limit reached (${downloadLimit}/month). Upgrade your plan to download more.`);
+        return;
+      }
+      if (remaining <= 3) {
+        toast.warning(`${remaining} download${remaining === 1 ? '' : 's'} remaining this month.`);
+      }
     }
 
     setDownloading(soundId);
@@ -111,5 +126,8 @@ function triggerBlobDownload(blob: Blob, fileName: string) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  // Revoke after 5s (normal tab) AND on page unload (tab close before 5s)
+  const revoke = () => URL.revokeObjectURL(url);
+  setTimeout(revoke, 5000);
+  window.addEventListener('beforeunload', revoke, { once: true });
 }

@@ -47,6 +47,7 @@ export interface Category {
   name: string;
   slug: string;
   icon?: string;
+  type?: 'sfx' | 'music';
 }
 
 export interface Tag {
@@ -78,6 +79,10 @@ export interface SoundEffect {
   isPurchased?: boolean;
   isPublished?: boolean;
   reviewStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_RE_REVIEW';
+  bpm?: number | null;
+  mood?: string | null;
+  musicalKey?: string | null;
+  hasStems?: boolean;
   reviewNote?: string;
   accessLevel: 'FREE' | 'PRO' | 'BUSINESS' | 'PURCHASE';
   licenseType: string;
@@ -148,17 +153,49 @@ export interface SoundFilters {
   minPrice?: number;
   maxPrice?: number;
   tags?: string;
+  minBpm?: number;
+  maxBpm?: number;
+  mood?: string;
   sortBy?: 'newest' | 'oldest' | 'popular' | 'mostplayed' | 'price_asc' | 'price_desc' | 'trending';
   page?: number;
   limit?: number;
 }
 
+export type LicenseType = 'personal' | 'commercial' | 'sync' | 'broadcast';
+
 export interface CartItem {
   sound: SoundEffect;
-  licenseType: 'personal' | 'commercial';
+  licenseType: LicenseType;
 }
 
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
+}
+
+export interface DownloadHistoryItem {
+  id: string;
+  soundId: string;
+  soundTitle: string;
+  soundSlug: string;
+  soundFormat: string;
+  previewUrl: string;
+  categoryName: string;
+  categorySlug: string;
+  authorName: string | null;
+  authorId: string | null;
+  source: 'subscription' | 'purchase';
+  licenseType: 'personal' | 'commercial' | 'sync' | 'broadcast';
+  priceAtPurchase: number | null;
+  downloadedAt: string;
+}
+
+export interface DownloadHistoryResponse {
+  items: DownloadHistoryItem[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }

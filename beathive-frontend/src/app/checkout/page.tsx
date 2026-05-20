@@ -1,312 +1,209 @@
 // src/app/checkout/page.tsx
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useCartStore } from '@/lib/store/cart.store';
 import { ordersApi } from '@/lib/api/orders';
-import { formatPrice, formatDate } from '@/lib/utils';
-
-const SERVICE_FEE_PERCENT = 5;
-const TAX_PERCENT = 11;
-
-interface InvoiceData {
-  orderId: string;
-  invoiceNumber: string;
-  issuedAt: string;
-  customer: { name: string; email: string };
-  items: { title: string; licenseType: string; price: number }[];
-  subtotal: number;
-}
-
-function InvoiceModal({ invoice, onClose, onDownload, downloading }: {
-  invoice: InvoiceData;
-  onClose: () => void;
-  onDownload: () => void;
-  downloading: boolean;
-}) {
-  const serviceFee = Math.round(invoice.subtotal * SERVICE_FEE_PERCENT / 100);
-  const tax = Math.round((invoice.subtotal + serviceFee) * TAX_PERCENT / 100);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="card-lift rounded-2xl shadow-elevated w-full max-w-md overflow-hidden border border-rim">
-        {/* Header */}
-        <div className="bg-accent px-6 py-5 text-white">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-lg font-bold">BeatHive</span>
-            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">Payment Successful ✓</span>
-          </div>
-          <p className="text-sm text-accent-bright/80">{invoice.invoiceNumber}</p>
-          <p className="text-xs text-accent-bright/60 mt-0.5">{formatDate(invoice.issuedAt)}</p>
-        </div>
-
-        <div className="px-6 py-4">
-          {/* Customer */}
-          <div className="mb-4 pb-4 border-b border-rim">
-            <p className="text-xs text-[#6b6f82] mb-1">Customer</p>
-            <p className="text-sm font-medium text-[#c4c6d8]">{invoice.customer.name}</p>
-            <p className="text-xs text-[#6b6f82]">{invoice.customer.email}</p>
-          </div>
-
-          {/* Items */}
-          <div className="mb-4 space-y-2">
-            {invoice.items.map((item, i) => (
-              <div key={i} className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-sm text-[#c4c6d8] font-medium">{item.title}</p>
-                  <p className="text-xs text-[#6b6f82] capitalize">{item.licenseType} license</p>
-                </div>
-                <span className="text-sm text-[#c4c6d8] flex-shrink-0">{formatPrice(item.price)}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Breakdown */}
-          <div className="border-t border-rim pt-3 space-y-1.5">
-            <div className="flex justify-between text-xs text-[#6b6f82]">
-              <span>Subtotal</span>
-              <span>{formatPrice(invoice.subtotal)}</span>
-            </div>
-            <div className="flex justify-between text-xs text-[#6b6f82]">
-              <span>Service Fee ({SERVICE_FEE_PERCENT}%)</span>
-              <span>{formatPrice(serviceFee)}</span>
-            </div>
-            <div className="flex justify-between text-xs text-[#6b6f82]">
-              <span>VAT ({TAX_PERCENT}%)</span>
-              <span>{formatPrice(tax)}</span>
-            </div>
-            <div className="flex justify-between text-sm font-bold text-white pt-1.5 border-t border-rim">
-              <span>Total</span>
-              <span className="text-accent-bright">{formatPrice(invoice.subtotal + serviceFee + tax)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="px-6 pb-5 flex gap-2">
-          <button
-            onClick={onDownload}
-            disabled={downloading}
-            className="flex-1 py-2.5 border border-accent/30 text-accent-bright text-sm font-medium rounded-xl hover:bg-accent/10 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            {downloading ? 'Downloading...' : 'Download PDF'}
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 btn-accent text-sm font-medium rounded-xl  transition-colors"
-          >
-            View Purchase History
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { formatPrice } from '@/lib/utils';
+import { calcOrderTotals, SERVICE_FEE_PERCENT, TAX_PERCENT } from '@/lib/constants';
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { items, removeItem, updateLicense, totalAmount, clearCart } = useCartStore();
+  const { items, removeItem, updateLicense, totalAmount } = useCartStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [invoice, setInvoice] = useState<InvoiceData | null>(null);
-  const [paidOrderId, setPaidOrderId] = useState<string | null>(null);
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
-  const subtotal = totalAmount();
-  const serviceFee = Math.round(subtotal * SERVICE_FEE_PERCENT / 100);
-  const taxBase = subtotal + serviceFee;
-  const tax = Math.round(taxBase * TAX_PERCENT / 100);
-  const grandTotal = subtotal + serviceFee + tax;
+  const { subtotal, serviceFee, tax, grandTotal } = calcOrderTotals(totalAmount());
 
-  const handleCheckout = async () => {
+  const handleProceed = async () => {
     if (!items.length) return;
     setLoading(true);
     setError(null);
-
     try {
       const result = await ordersApi.create(items);
-
-      if (typeof window !== 'undefined' && (window as any).snap) {
-        (window as any).snap.pay(result.snapToken, {
-          onSuccess: async () => {
-            try { await ordersApi.verifyPayment(result.orderId); } catch { /* webhook */ }
-            clearCart();
-            // Retry getInvoice beberapa kali karena invoice dibuat async
-            let inv = null;
-            for (let i = 0; i < 4; i++) {
-              try {
-                inv = await ordersApi.getInvoice(result.orderId);
-                break;
-              } catch {
-                await new Promise(r => setTimeout(r, 800));
-              }
-            }
-            if (inv) {
-              setPaidOrderId(result.orderId);
-              setInvoice(inv);
-            } else {
-              router.push(`/orders/${result.orderId}/success`);
-            }
-            setLoading(false);
-          },
-          onPending: () => {
-            router.push(`/orders/${result.orderId}/success?status=pending`);
-          },
-          onError: () => { setError('Payment failed. Please try again.'); setLoading(false); },
-          onClose: () => setLoading(false),
-        });
-      }
+      // Save order context to sessionStorage so payment page can render without refetch
+      sessionStorage.setItem('pendingOrder', JSON.stringify({
+        orderId: result.orderId,
+        snapToken: result.snapToken,
+        items: result.items,
+        subtotal,
+        serviceFee,
+        tax,
+        grandTotal,
+      }));
+      router.push(`/orders/${result.orderId}/pay`);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to create order');
+      setError(err.response?.data?.message || 'Gagal membuat pesanan. Coba lagi.');
       setLoading(false);
     }
   };
 
-  const handleDownloadPdf = async () => {
-    if (!invoice || !paidOrderId) return;
-    setDownloadingPdf(true);
-    try { await ordersApi.downloadInvoicePdf(paidOrderId, invoice.invoiceNumber); } catch { /* ignore */ }
-    finally { setDownloadingPdf(false); }
-  };
-
-  if (items.length === 0 && !invoice) {
+  if (items.length === 0) {
     return (
       <div className="max-w-lg mx-auto px-4 py-20 text-center">
-        <p className="text-xl font-medium text-white mb-2">Your cart is empty</p>
-        <p className="text-[#6b6f82] mb-6">Add sound effects from the browse page</p>
-        <button
-          onClick={() => router.push('/browse')}
-          className="px-5 py-2.5 btn-accent rounded-xl text-sm font-medium  transition-colors"
-        >
-          Browse Sound Effects
-        </button>
+        <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-rim flex items-center justify-center mx-auto mb-5">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4a4d5e" strokeWidth="1.5" strokeLinecap="round">
+            <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <path d="M16 10a4 4 0 0 1-8 0"/>
+          </svg>
+        </div>
+        <p className="text-lg font-semibold text-white mb-1">Keranjang kosong</p>
+        <p className="text-sm text-[#6b6f82] mb-6">Tambahkan sound dari halaman browse</p>
+        <Link href="/browse" className="px-5 py-2.5 btn-accent rounded-xl text-sm font-medium">
+          Browse Sounds
+        </Link>
       </div>
     );
   }
 
   return (
-    <>
-      {/* Invoice modal setelah pembayaran berhasil */}
-      {invoice && (
-        <InvoiceModal
-          invoice={invoice}
-          onClose={() => router.push('/dashboard')}
-          onDownload={handleDownloadPdf}
-          downloading={downloadingPdf}
-        />
-      )}
+    <div className="max-w-2xl mx-auto px-4 py-8 pb-28">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-2 text-sm text-[#5a5d72] mb-6">
+        <Link href="/browse" className="hover:text-white transition-colors">Browse</Link>
+        <span>/</span>
+        <span className="text-[#8b8fa8]">Keranjang</span>
+      </nav>
 
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-semibold text-white mb-6">Cart</h1>
+      <h1 className="text-xl font-bold text-white mb-6">Keranjang Belanja</h1>
 
-        {/* Items */}
-        <div className="card rounded-2xl overflow-hidden mb-4">
-          {items.map((item, i) => {
-            const price = item.licenseType === 'commercial'
-              ? item.sound.price * 2
-              : item.sound.price;
+      {/* Items */}
+      <div className="rounded-2xl border border-rim overflow-hidden mb-4">
+        {items.map((item, i) => {
+          const isMusic = item.sound.category?.type === 'music';
+          const price = item.licenseType === 'commercial' || item.licenseType === 'sync'
+            ? item.sound.price * 2
+            : item.licenseType === 'broadcast'
+            ? item.sound.price * 3
+            : item.sound.price;
 
-            return (
-              <div key={item.sound.id} className={`p-4 ${i > 0 ? 'border-t border-gray-50' : ''}`}>
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center flex-shrink-0">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <rect x="1" y="4" width="3" height="8" rx="1" fill="#7c3aed"/>
-                      <rect x="5.5" y="2" width="3" height="12" rx="1" fill="#7c3aed"/>
-                      <rect x="10" y="5" width="3" height="6" rx="1" fill="#7c3aed"/>
-                    </svg>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white">{item.sound.title}</p>
-                    <p className="text-xs text-[#6b6f82] mt-0.5">{item.sound.category.name}</p>
-                    <div className="flex gap-2 mt-2">
-                      {(['personal', 'commercial'] as const).map((type) => (
-                        <button
-                          key={type}
-                          onClick={() => updateLicense(item.sound.id, type)}
-                          className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${
-                            item.licenseType === type
-                              ? 'border-violet-400 bg-accent/10 text-accent-bright font-medium'
-                              : 'border-rim text-[#6b6f82] hover:border-gray-300'
-                          }`}
-                        >
-                          {type === 'personal' ? 'Personal' : 'Commercial (2×)'}
-                        </button>
-                      ))}
+          const licenseOptions = isMusic
+            ? [
+                { type: 'personal',   label: 'Personal',        desc: 'Proyek personal, podcast, konten non-komersial' },
+                { type: 'sync',       label: 'Sync (2×)',        desc: 'Video monetized, YouTube, film independen' },
+                { type: 'broadcast',  label: 'Broadcast (3×)',   desc: 'TV, radio, iklan, distribusi komersial luas' },
+              ]
+            : [
+                { type: 'personal',   label: 'Personal',        desc: 'Proyek personal, podcast, social media' },
+                { type: 'commercial', label: 'Commercial (2×)',  desc: 'Iklan, film, game, produk berbayar' },
+              ];
+
+          return (
+            <div key={item.sound.id} className={`p-4 bg-surface ${i > 0 ? 'border-t border-rim' : ''}`}>
+              <div className="flex items-start gap-3">
+                {/* Icon */}
+                <div className="w-10 h-10 rounded-xl bg-accent/[0.08] border border-accent/[0.12] flex items-center justify-center flex-shrink-0">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+                  </svg>
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">{item.sound.title}</p>
+                      <p className="text-xs text-[#5a5d72] mt-0.5">{item.sound.category.name}</p>
                     </div>
-                    <p className="text-xs text-[#6b6f82] mt-1.5 leading-relaxed">
-                      {item.licenseType === 'personal'
-                        ? 'Personal: YouTube, social media, non-commercial projects.'
-                        : 'Commercial: Ads, films, games, paid products. Lifetime license.'}
-                    </p>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-sm font-bold text-white">{formatPrice(price)}</span>
+                      <button
+                        onClick={() => removeItem(item.sound.id)}
+                        className="w-6 h-6 rounded-lg flex items-center justify-center text-[#3a3c4e] hover:text-red-400 hover:bg-red-500/10 transition-all"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                          <path d="M1 1l12 12M13 1L1 13"/>
+                        </svg>
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-sm font-medium text-white">{formatPrice(price)}</span>
-                    <button onClick={() => removeItem(item.sound.id)} className="text-gray-300 hover:text-red-400 transition-colors">
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                        <path d="M1 1l12 12M13 1L1 13"/>
-                      </svg>
-                    </button>
+
+                  {/* License picker */}
+                  <div className="flex flex-wrap gap-1.5 mt-2.5">
+                    {licenseOptions.map(({ type, label }) => (
+                      <button
+                        key={type}
+                        onClick={() => updateLicense(item.sound.id, type as any)}
+                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all ${
+                          item.licenseType === type
+                            ? 'border-accent/50 bg-accent/10 text-accent-bright font-medium'
+                            : 'border-rim text-[#6b6f82] hover:border-white/10 hover:text-white'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
                   </div>
+                  <p className="text-[11px] text-[#4a4d5e] mt-1.5 leading-relaxed">
+                    {licenseOptions.find(l => l.type === item.licenseType)?.desc}
+                  </p>
                 </div>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
+      </div>
 
-        {/* Invoice Breakdown */}
-        <div className="card rounded-2xl p-4 mb-4">
-          <h2 className="text-sm font-semibold text-[#c4c6d8] mb-3">Payment Summary</h2>
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-[#6b6f82]">Subtotal</span>
-              <span className="text-[#c4c6d8]">{formatPrice(subtotal)}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-[#6b6f82]">Biaya Layanan ({SERVICE_FEE_PERCENT}%)</span>
-              <span className="text-[#c4c6d8]">{formatPrice(serviceFee)}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-[#6b6f82]">PPN ({TAX_PERCENT}%)</span>
-              <span className="text-[#c4c6d8]">{formatPrice(tax)}</span>
-            </div>
-            <div className="border-t border-rim pt-2.5 flex items-center justify-between">
-              <span className="text-sm font-semibold text-white">Total</span>
-              <span className="text-xl font-bold text-white">{formatPrice(grandTotal)}</span>
-            </div>
+      {/* Summary */}
+      <div className="rounded-2xl border border-rim bg-surface p-5 mb-4">
+        <h2 className="text-sm font-semibold text-white mb-4">Ringkasan Pembayaran</h2>
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-[#6b6f82]">Subtotal ({items.length} item)</span>
+            <span className="text-[#c4c6d8]">{formatPrice(subtotal)}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-[#6b6f82]">Biaya Layanan ({SERVICE_FEE_PERCENT}%)</span>
+            <span className="text-[#c4c6d8]">{formatPrice(serviceFee)}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-[#6b6f82]">PPN ({TAX_PERCENT}%)</span>
+            <span className="text-[#c4c6d8]">{formatPrice(tax)}</span>
+          </div>
+          <div className="border-t border-rim pt-3 flex items-center justify-between">
+            <span className="text-sm font-semibold text-white">Total</span>
+            <span className="text-xl font-bold text-white">{formatPrice(grandTotal)}</span>
           </div>
         </div>
-
-        {/* Checkout button */}
-        <div className="card rounded-2xl p-4">
-          {error && <div className="mb-3 p-3 bg-red-50 text-red-700 text-sm rounded-xl">{error}</div>}
-          <button
-            onClick={handleCheckout}
-            disabled={loading}
-            className="w-full py-3 btn-accent rounded-xl text-sm font-medium  transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Processing...' : `Pay ${formatPrice(grandTotal)}`}
-          </button>
-          <p className="text-xs text-center text-[#6b6f82] mt-3">
-            Secure payment via Midtrans · QRIS · Bank Transfer · Credit Card
-          </p>
-        </div>
-
-        <script
-          type="text/javascript"
-          src={`https://app.${process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION === 'true' ? '' : 'sandbox.'}midtrans.com/snap/snap.js`}
-          data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
-        />
       </div>
-    </>
+
+      {/* CTA */}
+      <div className="rounded-2xl border border-rim bg-surface p-4">
+        {error && (
+          <div className="mb-3 px-3 py-2.5 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl">
+            {error}
+          </div>
+        )}
+        <button
+          onClick={handleProceed}
+          disabled={loading}
+          className="w-full py-3.5 btn-accent rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
+        >
+          {loading ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Memproses...
+            </>
+          ) : (
+            <>
+              Lanjut ke Pembayaran
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </>
+          )}
+        </button>
+        <div className="flex items-center justify-center gap-4 mt-3">
+          <span className="text-[11px] text-[#3a3c4e] flex items-center gap-1">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Secure payment
+          </span>
+          <span className="text-[#2a2c3e]">·</span>
+          <span className="text-[11px] text-[#3a3c4e]">Midtrans · QRIS · VA · CC</span>
+        </div>
+      </div>
+    </div>
   );
 }

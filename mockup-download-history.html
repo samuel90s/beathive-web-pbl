@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mockup — Download History</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0c0d16; color: #c4c6d8; min-height: 100vh; }
+
+  /* ── Navbar ── */
+  .navbar { height: 56px; border-bottom: 1px solid #1e2035; display: flex; align-items: center; padding: 0 24px; gap: 32px; position: sticky; top: 0; background: #0c0d16; z-index: 100; }
+  .navbar .logo { font-size: 18px; font-weight: 700; color: white; letter-spacing: -0.5px; }
+  .navbar .logo span { color: #8b5cf6; }
+  .navbar nav { display: flex; gap: 4px; flex: 1; }
+  .navbar nav a { font-size: 14px; color: #6b6f82; padding: 6px 12px; border-radius: 8px; text-decoration: none; transition: all .15s; cursor: pointer; }
+  .navbar nav a:hover, .navbar nav a.active { color: white; background: rgba(255,255,255,.06); }
+  .navbar .right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #8b5cf6, #6d28d9); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: white; }
+  .quota-chip { font-size: 12px; background: rgba(139,92,246,.12); color: #a78bfa; border: 1px solid rgba(139,92,246,.2); padding: 4px 10px; border-radius: 20px; }
+
+  /* ── Layout ── */
+  .layout { display: flex; height: calc(100vh - 56px); }
+  .sidebar { width: 220px; flex-shrink: 0; border-right: 1px solid #1e2035; padding: 20px 12px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+  .sidebar-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 10px; font-size: 14px; color: #6b6f82; cursor: pointer; transition: all .15s; text-decoration: none; }
+  .sidebar-item:hover { color: #c4c6d8; background: rgba(255,255,255,.04); }
+  .sidebar-item.active { color: #a78bfa; background: rgba(139,92,246,.1); }
+  .sidebar-item svg { opacity: .7; flex-shrink: 0; }
+  .sidebar-item.active svg { opacity: 1; }
+  .sidebar-divider { height: 1px; background: #1e2035; margin: 8px 4px; }
+  .sidebar-label { font-size: 10px; font-weight: 600; color: #3a3c4e; text-transform: uppercase; letter-spacing: .08em; padding: 6px 12px 2px; }
+
+  /* ── Main ── */
+  .main { flex: 1; overflow-y: auto; }
+  .page-header { padding: 28px 32px 0; }
+  .page-header h1 { font-size: 22px; font-weight: 700; color: white; }
+  .page-header p { font-size: 14px; color: #5a5d72; margin-top: 4px; }
+  .content { padding: 24px 32px 80px; }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; gap: 2px; margin-bottom: 24px; border-bottom: 1px solid #1e2035; padding-bottom: 0; }
+  .tab { font-size: 14px; padding: 8px 16px; color: #6b6f82; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s; }
+  .tab:hover { color: #c4c6d8; }
+  .tab.active { color: white; border-bottom-color: #8b5cf6; font-weight: 500; }
+
+  /* ── Filter bar ── */
+  .filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+  .search-wrap { position: relative; flex: 1; max-width: 300px; }
+  .search-wrap input { width: 100%; background: #12131f; border: 1px solid #1e2035; border-radius: 10px; padding: 8px 12px 8px 36px; font-size: 13px; color: #c4c6d8; outline: none; }
+  .search-wrap input::placeholder { color: #3a3c4e; }
+  .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: #3a3c4e; pointer-events: none; }
+  .select-filter { background: #12131f; border: 1px solid #1e2035; border-radius: 10px; padding: 8px 12px; font-size: 13px; color: #6b6f82; outline: none; cursor: pointer; }
+  .count-text { margin-left: auto; font-size: 13px; color: #3a3c4e; }
+
+  /* ── Download List ── */
+  .dl-list { display: flex; flex-direction: column; gap: 2px; }
+  .dl-row { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 12px; border: 1px solid transparent; background: #12131f; transition: all .15s; cursor: default; }
+  .dl-row:hover { border-color: rgba(255,255,255,.06); background: #161723; }
+
+  .dl-thumb { width: 38px; height: 38px; border-radius: 8px; flex-shrink: 0; }
+  .dl-play { width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,.06); display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; transition: background .15s; }
+  .dl-play:hover { background: rgba(139,92,246,.25); }
+  .dl-info { min-width: 0; flex: 1; }
+  .dl-title { font-size: 14px; font-weight: 500; color: #c4c6d8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dl-meta { font-size: 12px; color: #5a5d72; margin-top: 2px; }
+  .dl-date { font-size: 12px; color: #3a3c4e; white-space: nowrap; flex-shrink: 0; width: 100px; text-align: right; }
+
+  .badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; border: 1px solid; white-space: nowrap; }
+  .badge-personal { background: rgba(20,184,166,.1); color: #2dd4bf; border-color: rgba(20,184,166,.2); }
+  .badge-commercial { background: rgba(59,130,246,.1); color: #60a5fa; border-color: rgba(59,130,246,.2); }
+  .badge-sync { background: rgba(139,92,246,.1); color: #a78bfa; border-color: rgba(139,92,246,.2); }
+  .badge-broadcast { background: rgba(245,158,11,.1); color: #fbbf24; border-color: rgba(245,158,11,.2); }
+  .badge-sub { background: rgba(255,255,255,.04); color: #6b6f82; border-color: #1e2035; }
+
+  .dl-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .btn-icon { width: 30px; height: 30px; border-radius: 8px; border: 1px solid #1e2035; background: transparent; color: #6b6f82; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; }
+  .btn-icon:hover { border-color: rgba(255,255,255,.12); color: white; background: rgba(255,255,255,.04); }
+  .btn-license { font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 8px; border: 1px solid rgba(139,92,246,.3); background: rgba(139,92,246,.08); color: #a78bfa; cursor: pointer; transition: all .15s; white-space: nowrap; }
+  .btn-license:hover { background: rgba(139,92,246,.15); border-color: rgba(139,92,246,.5); color: #c4b5fd; }
+
+  /* ── Pagination ── */
+  .pagination { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 24px; }
+  .page-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid #1e2035; background: transparent; color: #6b6f82; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+  .page-btn:hover { border-color: rgba(255,255,255,.1); color: white; }
+  .page-btn.current { background: rgba(139,92,246,.15); border-color: rgba(139,92,246,.4); color: #a78bfa; font-weight: 600; }
+
+  /* ── Modal Overlay ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); backdrop-filter: blur(4px); z-index: 200; display: none; align-items: center; justify-content: center; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: #12131f; border: 1px solid #1e2035; border-radius: 20px; width: 520px; max-width: 95vw; overflow: hidden; box-shadow: 0 24px 80px rgba(0,0,0,.6); }
+  .modal-header { padding: 20px 24px 16px; border-bottom: 1px solid #1e2035; display: flex; align-items: center; justify-content: space-between; }
+  .modal-header h2 { font-size: 16px; font-weight: 700; color: white; }
+  .modal-close { width: 28px; height: 28px; border-radius: 8px; border: 1px solid #1e2035; background: transparent; color: #6b6f82; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+  .modal-close:hover { color: white; border-color: rgba(255,255,255,.12); }
+  .modal-body { padding: 24px; }
+  .modal-footer { padding: 16px 24px; border-top: 1px solid #1e2035; display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* License modal specifics */
+  .license-hero { display: flex; align-items: center; gap: 14px; padding: 16px; background: #0c0d16; border-radius: 12px; margin-bottom: 20px; }
+  .license-thumb { width: 52px; height: 52px; border-radius: 10px; }
+  .license-title { font-size: 16px; font-weight: 600; color: white; }
+  .license-author { font-size: 13px; color: #5a5d72; margin-top: 2px; }
+
+  .license-rows { display: flex; flex-direction: column; gap: 0; }
+  .license-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #1a1b2e; }
+  .license-row:last-child { border-bottom: none; }
+  .lr-label { font-size: 13px; color: #5a5d72; }
+  .lr-value { font-size: 13px; color: #c4c6d8; font-weight: 500; text-align: right; }
+  .lr-value.green { color: #34d399; }
+  .lr-value.red { color: #f87171; }
+
+  .rights-box { margin-top: 16px; background: #0c0d16; border-radius: 12px; padding: 14px 16px; }
+  .rights-box h4 { font-size: 12px; font-weight: 600; color: #3a3c4e; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
+  .right-item { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: #6b6f82; margin-bottom: 6px; }
+  .right-item:last-child { margin-bottom: 0; }
+  .right-item svg { flex-shrink: 0; margin-top: 2px; }
+  .right-item.allowed svg { color: #34d399; }
+  .right-item.disallowed svg { color: #f87171; }
+  .right-item.allowed { color: #c4c6d8; }
+
+  .btn-primary { font-size: 13px; font-weight: 600; padding: 9px 20px; border-radius: 10px; background: #8b5cf6; color: white; border: none; cursor: pointer; transition: background .15s; }
+  .btn-primary:hover { background: #7c3aed; }
+  .btn-secondary { font-size: 13px; font-weight: 500; padding: 9px 20px; border-radius: 10px; background: transparent; color: #6b6f82; border: 1px solid #1e2035; cursor: pointer; transition: all .15s; }
+  .btn-secondary:hover { color: #c4c6d8; border-color: rgba(255,255,255,.1); }
+
+  /* ── Empty state ── */
+  .empty { text-align: center; padding: 64px 24px; }
+  .empty-icon { width: 52px; height: 52px; border-radius: 50%; background: rgba(255,255,255,.03); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+  .empty p { font-size: 15px; color: #6b6f82; }
+  .empty small { font-size: 13px; color: #3a3c4e; display: block; margin-top: 4px; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #1e2035; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #2a2d45; }
+</style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="logo">Beat<span>Hive</span></div>
+  <nav>
+    <a href="#">Browse</a>
+    <a href="#">Pricing</a>
+  </nav>
+  <div class="right">
+    <div class="quota-chip">18 / 30 downloads</div>
+    <div class="avatar">S</div>
+  </div>
+</nav>
+
+<!-- Layout -->
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-label">Akun</div>
+    <a class="sidebar-item">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </a>
+    <a class="sidebar-item active">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download History
+    </a>
+    <a class="sidebar-item">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      Wishlist
+    </a>
+    <a class="sidebar-item">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      Pesanan
+    </a>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-label">Creator</div>
+    <a class="sidebar-item">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      Upload Sound
+    </a>
+    <a class="sidebar-item">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Earnings
+    </a>
+    <div class="sidebar-divider"></div>
+    <a class="sidebar-item">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      Profil Saya
+    </a>
+    <a class="sidebar-item">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      Pengaturan
+    </a>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="page-header">
+      <h1>Download History</h1>
+      <p>Semua sound yang pernah kamu download beserta lisensinya</p>
+    </div>
+
+    <div class="content">
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab(this,'all')">Semua (47)</div>
+        <div class="tab" onclick="switchTab(this,'subscription')">Via Subscription (38)</div>
+        <div class="tab" onclick="switchTab(this,'purchase')">Via Pembelian (9)</div>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="filter-bar">
+        <div class="search-wrap">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="Cari sound..." />
+        </div>
+        <select class="select-filter">
+          <option>Semua Lisensi</option>
+          <option>Personal</option>
+          <option>Commercial</option>
+          <option>Sync</option>
+          <option>Broadcast</option>
+        </select>
+        <select class="select-filter">
+          <option>Semua Kategori</option>
+          <option>Foley</option>
+          <option>Ambience</option>
+          <option>Music</option>
+        </select>
+        <span class="count-text">47 downloads</span>
+      </div>
+
+      <!-- Download list -->
+      <div class="dl-list">
+
+        <!-- Row 1 — Subscription, Personal -->
+        <div class="dl-row">
+          <div class="dl-thumb" style="background:linear-gradient(135deg,#ef4444,#ea580c)"></div>
+          <button class="dl-play" onclick="event.stopPropagation()">
+            <svg width="9" height="11" viewBox="0 0 10 12" fill="#6b6f82"><polygon points="0,0 10,6 0,12"/></svg>
+          </button>
+          <div class="dl-info">
+            <div class="dl-title">Heavy Explosion Impact 03</div>
+            <div class="dl-meta">Explosions · oleh SoundForge Studio</div>
+          </div>
+          <span class="badge badge-personal">Personal</span>
+          <span class="badge badge-sub">Subscription</span>
+          <div class="dl-date">12 Mei 2026</div>
+          <div class="dl-actions">
+            <button class="btn-icon" title="Download ulang">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
+            <button class="btn-license" onclick="openModal('personal','Heavy Explosion Impact 03','SoundForge Studio','Explosions','12 Mei 2026','Subscription','linear-gradient(135deg,#ef4444,#ea580c)')">📄 Lihat Lisensi</button>
+          </div>
+        </div>
+
+        <!-- Row 2 — Purchase, Sync -->
+        <div class="dl-row">
+          <div class="dl-thumb" style="background:linear-gradient(135deg,#8b5cf6,#4338ca)"></div>
+          <button class="dl-play">
+            <svg width="9" height="11" viewBox="0 0 10 12" fill="#6b6f82"><polygon points="0,0 10,6 0,12"/></svg>
+          </button>
+          <div class="dl-info">
+            <div class="dl-title">Cinematic Tension Build</div>
+            <div class="dl-meta">Sound Scoring · oleh AudioCraft ID</div>
+          </div>
+          <span class="badge badge-sync">Sync</span>
+          <span style="font-size:11px;color:#5a5d72;white-space:nowrap;">Rp 120.000</span>
+          <div class="dl-date">10 Mei 2026</div>
+          <div class="dl-actions">
+            <button class="btn-icon" title="Download ulang">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
+            <button class="btn-license" onclick="openModal('sync','Cinematic Tension Build','AudioCraft ID','Sound Scoring','10 Mei 2026','Purchase · Rp 120.000','linear-gradient(135deg,#8b5cf6,#4338ca)')">📄 Lihat Lisensi</button>
+          </div>
+        </div>
+
+        <!-- Row 3 — Subscription, Personal -->
+        <div class="dl-row">
+          <div class="dl-thumb" style="background:linear-gradient(135deg,#0d9488,#0891b2)"></div>
+          <button class="dl-play">
+            <svg width="9" height="11" viewBox="0 0 10 12" fill="#6b6f82"><polygon points="0,0 10,6 0,12"/></svg>
+          </button>
+          <div class="dl-info">
+            <div class="dl-title">Forest Rain Ambience Loop</div>
+            <div class="dl-meta">Ambience · oleh NatureBox</div>
+          </div>
+          <span class="badge badge-personal">Personal</span>
+          <span class="badge badge-sub">Subscription</span>
+          <div class="dl-date">8 Mei 2026</div>
+          <div class="dl-actions">
+            <button class="btn-icon" title="Download ulang">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
+            <button class="btn-license" onclick="openModal('personal','Forest Rain Ambience Loop','NatureBox','Ambience','8 Mei 2026','Subscription','linear-gradient(135deg,#0d9488,#0891b2)')">📄 Lihat Lisensi</button>
+          </div>
+        </div>
+
+        <!-- Row 4 — Purchase, Broadcast -->
+        <div class="dl-row">
+          <div class="dl-thumb" style="background:linear-gradient(135deg,#4f46e5,#1e40af)"></div>
+          <button class="dl-play">
+            <svg width="9" height="11" viewBox="0 0 10 12" fill="#6b6f82"><polygon points="0,0 10,6 0,12"/></svg>
+          </button>
+          <div class="dl-info">
+            <div class="dl-title">Epic Orchestral Intro</div>
+            <div class="dl-meta">Cinematic · oleh OrchestraAI</div>
+          </div>
+          <span class="badge badge-broadcast">Broadcast</span>
+          <span style="font-size:11px;color:#5a5d72;white-space:nowrap;">Rp 180.000</span>
+          <div class="dl-date">5 Mei 2026</div>
+          <div class="dl-actions">
+            <button class="btn-icon" title="Download ulang">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
+            <button class="btn-license" onclick="openModal('broadcast','Epic Orchestral Intro','OrchestraAI','Cinematic','5 Mei 2026','Purchase · Rp 180.000','linear-gradient(135deg,#4f46e5,#1e40af)')">📄 Lihat Lisensi</button>
+          </div>
+        </div>
+
+        <!-- Row 5 — Subscription, Personal -->
+        <div class="dl-row">
+          <div class="dl-thumb" style="background:linear-gradient(135deg,#ec4899,#8b5cf6)"></div>
+          <button class="dl-play">
+            <svg width="9" height="11" viewBox="0 0 10 12" fill="#6b6f82"><polygon points="0,0 10,6 0,12"/></svg>
+          </button>
+          <div class="dl-info">
+            <div class="dl-title">Magic Sparkle Whoosh</div>
+            <div class="dl-meta">Magic & Fantasy · oleh PixelSounds</div>
+          </div>
+          <span class="badge badge-personal">Personal</span>
+          <span class="badge badge-sub">Subscription</span>
+          <div class="dl-date">3 Mei 2026</div>
+          <div class="dl-actions">
+            <button class="btn-icon" title="Download ulang">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
+            <button class="btn-license" onclick="openModal('personal','Magic Sparkle Whoosh','PixelSounds','Magic & Fantasy','3 Mei 2026','Subscription','linear-gradient(135deg,#ec4899,#8b5cf6)')">📄 Lihat Lisensi</button>
+          </div>
+        </div>
+
+        <!-- Row 6 — Purchase, Commercial -->
+        <div class="dl-row">
+          <div class="dl-thumb" style="background:linear-gradient(135deg,#f59e0b,#ea580c)"></div>
+          <button class="dl-play">
+            <svg width="9" height="11" viewBox="0 0 10 12" fill="#6b6f82"><polygon points="0,0 10,6 0,12"/></svg>
+          </button>
+          <div class="dl-info">
+            <div class="dl-title">Upbeat Corporate Loop</div>
+            <div class="dl-meta">Electronic Music · oleh TrackMaker</div>
+          </div>
+          <span class="badge badge-commercial">Commercial</span>
+          <span style="font-size:11px;color:#5a5d72;white-space:nowrap;">Rp 90.000</span>
+          <div class="dl-date">1 Mei 2026</div>
+          <div class="dl-actions">
+            <button class="btn-icon" title="Download ulang">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
+            <button class="btn-license" onclick="openModal('commercial','Upbeat Corporate Loop','TrackMaker','Electronic Music','1 Mei 2026','Purchase · Rp 90.000','linear-gradient(135deg,#f59e0b,#ea580c)')">📄 Lihat Lisensi</button>
+          </div>
+        </div>
+
+      </div><!-- end dl-list -->
+
+      <!-- Pagination -->
+      <div class="pagination">
+        <button class="page-btn">‹</button>
+        <button class="page-btn current">1</button>
+        <button class="page-btn">2</button>
+        <button class="page-btn">3</button>
+        <span style="color:#3a3c4e;font-size:13px;">...</span>
+        <button class="page-btn">5</button>
+        <button class="page-btn">›</button>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- ─── License Modal ─── -->
+<div class="modal-overlay" id="licenseModal" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Sertifikat Lisensi</h2>
+      <button class="modal-close" onclick="document.getElementById('licenseModal').classList.remove('show')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Sound info -->
+      <div class="license-hero">
+        <div id="modalThumb" class="license-thumb" style="background:linear-gradient(135deg,#8b5cf6,#4338ca)"></div>
+        <div>
+          <div class="license-title" id="modalTitle">Cinematic Tension Build</div>
+          <div class="license-author" id="modalAuthor">oleh AudioCraft ID · Sound Scoring</div>
+        </div>
+      </div>
+
+      <!-- Details -->
+      <div class="license-rows">
+        <div class="license-row">
+          <span class="lr-label">Lisensi untuk</span>
+          <span class="lr-value">Samx (samx@gmail.com)</span>
+        </div>
+        <div class="license-row">
+          <span class="lr-label">Tanggal Download</span>
+          <span class="lr-value" id="modalDate">10 Mei 2026</span>
+        </div>
+        <div class="license-row">
+          <span class="lr-label">Tipe Lisensi</span>
+          <span class="lr-value" id="modalBadge"><span class="badge badge-sync">Sync License</span></span>
+        </div>
+        <div class="license-row">
+          <span class="lr-label">Diperoleh via</span>
+          <span class="lr-value" id="modalSource">Purchase · Rp 120.000</span>
+        </div>
+        <div class="license-row">
+          <span class="lr-label">Nomor Lisensi</span>
+          <span class="lr-value" style="font-family:monospace;font-size:12px;" id="modalLicNum">BH-LIC-2026-00847</span>
+        </div>
+      </div>
+
+      <!-- Rights box -->
+      <div class="rights-box" id="rightsBox">
+        <h4>Hak yang Diberikan</h4>
+        <!-- filled by JS -->
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="document.getElementById('licenseModal').classList.remove('show')">Tutup</button>
+      <button class="btn-primary" onclick="alert('Download PDF license certificate...')">⬇ Download PDF</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const licenseRights = {
+  personal: {
+    label: 'Personal License',
+    badgeCls: 'badge-personal',
+    allowed: [
+      'Konten personal & non-komersial',
+      'YouTube, podcast, video pribadi',
+      'Proyek edukasi & portfolio',
+      'Tanpa batas durasi & penggunaan',
+    ],
+    disallowed: [
+      'Iklan komersial berbayar',
+      'Broadcast TV / radio',
+      'Distribusi sebagai produk',
+    ],
+  },
+  commercial: {
+    label: 'Commercial License',
+    badgeCls: 'badge-commercial',
+    allowed: [
+      'Iklan & konten promosi bisnis',
+      'YouTube monetized & brand content',
+      'Aplikasi & produk digital',
+      'Platform streaming komersial',
+    ],
+    disallowed: [
+      'Broadcast TV / radio nasional',
+      'Redistribusi / dijual kembali',
+    ],
+  },
+  sync: {
+    label: 'Sync License',
+    badgeCls: 'badge-sync',
+    allowed: [
+      'Film, series, & video production',
+      'Iklan TV & digital advertising',
+      'Game & aplikasi interaktif',
+      'Platform streaming internasional',
+      'Distribusi global tanpa batas',
+    ],
+    disallowed: [
+      'Broadcast TV frekuensi publik',
+      'Redistribusi audio mentah',
+    ],
+  },
+  broadcast: {
+    label: 'Broadcast License',
+    badgeCls: 'badge-broadcast',
+    allowed: [
+      'Siaran TV & radio nasional',
+      'Semua hak Sync License',
+      'Distribusi fisik (DVD, Blu-ray)',
+      'Hak global tanpa batasan',
+      'Penggunaan komersial skala besar',
+    ],
+    disallowed: [
+      'Redistribusi file audio mentah',
+    ],
+  },
+};
+
+function openModal(type, title, author, category, date, source, gradient) {
+  const r = licenseRights[type];
+  document.getElementById('modalThumb').style.background = gradient;
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalAuthor').textContent = 'oleh ' + author + ' · ' + category;
+  document.getElementById('modalDate').textContent = date;
+  document.getElementById('modalSource').textContent = source;
+  document.getElementById('modalBadge').innerHTML = '<span class="badge ' + r.badgeCls + '">' + r.label + '</span>';
+
+  // random license number
+  const num = 'BH-LIC-2026-0' + Math.floor(1000 + Math.random() * 9000);
+  document.getElementById('modalLicNum').textContent = num;
+
+  // rights
+  let html = '<h4>Hak yang Diberikan</h4>';
+  r.allowed.forEach(a => {
+    html += '<div class="right-item allowed"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>' + a + '</div>';
+  });
+  if (r.disallowed && r.disallowed.length) {
+    html += '<div style="height:6px"></div>';
+    r.disallowed.forEach(d => {
+      html += '<div class="right-item disallowed"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' + d + '</div>';
+    });
+  }
+  document.getElementById('rightsBox').innerHTML = html;
+
+  document.getElementById('licenseModal').classList.add('show');
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('licenseModal')) {
+    document.getElementById('licenseModal').classList.remove('show');
+  }
+}
+
+function switchTab(el, type) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}
+</script>
+</body>
+</html>

@@ -8,9 +8,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LicenseModule } from '../common/license/license.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { EarningsModule } from '../earnings/earnings.module';
+import { EmailModule } from '../email/email.module';
 
 @Module({
-  imports: [ConfigModule, LicenseModule, SubscriptionsModule, EarningsModule],
+  imports: [ConfigModule, LicenseModule, SubscriptionsModule, EarningsModule, EmailModule],
   controllers: [OrdersController],
   providers: [OrdersService, WebhookService, PrismaService],
 })

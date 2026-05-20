@@ -6,6 +6,7 @@ import type {
   SoundFilters,
   DownloadResult,
   WishlistToggleResult,
+  DownloadHistoryResponse,
 } from '@/types';
 
 /** URL backend API (tanpa trailing slash) */
@@ -65,6 +66,35 @@ export const soundsApi = {
     const { data } = await apiClient.get(
       `/sounds/wishlist?page=${page}&limit=${limit}`,
     );
+    return data;
+  },
+
+  /** Related sounds berdasarkan kategori */
+  getRelated: async (slug: string, limit = 6): Promise<SoundEffect[]> => {
+    const { data } = await apiClient.get(`/sounds/${slug}/related?limit=${limit}`);
+    return data;
+  },
+
+  /** Creator analytics */
+  getCreatorAnalytics: async () => {
+    const { data } = await apiClient.get('/sounds/creator/analytics');
+    return data as { topSounds: any[]; monthlyDownloads: { month: string; label: string; downloads: number }[] };
+  },
+
+  /** Download history user */
+  getDownloadHistory: async (params: {
+    page?: number;
+    limit?: number;
+    licenseType?: string;
+    categorySlug?: string;
+    search?: string;
+    source?: string;
+  } = {}): Promise<DownloadHistoryResponse> => {
+    const p = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '' && v !== 'all') p.set(k, String(v));
+    });
+    const { data } = await apiClient.get(`/sounds/downloads/history?${p}`);
     return data;
   },
 };

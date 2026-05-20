@@ -135,6 +135,54 @@ export class EmailService {
     }
   }
 
+  async sendSubscriptionExpiring(email: string, userName: string, planName: string, expiryDate: string) {
+    const html = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#333;max-width:600px;margin:0 auto;padding:20px">
+      <h2 style="color:#7c3aed">Subscription kamu akan habis dalam 7 hari</h2>
+      <p>Hi ${userName},</p>
+      <p>Subscription <strong>${planName}</strong> kamu akan berakhir pada <strong>${expiryDate}</strong>.</p>
+      <p>Perpanjang sekarang untuk tetap bisa download sound tanpa batas.</p>
+      <a href="${process.env.FRONTEND_URL}/pricing" style="background:#7c3aed;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin:16px 0">Perpanjang Sekarang</a>
+      <p style="color:#999;font-size:12px;margin-top:24px">BeatHive &copy; 2026</p>
+    </body></html>`;
+    await this.transporter.sendMail({ to: email, subject: `Subscription ${planName} berakhir dalam 7 hari`, html }).catch(e => this.logger.error(e.message));
+  }
+
+  async sendQuotaLow(email: string, userName: string, remaining: number, limit: number) {
+    const html = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#333;max-width:600px;margin:0 auto;padding:20px">
+      <h2 style="color:#f59e0b">Kuota download hampir habis</h2>
+      <p>Hi ${userName},</p>
+      <p>Kamu hanya punya <strong>${remaining} download</strong> tersisa dari ${limit}/bulan.</p>
+      <p>Upgrade plan untuk mendapatkan lebih banyak download.</p>
+      <a href="${process.env.FRONTEND_URL}/pricing" style="background:#7c3aed;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin:16px 0">Lihat Plan</a>
+      <p style="color:#999;font-size:12px;margin-top:24px">BeatHive &copy; 2026</p>
+    </body></html>`;
+    await this.transporter.sendMail({ to: email, subject: `Sisa ${remaining} download bulan ini`, html }).catch(e => this.logger.error(e.message));
+  }
+
+  async sendSoundSold(creatorEmail: string, creatorName: string, soundTitle: string, amount: number, licenseType: string) {
+    const html = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#333;max-width:600px;margin:0 auto;padding:20px">
+      <h2 style="color:#10b981">Sound kamu terjual!</h2>
+      <p>Hi ${creatorName},</p>
+      <p>Sound <strong>"${soundTitle}"</strong> baru saja dibeli dengan <strong>${licenseType} license</strong>.</p>
+      <p>Earning kamu bertambah <strong>Rp ${amount.toLocaleString('id-ID')}</strong>.</p>
+      <a href="${process.env.FRONTEND_URL}/dashboard/earnings" style="background:#7c3aed;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin:16px 0">Lihat Earnings</a>
+      <p style="color:#999;font-size:12px;margin-top:24px">BeatHive &copy; 2026</p>
+    </body></html>`;
+    await this.transporter.sendMail({ to: creatorEmail, subject: `Sound terjual: "${soundTitle}"`, html }).catch(e => this.logger.error(e.message));
+  }
+
+  async sendEmailVerification(email: string, userName: string, verifyUrl: string) {
+    const html = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#333;max-width:600px;margin:0 auto;padding:20px">
+      <h2 style="color:#7c3aed">Verifikasi Email BeatHive</h2>
+      <p>Hi ${userName},</p>
+      <p>Terima kasih telah mendaftar di BeatHive! Klik tombol di bawah untuk verifikasi email kamu.</p>
+      <a href="${verifyUrl}" style="background:#7c3aed;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin:16px 0">Verifikasi Email</a>
+      <p style="color:#999;font-size:12px">Link berlaku 24 jam. Jika tidak mendaftar, abaikan email ini.</p>
+      <p style="color:#999;font-size:12px;margin-top:24px">BeatHive &copy; 2026</p>
+    </body></html>`;
+    await this.transporter.sendMail({ to: email, subject: 'Verifikasi Email BeatHive', html }).catch(e => this.logger.error(e.message));
+  }
+
   // HTML Templates
   private getPasswordResetTemplate(resetUrl: string, userName: string): string {
     return `

@@ -24,20 +24,23 @@ async function bootstrap() {
   );
 
   // CORS — izinkan request dari frontend
+  // BE-CONFIG-01 fix: gunakan STRICT_CORS=true di staging/demo agar tidak auto-allow semua origin
   const allowedOrigins = [
     process.env.FRONTEND_URL || 'http://localhost:3001',
     'http://localhost:3001',
+    ...(process.env.EXTRA_ALLOWED_ORIGINS ? process.env.EXTRA_ALLOWED_ORIGINS.split(',') : []),
   ];
-  const isProduction = process.env.NODE_ENV === 'production';
+  const strictCors = process.env.NODE_ENV === 'production' || process.env.STRICT_CORS === 'true';
 
   app.enableCors({
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       // Izinkan request tanpa origin (Postman, curl, server-to-server)
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
-      // Development: izinkan semua origin; Production: tolak origin yang tidak dikenal
-      if (!isProduction) return callback(null, true);
-      callback(new Error(`Origin ${origin} not allowed by CORS`), false);
+      // Strict mode (production + staging): tolak origin tidak dikenal
+      if (strictCors) return callback(new Error(`Origin ${origin} not allowed by CORS`), false);
+      // Development only: izinkan semua origin
+      return callback(null, true);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

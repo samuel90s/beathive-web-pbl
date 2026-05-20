@@ -10,7 +10,10 @@ import { getPreviewStreamUrl } from '@/lib/api/sounds';
 import { formatDuration } from '@/lib/utils';
 import { toast } from '@/lib/store/toast.store';
 
-const PREVIEW_LIMIT = 30; // seconds
+// SFX: 30s preview, Music: 60s preview
+function getPreviewLimit(categoryType?: string): number {
+  return categoryType === 'music' ? 60 : 30;
+}
 
 function canPlayFull(accessLevel: string, userPlanSlug?: string): boolean {
   if (accessLevel === 'FREE') return true;
@@ -31,6 +34,21 @@ export default function GlobalPlayer() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [seeking, setSeeking] = useState(false);
+
+  // Keyboard shortcuts: Space=play/pause, ←/→=seek 10s, M=mute
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (['INPUT','TEXTAREA','SELECT'].includes(target.tagName) || target.isContentEditable) return;
+      const audio = audioRef.current;
+      if (e.key === ' ' && currentTrack) { e.preventDefault(); isPlaying ? pause() : resume(); }
+      if (e.key === 'ArrowLeft' && audio) { e.preventDefault(); audio.currentTime = Math.max(0, audio.currentTime - 10); }
+      if (e.key === 'ArrowRight' && audio) { e.preventDefault(); audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 10); }
+      if ((e.key === 'm' || e.key === 'M') && audio) { e.preventDefault(); audio.muted = !audio.muted; }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [currentTrack, isPlaying, pause, resume]);
   const [liked, setLiked] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
   const [previewLocked, setPreviewLocked] = useState(false);
@@ -40,6 +58,7 @@ export default function GlobalPlayer() {
   const planSlug = user?.subscription?.plan?.slug;
   const isOwner = !!(user?.id && currentTrack?.author?.id && currentTrack.author.id === user.id);
   const fullAccess = currentTrack ? (isOwner || canPlayFull(currentTrack.accessLevel, planSlug)) : false;
+  const PREVIEW_LIMIT = currentTrack ? getPreviewLimit(currentTrack.category?.type) : 30;
 
   useEffect(() => {
     setLiked(currentTrack?.isLiked ?? false);
@@ -102,6 +121,8 @@ export default function GlobalPlayer() {
   };
 
   const inCart = hasItem(currentTrack.id);
+  const isPurchasable = currentTrack.accessLevel === 'PURCHASE' ||
+    ((currentTrack.accessLevel === 'PRO' || currentTrack.accessLevel === 'BUSINESS') && currentTrack.price > 0);
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
   const displayTotal = !fullAccess ? Math.min(totalSec || 0, PREVIEW_LIMIT) : (totalSec || 0);
   const displayProgress = !fullAccess
@@ -128,7 +149,7 @@ export default function GlobalPlayer() {
               </svg>
             </div>
             <div>
-              <p className="text-xs font-semibold text-violet-200">30-second preview only</p>
+              <p className="text-xs font-semibold text-violet-200">{PREVIEW_LIMIT}s preview only</p>
               <p className="text-[10px] text-violet-400">
                 {currentTrack.accessLevel === 'PURCHASE'
                   ? 'Purchase this sound to play the full version'
@@ -198,7 +219,7 @@ export default function GlobalPlayer() {
             </button>
             <button
               onClick={stop}
-              className="w-7 h-7 rounded-full text-[#3a3c4e] hover:text-[#6b6f82] flex items-center justify-center transition-colors"
+              className="hidden sm:flex w-7 h-7 rounded-full text-[#3a3c4e] hover:text-[#6b6f82] items-center justify-center transition-colors"
             >
               <svg width="11" height="11" viewBox="0 0 14 14" fill="currentColor">
                 <rect x="1" y="1" width="12" height="12" rx="2"/>
@@ -207,14 +228,14 @@ export default function GlobalPlayer() {
           </div>
 
           {/* Track info */}
-          <div className="flex-shrink-0 min-w-0 w-40">
-            <p className="text-[13px] font-semibold text-white truncate leading-tight">{currentTrack.title}</p>
+          <div className="flex-shrink-0 min-w-0 w-28 sm:w-40">
+            <p className="text-[12px] sm:text-[13px] font-semibold text-white truncate leading-tight">{currentTrack.title}</p>
             <div className="flex items-center gap-1.5 mt-0.5">
               <p className="text-[10px] text-[#5a5d72] truncate">
                 {currentTrack.category.name}
                 {audioError
                   ? <span className="text-red-400 ml-1">· Error</span>
-                  : !fullAccess ? ' · Preview 30s' : ''}
+                  : !fullAccess ? <span className="hidden sm:inline"> · Preview {PREVIEW_LIMIT}s</span> : ''}
               </p>
               {!fullAccess && !previewLocked && (
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#6b6f82" strokeWidth="2.5" strokeLinecap="round" className="flex-shrink-0">
@@ -305,34 +326,11 @@ export default function GlobalPlayer() {
           {/* Action button */}
           <div className="flex items-center gap-2 flex-shrink-0">
             {isOwner ? (
-              <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-500/10 text-violet-400 border border-violet-500/20">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
-                </svg>
+              <span className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-400 border border-violet-500/20">
                 Your Sound
               </span>
-            ) : currentTrack.accessLevel !== 'PURCHASE' ? (
-              <button
-                onClick={async () => {
-                  try { await download(currentTrack.id, currentTrack.slug, currentTrack.format); }
-                  catch (err: any) { toast.error(err.message || 'Download failed'); }
-                }}
-                disabled={downloading === currentTrack.id}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal/10 text-teal border border-teal/20 hover:bg-teal/20 transition-colors disabled:opacity-50"
-              >
-                {downloading === currentTrack.id ? (
-                  <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10" strokeOpacity=".2"/><path d="M12 2a10 10 0 0 1 10 10"/>
-                  </svg>
-                ) : (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                  </svg>
-                )}
-                {downloading === currentTrack.id ? 'Downloading...' : currentTrack.accessLevel === 'FREE' ? 'Download Free' : `Download`}
-              </button>
-            ) : (
+            ) : isPurchasable && !currentTrack.isPurchased ? (
+              /* Paid sound — show cart button */
               <button
                 onClick={() => !inCart && addItem(currentTrack, 'personal')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
@@ -343,9 +341,7 @@ export default function GlobalPlayer() {
               >
                 {inCart ? (
                   <>
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                      <polyline points="20 6 9 17 4 12"/>
-                    </svg>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
                     In Cart
                   </>
                 ) : (
@@ -357,6 +353,30 @@ export default function GlobalPlayer() {
                     Rp {(currentTrack.price / 1000).toFixed(0)}k
                   </>
                 )}
+              </button>
+            ) : (
+              /* Free or subscription-accessible or already purchased — show download */
+              <button
+                onClick={async () => {
+                  try { await download(currentTrack.id, currentTrack.slug, currentTrack.format); }
+                  catch (err: any) { toast.error(err.message || 'Download failed'); }
+                }}
+                disabled={downloading === currentTrack.id}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 transition-colors disabled:opacity-50"
+              >
+                {downloading === currentTrack.id ? (
+                  <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" strokeOpacity=".2"/><path d="M12 2a10 10 0 0 1 10 10"/>
+                  </svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                )}
+                <span className="hidden sm:inline">
+                  {downloading === currentTrack.id ? '...' : currentTrack.accessLevel === 'FREE' ? 'Download Free' : 'Download'}
+                </span>
               </button>
             )}
           </div>
