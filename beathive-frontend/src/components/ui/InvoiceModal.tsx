@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { formatPrice, formatDate } from '@/lib/utils';
 import { calcOrderTotals, SERVICE_FEE_PERCENT, TAX_PERCENT } from '@/lib/constants';
+import BrandLogo from '@/components/layout/BrandLogo';
 
 export interface InvoiceData {
   orderId: string;
@@ -36,7 +37,7 @@ export function InvoiceModal({ invoice, onClose, onDownload, downloading, closeL
         {/* Header */}
         <div className="bg-accent px-6 py-5 text-white">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-lg font-bold">Arsonus</span>
+            <BrandLogo frameClassName="h-7 w-7" textClassName="text-sm" />
             <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">Payment Successful ✓</span>
           </div>
           <p className="text-sm text-accent-bright/80">{invoice.invoiceNumber}</p>

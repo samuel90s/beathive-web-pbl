@@ -46,8 +46,8 @@ const STATUS_LABELS: Record<string, string> = {
 
 const ACCESS_COLORS: Record<string, string> = {
   FREE:     'bg-green-500/10 text-green-400',
-  PRO:      'bg-violet-500/10 text-violet-400',
-  BUSINESS: 'bg-blue-500/10 text-blue-400',
+  PRO:      'bg-accent/10 text-accent-bright',
+  BUSINESS: 'bg-carmine/10 text-carmine',
   PURCHASE: 'bg-amber-500/10 text-amber-400',
 };
 
@@ -74,7 +74,7 @@ function WaveformBars({ data }: { data?: number[] }) {
       {bars.map((v, i) => (
         <div
           key={i}
-          className="flex-1 bg-violet-500/40 rounded-[1px] min-w-[2px]"
+          className="flex-1 bg-accent/40 rounded-[1px] min-w-[2px]"
           style={{ height: `${Math.max(10, v * 100)}%` }}
         />
       ))}
@@ -121,7 +121,7 @@ function AudioPlayer({ soundId, previewUrl, api }: { soundId: string; previewUrl
     <div className="flex items-center gap-3">
       <button
         onClick={togglePlay}
-        className="w-9 h-9 rounded-full bg-violet-600 hover:bg-violet-500 flex items-center justify-center flex-shrink-0 transition-colors"
+        className="w-9 h-9 rounded-full bg-accent hover:bg-accent-dim flex items-center justify-center flex-shrink-0 transition-colors"
       >
         {playing ? (
           <svg width="10" height="10" viewBox="0 0 10 10" fill="white">
@@ -139,7 +139,7 @@ function AudioPlayer({ soundId, previewUrl, api }: { soundId: string; previewUrl
           onClick={seek}
         >
           <div
-            className="absolute inset-y-0 left-0 bg-violet-500 rounded-full"
+            className="absolute inset-y-0 left-0 bg-accent rounded-full"
             style={{ width: `${progress * 100}%` }}
           />
         </div>
@@ -244,7 +244,7 @@ function DetailPanel({
               <p className="text-[10px] text-[#6b6f82] uppercase mb-1.5">Tags</p>
               <div className="flex flex-wrap gap-1.5">
                 {(sound.tags ?? []).map(t => (
-                  <span key={t.tag.slug} className="text-xs px-2 py-0.5 bg-violet-500/10 text-violet-400 rounded-full border border-violet-500/20">
+                  <span key={t.tag.slug} className="text-xs px-2 py-0.5 bg-accent/10 text-accent-bright rounded-full border border-accent/20">
                     {t.tag.name}
                   </span>
                 ))}
@@ -283,7 +283,7 @@ function DetailPanel({
           <div>
             <p className="text-xs font-semibold text-[#6b6f82] uppercase tracking-widest mb-2">Creator</p>
             <div className="card-lift rounded-xl p-3 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-violet-400 text-sm font-bold flex-shrink-0">
+              <div className="w-9 h-9 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center text-accent-bright text-sm font-bold flex-shrink-0">
                 {sound.author.name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
@@ -473,7 +473,7 @@ export default function AdminSoundsPage() {
         <div className="flex-1 overflow-y-auto space-y-2 pr-1">
           {loading ? (
             <div className="flex justify-center py-20">
-              <div className="w-7 h-7 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+              <div className="w-7 h-7 border-2 border-accent border-t-transparent rounded-full animate-spin" />
             </div>
           ) : sounds.length === 0 ? (
             <div className="text-center py-20 card rounded-2xl border border-rim">
@@ -486,14 +486,14 @@ export default function AdminSoundsPage() {
                 onClick={() => setSelected(prev => prev?.id === s.id ? null : s)}
                 className={`w-full text-left card rounded-xl border p-3.5 transition-all ${
                   selected?.id === s.id
-                    ? 'border-violet-500/50 bg-violet-500/5'
+                    ? 'border-accent/50 bg-accent/5'
                     : 'border-rim hover:border-white/10 hover:bg-white/[0.02]'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   {/* Mini play indicator */}
                   <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center ${
-                    selected?.id === s.id ? 'bg-violet-600' : 'bg-white/[0.05]'
+                    selected?.id === s.id ? 'bg-accent' : 'bg-white/[0.05]'
                   }`}>
                     <svg width="8" height="10" viewBox="0 0 8 10" fill={selected?.id === s.id ? 'white' : '#6b7280'}>
                       <polygon points="0,0 8,5 0,10"/>
@@ -533,7 +533,7 @@ export default function AdminSoundsPage() {
                   {/* Arrow indicator when panel open */}
                   {panelOpen && (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                      className={selected?.id === s.id ? 'text-violet-400' : 'text-[#4a4d5e]'}>
+                      className={selected?.id === s.id ? 'text-accent-bright' : 'text-[#4a4d5e]'}>
                       <polyline points="9 18 15 12 9 6"/>
                     </svg>
                   )}

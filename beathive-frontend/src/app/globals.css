@@ -2,22 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Tall Films Expanded font-face ─────────────────────── */
-/* Jika kamu punya file font Tall Films Expanded, taruh di /public/fonts/
-   dan uncomment @font-face di bawah ini. Saat ini heading memakai Oswald
-   sebagai font utama (tersedia via Google Fonts). */
-/*
-@font-face {
-  font-family: 'Tall Films Expanded';
-  src: url('/fonts/TallFilmsExpanded.woff2') format('woff2'),
-       url('/fonts/TallFilmsExpanded.woff') format('woff');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-*/
-
-/* ─── Theme Variables ─────────────────────────────────── */
+/* Theme variables */
 
 :root,
 .light {
@@ -53,7 +38,7 @@
   --text-muted:  #8b8fa8;
   --text-subtle: #6b6f82;
 
-  /* Arsonus brand colors — background tetap hitam */
+  /* Arsonus brand colors; dark background stays black. */
   --accent:       #F7941D;
   --accent-dim:   #e07e0a;
   --accent-bright:#ffaa4d;
@@ -64,7 +49,7 @@
   --shadow-elevated: 0 8px 32px rgba(0,0,0,0.6);
 }
 
-/* ─── Base ─────────────────────────────────────────────── */
+/* Base */
 
 @layer base {
   * { box-sizing: border-box; }
@@ -75,17 +60,17 @@
   body {
     background-color: var(--bg-base);
     color: var(--text-primary);
-    font-family: 'Oswald', 'Tall Films Expanded', sans-serif;
-    letter-spacing: 0.01em;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     transition: background-color 0.2s, color 0.2s;
   }
 
-  /* Heading pakai Tall Films Expanded jika tersedia, fallback Oswald */
+  /* Headings use the same Inter family as the rest of the UI. */
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Tall Films Expanded', 'Oswald', sans-serif;
-    letter-spacing: 0.02em;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0;
   }
 
   ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -94,7 +79,7 @@
   ::-webkit-scrollbar-thumb:hover { background: rgba(247,148,29,0.55); }
 }
 
-/* ─── Components ───────────────────────────────────────── */
+/* Components */
 
 @layer components {
   .card {
@@ -163,7 +148,7 @@
   }
 }
 
-/* ─── Utilities ────────────────────────────────────────── */
+/* Utilities */
 
 @layer utilities {
   .scrollbar-none::-webkit-scrollbar { display: none; }
@@ -175,15 +160,15 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-  .text-gradient-violet {
+  .text-gradient-brand {
     background: linear-gradient(135deg, #ffaa4d 0%, #F7941D 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
-  .glow-violet   { box-shadow: 0 0 24px rgba(247,148,29,0.4); }
-  .glow-violet-sm { box-shadow: 0 0 12px rgba(247,148,29,0.25); }
+  .glow-brand   { box-shadow: 0 0 24px rgba(247,148,29,0.4); }
+  .glow-brand-sm { box-shadow: 0 0 12px rgba(247,148,29,0.25); }
 
   .bg-grid {
     background-image:

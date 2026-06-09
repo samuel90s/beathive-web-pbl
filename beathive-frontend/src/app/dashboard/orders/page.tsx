@@ -140,7 +140,7 @@ function OrdersContent() {
               </svg>
             </div>
             <p className="text-sm font-medium text-[#6b6f82]">Belum ada pesanan</p>
-            <Link href="/browse" className="mt-2 inline-block text-xs text-violet-500 hover:underline">
+            <Link href="/browse" className="mt-2 inline-block text-xs text-accent-bright hover:underline">
               Mulai browse sound
             </Link>
           </div>
@@ -165,7 +165,7 @@ function OrdersContent() {
                         <button
                           onClick={() => handleDownloadInvoice(order.id, order.invoice!.invoiceNumber)}
                           disabled={invoiceLoading === order.id}
-                          className="mt-1 flex items-center gap-1 text-xs text-violet-500 hover:text-accent-bright ml-auto disabled:opacity-50 transition-colors"
+                          className="mt-1 flex items-center gap-1 text-xs text-accent-bright hover:text-accent-dim ml-auto disabled:opacity-50 transition-colors"
                         >
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                           {invoiceLoading === order.id ? 'Mengunduh...' : 'Invoice PDF'}
@@ -178,11 +178,11 @@ function OrdersContent() {
                   <div className="space-y-2">
                     {order.items.map((item) => (
                       <div key={item.id} className="flex items-center gap-3 bg-white/[0.03] rounded-xl px-3 py-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-violet-500/15 flex items-center justify-center flex-shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-accent/15 flex items-center justify-center flex-shrink-0">
                           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                            <rect x="1" y="4" width="3" height="8" rx="1" fill="#8b5cf6"/>
-                            <rect x="5.5" y="2" width="3" height="12" rx="1" fill="#8b5cf6"/>
-                            <rect x="10" y="5" width="3" height="6" rx="1" fill="#8b5cf6"/>
+                            <rect x="1" y="4" width="3" height="8" rx="1" fill="#F7941D"/>
+                            <rect x="5.5" y="2" width="3" height="12" rx="1" fill="#F7941D"/>
+                            <rect x="10" y="5" width="3" height="6" rx="1" fill="#F7941D"/>
                           </svg>
                         </div>
                         <div className="flex-1 min-w-0">

@@ -141,7 +141,7 @@ export default function ProfilePage() {
         {/* Avatar */}
         <div className="flex items-center gap-5 mb-6">
           <div className="relative">
-            <div className="w-20 h-20 rounded-full bg-violet-100 flex items-center justify-center overflow-hidden border-2 border-white shadow-sm">
+            <div className="w-20 h-20 rounded-full bg-accent/10 flex items-center justify-center overflow-hidden border-2 border-white shadow-sm">
               {avatarSrc ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarSrc} alt="avatar" className="w-full h-full object-cover" />
@@ -251,7 +251,7 @@ export default function ProfilePage() {
           )}
           <button
             type="submit" disabled={savingProfile}
-            className="px-5 py-2.5 btn-accent text-sm font-medium rounded-xl hover:bg-violet-700 disabled:opacity-50 transition-colors"
+            className="px-5 py-2.5 btn-accent text-sm font-medium rounded-xl hover:bg-accent-dim disabled:opacity-50 transition-colors"
           >
             {savingProfile ? 'Saving...' : 'Save Changes'}
           </button>
@@ -287,7 +287,7 @@ export default function ProfilePage() {
             )}
             <button
               type="submit" disabled={savingPw}
-              className="px-5 py-2.5 btn-accent text-sm font-medium rounded-xl hover:bg-violet-700 disabled:opacity-50 transition-colors"
+              className="px-5 py-2.5 btn-accent text-sm font-medium rounded-xl hover:bg-accent-dim disabled:opacity-50 transition-colors"
             >
               {savingPw ? 'Updating...' : 'Update Password'}
             </button>
@@ -384,7 +384,7 @@ function TwoFactorSection({ isTwoFactorEnabled }: { isTwoFactorEnabled: boolean 
         <button
           onClick={startSetup}
           disabled={loading}
-          className="px-5 py-2.5 btn-accent text-sm font-medium rounded-xl hover:bg-violet-700 disabled:opacity-50 transition-colors"
+          className="px-5 py-2.5 btn-accent text-sm font-medium rounded-xl hover:bg-accent-dim disabled:opacity-50 transition-colors"
         >
           {loading ? 'Loading...' : 'Enable 2FA'}
         </button>
@@ -413,7 +413,7 @@ function TwoFactorSection({ isTwoFactorEnabled }: { isTwoFactorEnabled: boolean 
             <button
               type="submit"
               disabled={loading || token.length !== 6}
-              className="px-4 py-2.5 btn-accent text-sm font-medium rounded-xl hover:bg-violet-700 disabled:opacity-50"
+              className="px-4 py-2.5 btn-accent text-sm font-medium rounded-xl hover:bg-accent-dim disabled:opacity-50"
             >
               {loading ? '...' : 'Verify'}
             </button>

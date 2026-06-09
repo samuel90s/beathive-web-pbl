@@ -79,7 +79,7 @@ export default function AdminCategoriesPage() {
           <p className="text-sm text-[#6b6f82] mt-0.5">Kelola kategori sound effect</p>
         </div>
         {editId !== 'new' && (
-          <button onClick={startCreate} className="px-4 py-2 btn-accent text-sm rounded-xl hover:bg-violet-700 transition-colors">
+          <button onClick={startCreate} className="px-4 py-2 btn-accent text-sm rounded-xl hover:bg-accent-dim transition-colors">
             + Add Category
           </button>
         )}
@@ -95,7 +95,7 @@ export default function AdminCategoriesPage() {
               <label className="block text-xs text-[#6b6f82] mb-1">Name</label>
               <input
                 value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value, slug: editId === 'new' ? slugify(e.target.value) : f.slug }))}
-                className="w-full px-3 py-2 text-sm border border-rim rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-400"
+                className="w-full px-3 py-2 text-sm border border-rim rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="e.g. Nature"
               />
             </div>
@@ -103,7 +103,7 @@ export default function AdminCategoriesPage() {
               <label className="block text-xs text-[#6b6f82] mb-1">Slug</label>
               <input
                 value={form.slug} onChange={e => setForm(f => ({ ...f, slug: slugify(e.target.value) }))}
-                className="w-full px-3 py-2 text-sm border border-rim rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-400"
+                className="w-full px-3 py-2 text-sm border border-rim rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="e.g. nature"
               />
             </div>
@@ -111,13 +111,13 @@ export default function AdminCategoriesPage() {
               <label className="block text-xs text-[#6b6f82] mb-1">Icon (emoji, optional)</label>
               <input
                 value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-rim rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-400"
+                className="w-full px-3 py-2 text-sm border border-rim rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="e.g. 🌿"
               />
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={save} disabled={saving} className="px-4 py-2 btn-accent text-sm rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-colors">
+            <button onClick={save} disabled={saving} className="px-4 py-2 btn-accent text-sm rounded-lg hover:bg-accent-dim disabled:opacity-50 transition-colors">
               {saving ? 'Saving...' : 'Save'}
             </button>
             <button onClick={cancel} className="px-4 py-2 text-sm text-[#6b6f82] hover:text-[#c4c6d8] transition-colors">Cancel</button>
@@ -127,7 +127,7 @@ export default function AdminCategoriesPage() {
 
       {/* List */}
       {loading ? (
-        <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" /></div>
+        <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>
       ) : (
         <div className="card rounded-xl border border-rim overflow-hidden">
           <table className="w-full">

@@ -68,14 +68,14 @@ export default function AdminTagsPage() {
           <input
             value={form.name} onChange={e => setForm({ name: e.target.value, slug: slugify(e.target.value) })}
             placeholder="Tag name (e.g. Ambient)"
-            className="flex-1 px-3 py-2 text-sm border border-rim rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-400"
+            className="flex-1 px-3 py-2 text-sm border border-rim rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
           />
           <input
             value={form.slug} onChange={e => setForm(f => ({ ...f, slug: slugify(e.target.value) }))}
             placeholder="slug (auto)"
-            className="w-40 px-3 py-2 text-sm border border-rim rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-violet-400"
+            className="w-40 px-3 py-2 text-sm border border-rim rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-accent"
           />
-          <button type="submit" disabled={saving} className="px-4 py-2 btn-accent text-sm rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-colors">
+          <button type="submit" disabled={saving} className="px-4 py-2 btn-accent text-sm rounded-lg hover:bg-accent-dim disabled:opacity-50 transition-colors">
             {saving ? '...' : '+ Add'}
           </button>
         </div>
@@ -91,7 +91,7 @@ export default function AdminTagsPage() {
           />
         </div>
         {loading ? (
-          <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" /></div>
+          <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>
         ) : (
           <div className="divide-y divide-white/[0.04]">
             {filtered.map(tag => (

@@ -103,6 +103,27 @@ export class SoundFilterDto {
 
   @IsOptional()
   @IsString()
+  musicalKey?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return undefined;
+  })
+  @IsBoolean()
+  hasStems?: boolean;
+
+  @IsOptional()
+  @IsString()
+  genreSlug?: string;
+
+  @IsOptional()
+  @IsString()
+  genres?: string; // comma-separated genre slugs
+
+  @IsOptional()
+  @IsString()
   sortBy?: string;
 
   @IsOptional()
@@ -176,6 +197,10 @@ export class UploadSoundDto {
   musicalKey?: string;
 
   @IsOptional()
+  @IsString()
+  genres?: string; // comma-separated genre names/slugs
+
+  @IsOptional()
   @Transform(({ value }) => value === true || value === 'true')
   @IsBoolean()
   hasStems?: boolean;
@@ -224,6 +249,11 @@ export class UpdateSoundDto {
   @IsOptional()
   @IsString()
   musicalKey?: string;
+
+  @IsOptional()
+  @IsString({ each: true })
+  @ArrayMaxSize(12)
+  genres?: string[];
 
   @IsOptional()
   @Transform(({ value }) => value === true || value === 'true')
@@ -310,14 +340,31 @@ export class SoundsService {
       }
     }
 
+    const musicMetadataWhere: any = {};
     if (filters.minBpm !== undefined) {
-      where.bpm = { ...(where.bpm ?? {}), gte: filters.minBpm };
+      musicMetadataWhere.bpm = { ...(musicMetadataWhere.bpm ?? {}), gte: filters.minBpm };
     }
     if (filters.maxBpm !== undefined) {
-      where.bpm = { ...(where.bpm ?? {}), lte: filters.maxBpm };
+      musicMetadataWhere.bpm = { ...(musicMetadataWhere.bpm ?? {}), lte: filters.maxBpm };
     }
     if (filters.mood) {
-      where.mood = filters.mood;
+      musicMetadataWhere.mood = filters.mood;
+    }
+    if (filters.musicalKey) {
+      musicMetadataWhere.musicalKey = filters.musicalKey;
+    }
+    if (filters.hasStems !== undefined) {
+      musicMetadataWhere.hasStems = filters.hasStems;
+    }
+    if (Object.keys(musicMetadataWhere).length > 0) {
+      where.musicMetadata = { is: musicMetadataWhere };
+    }
+    const genreSlugs = [
+      ...(filters.genreSlug ? [filters.genreSlug] : []),
+      ...(filters.genres ? filters.genres.split(',') : []),
+    ].map(g => this.toSlug(g.trim())).filter(Boolean);
+    if (genreSlugs.length > 0) {
+      where.genres = { some: { genre: { slug: { in: genreSlugs } } } };
     }
 
     // Saat ada search query, urutkan by relevance (exact match dulu, lalu downloadCount)
@@ -350,6 +397,9 @@ export class SoundsService {
         include: {
           category: true,
           tags: { include: { tag: true } },
+          musicMetadata: true,
+          sfxMetadata: true,
+          genres: { include: { genre: true } },
           author: { select: { id: true, name: true, avatarUrl: true } },
           wishlists: userId ? { where: { userId } } : false,
           _count: { select: { ratings: true } },
@@ -396,6 +446,9 @@ export class SoundsService {
       include: {
         category: true,
         tags: { include: { tag: true } },
+        musicMetadata: true,
+        sfxMetadata: true,
+        genres: { include: { genre: true } },
         author: { select: { id: true, name: true, avatarUrl: true, bio: true } },
         wishlists: userId ? { where: { userId } } : false,
       },
@@ -636,6 +689,7 @@ export class SoundsService {
 
     // Resolve categoryId dari slug jika diperlukan
     let categoryId = dto.categoryId;
+    let resolvedCategory: { id: string; type: string } | null = null;
     if (!categoryId && dto.categorySlug) {
       if (!/^[a-z0-9-]+$/.test(dto.categorySlug)) {
         throw new BadRequestException('Invalid category slug format');
@@ -645,8 +699,14 @@ export class SoundsService {
       });
       if (!cat) throw new BadRequestException(`Category '${dto.categorySlug}' not found`);
       categoryId = cat.id;
+      resolvedCategory = { id: cat.id, type: cat.type };
     }
     if (!categoryId) throw new BadRequestException('categoryId or categorySlug is required');
+    if (!resolvedCategory) {
+      const cat = await this.prisma.category.findUnique({ where: { id: categoryId } });
+      if (!cat) throw new BadRequestException('Category not found');
+      resolvedCategory = { id: cat.id, type: cat.type };
+    }
 
     // Generate slug unik
     const slug = dto.slug
@@ -720,6 +780,9 @@ export class SoundsService {
       include: {
         category: true,
         tags: { include: { tag: true } },
+        musicMetadata: true,
+        sfxMetadata: true,
+        genres: { include: { genre: true } },
         author: { select: { id: true, name: true, avatarUrl: true } },
       },
     });
@@ -738,6 +801,7 @@ export class SoundsService {
         WHERE id=${soundId}
       `;
     }
+    await this.syncTypedMetadata(soundId, resolvedCategory.type, dto);
 
     // Tags
     if (dto.tags) {
@@ -769,7 +833,19 @@ export class SoundsService {
       this.recalculateDuration(soundId).catch(() => {});
     }
 
-    return this.formatSound(sound, uploaderId);
+    const enriched = await this.prisma.soundEffect.findUnique({
+      where: { id: soundId },
+      include: {
+        category: true,
+        tags: { include: { tag: true } },
+        musicMetadata: true,
+        sfxMetadata: true,
+        genres: { include: { genre: true } },
+        author: { select: { id: true, name: true, avatarUrl: true } },
+      },
+    });
+
+    return this.formatSound(enriched ?? sound, uploaderId);
   }
 
   // ─── Public categories list (for homepage / browse filters) ─
@@ -782,6 +858,7 @@ export class SoundsService {
         name: true,
         slug: true,
         icon: true,
+        type: true,
         _count: { select: { soundEffects: true } },
       },
     });
@@ -824,6 +901,9 @@ export class SoundsService {
             include: {
               category: true,
               tags: { include: { tag: true } },
+              musicMetadata: true,
+              sfxMetadata: true,
+              genres: { include: { genre: true } },
               author: { select: { id: true, name: true, avatarUrl: true } },
             },
           },
@@ -856,6 +936,9 @@ export class SoundsService {
         include: {
           category: true,
           tags: { include: { tag: true } },
+          musicMetadata: true,
+          sfxMetadata: true,
+          genres: { include: { genre: true } },
           author: { select: { id: true, name: true, avatarUrl: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -892,6 +975,9 @@ export class SoundsService {
       include: {
         category: true,
         tags: { include: { tag: true } },
+        musicMetadata: true,
+        sfxMetadata: true,
+        genres: { include: { genre: true } },
         author: { select: { id: true, name: true, avatarUrl: true } },
       },
       orderBy: { downloadCount: 'desc' },
@@ -1068,12 +1154,15 @@ export class SoundsService {
       reviewNote: sound.reviewNote,
       playCount: sound.playCount,
       downloadCount: sound.downloadCount,
-      bpm: (sound as any).bpm ?? null,
-      mood: (sound as any).mood ?? null,
-      musicalKey: (sound as any).musicalKey ?? null,
-      hasStems: (sound as any).hasStems ?? false,
+      bpm: sound.musicMetadata?.bpm ?? (sound as any).bpm ?? null,
+      mood: sound.musicMetadata?.mood ?? (sound as any).mood ?? null,
+      musicalKey: sound.musicMetadata?.musicalKey ?? (sound as any).musicalKey ?? null,
+      hasStems: sound.musicMetadata?.hasStems ?? (sound as any).hasStems ?? false,
       category: sound.category,
       tags: sound.tags?.map((t: any) => t.tag) ?? [],
+      genres: sound.genres?.map((g: any) => g.genre) ?? [],
+      sfxMetadata: sound.sfxMetadata ?? null,
+      musicMetadata: sound.musicMetadata ?? null,
       author: sound.author ?? null,
       publishedAt: sound.publishedAt,
       createdAt: sound.createdAt,
@@ -1104,6 +1193,80 @@ export class SoundsService {
     return Array.from({ length: bars }, () =>
       Math.floor(Math.random() * 20) + 4,
     );
+  }
+
+  private parseGenreSlugs(input?: string | string[]): string[] {
+    const values = Array.isArray(input) ? input : (input ?? '').split(',');
+    return [...new Set(values.map((g) => this.toSlug(String(g).trim())).filter(Boolean))].slice(0, 12);
+  }
+
+  private genreNameFromSlug(slug: string): string {
+    return slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  private async syncTypedMetadata(
+    soundId: string,
+    categoryType: string,
+    dto: {
+      bpm?: number;
+      mood?: string;
+      musicalKey?: string;
+      hasStems?: boolean;
+      genres?: string | string[];
+    },
+  ) {
+    if (categoryType === 'music') {
+      const update: any = {};
+      if (dto.bpm !== undefined) update.bpm = dto.bpm ?? null;
+      if (dto.mood !== undefined) update.mood = dto.mood ?? null;
+      if (dto.musicalKey !== undefined) update.musicalKey = dto.musicalKey ?? null;
+      if (dto.hasStems !== undefined) update.hasStems = dto.hasStems ?? false;
+
+      await this.prisma.musicMetadata.upsert({
+        where: { soundId },
+        update,
+        create: {
+          soundId,
+          bpm: dto.bpm ?? null,
+          mood: dto.mood ?? null,
+          musicalKey: dto.musicalKey ?? null,
+          hasStems: dto.hasStems ?? false,
+        },
+      });
+      await this.prisma.sfxMetadata.deleteMany({ where: { soundId } });
+      if (dto.genres !== undefined) {
+        await this.syncGenres(soundId, this.parseGenreSlugs(dto.genres));
+      }
+      return;
+    }
+
+    await this.prisma.sfxMetadata.upsert({
+      where: { soundId },
+      update: {},
+      create: { soundId },
+    });
+    await this.prisma.musicMetadata.deleteMany({ where: { soundId } });
+    await this.prisma.soundGenre.deleteMany({ where: { soundId } });
+  }
+
+  private async syncGenres(soundId: string, genreSlugs: string[]) {
+    await this.prisma.soundGenre.deleteMany({ where: { soundId } });
+    if (genreSlugs.length === 0) return;
+
+    const genres = await Promise.all(
+      genreSlugs.map((slug) =>
+        this.prisma.genre.upsert({
+          where: { slug },
+          update: {},
+          create: { slug, name: this.genreNameFromSlug(slug) },
+        }),
+      ),
+    );
+
+    await this.prisma.soundGenre.createMany({
+      data: genres.map((genre) => ({ soundId, genreId: genre.id })),
+      skipDuplicates: true,
+    });
   }
 
   // ─── Update sound (owner or admin) ───────────────────────
@@ -1159,6 +1322,9 @@ export class SoundsService {
         include: {
           category: true,
           tags: { include: { tag: true } },
+          musicMetadata: true,
+          sfxMetadata: true,
+          genres: { include: { genre: true } },
         },
       });
 
@@ -1188,6 +1354,9 @@ export class SoundsService {
         include: {
           category: true,
           tags: { include: { tag: true } },
+          musicMetadata: true,
+          sfxMetadata: true,
+          genres: { include: { genre: true } },
         },
       });
     });
@@ -1203,7 +1372,26 @@ export class SoundsService {
         WHERE id=${soundId}
       `;
     }
+    if (updated?.category?.type && (
+      dto.categorySlug !== undefined ||
+      dto.bpm !== undefined ||
+      dto.mood !== undefined ||
+      dto.musicalKey !== undefined ||
+      dto.hasStems !== undefined ||
+      dto.genres !== undefined
+    )) {
+      await this.syncTypedMetadata(soundId, updated.category.type, dto);
+    }
 
-    return updated;
+    return this.prisma.soundEffect.findUnique({
+      where: { id: soundId },
+      include: {
+        category: true,
+        tags: { include: { tag: true } },
+        musicMetadata: true,
+        sfxMetadata: true,
+        genres: { include: { genre: true } },
+      },
+    });
   }
 }

@@ -110,7 +110,7 @@ function EarningsContent() {
 
       {/* Withdraw form */}
       {showWithdrawForm && (
-        <div className="card rounded-2xl p-5 mb-5 border border-violet-500/20 max-w-2xl">
+        <div className="card rounded-2xl p-5 mb-5 border border-accent/20 max-w-2xl">
           <p className="text-sm font-semibold text-white mb-3">Ajukan Penarikan</p>
           <div className="flex gap-3">
             <div className="relative flex-1">

@@ -29,7 +29,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <p className="text-sm text-gray-400 mb-5">Halaman ini mengalami error tak terduga. Coba muat ulang halaman.</p>
             <button
               onClick={() => { this.setState({ hasError: false, message: '' }); window.location.reload(); }}
-              className="px-5 py-2.5 bg-violet-600 text-white text-sm font-medium rounded-xl hover:bg-violet-700 transition-colors"
+              className="px-5 py-2.5 bg-accent text-white text-sm font-medium rounded-xl hover:bg-accent-dim transition-colors"
             >
               Muat Ulang
             </button>

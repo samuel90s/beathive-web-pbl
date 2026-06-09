@@ -56,6 +56,12 @@ export interface Tag {
   slug: string;
 }
 
+export interface Genre {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export interface Author {
   id: string;
   name: string;
@@ -90,6 +96,16 @@ export interface SoundEffect {
   downloadCount: number;
   category: Category;
   tags: Tag[];
+  genres?: Genre[];
+  musicMetadata?: {
+    bpm?: number | null;
+    mood?: string | null;
+    musicalKey?: string | null;
+    hasStems?: boolean;
+  } | null;
+  sfxMetadata?: {
+    subcategory?: string | null;
+  } | null;
   author?: Author;
   publishedAt: string;
   createdAt?: string;
@@ -156,6 +172,10 @@ export interface SoundFilters {
   minBpm?: number;
   maxBpm?: number;
   mood?: string;
+  musicalKey?: string;
+  hasStems?: boolean;
+  genreSlug?: string;
+  genres?: string;
   sortBy?: 'newest' | 'oldest' | 'popular' | 'mostplayed' | 'price_asc' | 'price_desc' | 'trending';
   page?: number;
   limit?: number;

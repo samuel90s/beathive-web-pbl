@@ -1,6 +1,6 @@
 // src/components/sounds/WaveformBar.tsx
 'use client';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 
 interface Props {
   data: number[];
@@ -9,9 +9,11 @@ interface Props {
 }
 
 function WaveformBar({ data, isActive, progress }: Props) {
-  const raw = data?.length ? data : Array(48).fill(0).map((_, i) => Math.sin(i * 0.4) * 0.4 + 0.5);
-  const max = Math.max(...raw, 1);
-  const bars = raw.map((v) => (v as number) / max);
+  const bars = useMemo(() => {
+    const raw = data?.length ? data : Array(48).fill(0).map((_, i) => Math.sin(i * 0.4) * 0.4 + 0.5);
+    const max = Math.max(...raw, 1);
+    return raw.map((v) => (v as number) / max);
+  }, [data]);
   const progressIdx = Math.floor((progress / 100) * bars.length);
 
   return (

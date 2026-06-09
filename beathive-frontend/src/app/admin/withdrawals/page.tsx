@@ -85,7 +85,7 @@ export default function AdminWithdrawalsPage() {
 
       {loading ? (
         <div className="flex justify-center py-16">
-          <div className="w-6 h-6 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
         </div>
       ) : items.length === 0 ? (
         <div className="card rounded-2xl border border-rim p-12 text-center text-[#6b6f82] text-sm">

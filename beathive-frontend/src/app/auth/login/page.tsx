@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { authApi } from '@/lib/api/auth';
+import BrandLogo from '@/components/layout/BrandLogo';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -43,8 +44,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center px-4 bg-base">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <Link href="/" className="text-2xl font-bold">
-            <span className="text-white">beat</span><span className="text-accent-bright">hive</span>
+          <Link href="/" className="inline-flex">
+            <BrandLogo frameClassName="h-10 w-10" textClassName="text-xl" />
           </Link>
           <p className="text-[#6b6f82] text-sm mt-2">Sign in to your account</p>
         </div>

@@ -1,6 +1,6 @@
 // src/app/browse/page.tsx
 'use client';
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSounds } from '@/lib/hooks/useSounds';
 import SoundCard from '@/components/sounds/SoundCard';
@@ -12,27 +12,27 @@ import clsx from 'clsx';
 
 const SFX_CATS = [
   {
-    slug: 'foley', name: 'Foley', gradient: 'from-rose-500 to-pink-600',
+    slug: 'foley', name: 'Foley', gradient: 'from-carmine to-accent',
     desc: 'Everyday objects & materials',
     subcats: ['Footsteps', 'Clothing', 'Impact', 'Paper', 'Glass', 'Wood', 'Metal', 'Liquid'],
   },
   {
-    slug: 'ambience', name: 'Ambience', gradient: 'from-amber-400 to-orange-500',
+    slug: 'ambience', name: 'Ambience', gradient: 'from-accent to-carmine',
     desc: 'Background atmospheres',
     subcats: ['Indoor', 'Outdoor', 'Urban', 'Underwater', 'Weather'],
   },
   {
-    slug: 'soundscape', name: 'Soundscape', gradient: 'from-teal-500 to-cyan-600',
+    slug: 'soundscape', name: 'Soundscape', gradient: 'from-teal to-accent',
     desc: 'Immersive environments',
     subcats: ['Forest', 'Ocean', 'City', 'Space', 'Post-Apocalyptic'],
   },
   {
-    slug: 'nature', name: 'Nature', gradient: 'from-green-500 to-emerald-600',
+    slug: 'nature', name: 'Nature', gradient: 'from-teal to-teal-dim',
     desc: 'Outdoor & weather',
     subcats: ['Rain', 'Wind', 'Thunder', 'Fire', 'Birds', 'Insects', 'Water'],
   },
   {
-    slug: 'explosions', name: 'Explosions', gradient: 'from-red-500 to-orange-600',
+    slug: 'explosions', name: 'Explosions', gradient: 'from-carmine to-accent',
     desc: 'Blasts, impacts & debris',
     subcats: ['Small', 'Large', 'Impact', 'Debris', 'Distant', 'Designed'],
   },
@@ -42,47 +42,47 @@ const SFX_CATS = [
     subcats: ['Guns', 'Blades', 'Bows', 'Futuristic', 'Impact', 'Reload'],
   },
   {
-    slug: 'vehicles', name: 'Vehicles', gradient: 'from-blue-500 to-indigo-600',
+    slug: 'vehicles', name: 'Vehicles', gradient: 'from-teal to-carmine',
     desc: 'Cars, planes & more',
     subcats: ['Car', 'Motorcycle', 'Truck', 'Aircraft', 'Boat', 'Train'],
   },
   {
-    slug: 'ui-game', name: 'UI & Game', gradient: 'from-violet-500 to-purple-600',
+    slug: 'ui-game', name: 'UI & Game', gradient: 'from-accent to-teal',
     desc: 'Interface & game sounds',
     subcats: ['Click', 'Notification', 'Alert', 'Power-up', 'Game Over', 'Menu', 'Glitch'],
   },
   {
-    slug: 'horror', name: 'Horror', gradient: 'from-purple-900 to-violet-900',
+    slug: 'horror', name: 'Horror', gradient: 'from-carmine-dim to-carmine',
     desc: 'Scary & suspenseful',
     subcats: ['Suspense', 'Jump Scare', 'Ambient', 'Monster', 'Breathing'],
   },
   {
-    slug: 'human', name: 'Human', gradient: 'from-amber-400 to-yellow-500',
+    slug: 'human', name: 'Human', gradient: 'from-accent to-teal',
     desc: 'Body & crowd sounds',
     subcats: ['Footsteps', 'Breathing', 'Crowd', 'Laughter', 'Voice'],
   },
   {
-    slug: 'animals', name: 'Animals', gradient: 'from-lime-500 to-green-600',
+    slug: 'animals', name: 'Animals', gradient: 'from-teal to-accent',
     desc: 'Wildlife & pets',
     subcats: ['Dog', 'Cat', 'Bird', 'Wild', 'Insects'],
   },
   {
-    slug: 'electronic', name: 'Electronic & Sci-Fi', gradient: 'from-cyan-500 to-blue-600',
+    slug: 'electronic', name: 'Electronic & Sci-Fi', gradient: 'from-teal to-carmine',
     desc: 'Futuristic & digital',
     subcats: ['Robot', 'Computer', 'Glitch', 'Machine', 'Sci-Fi'],
   },
   {
-    slug: 'comedy', name: 'Comedy', gradient: 'from-yellow-400 to-amber-500',
+    slug: 'comedy', name: 'Comedy', gradient: 'from-accent to-accent-dim',
     desc: 'Cartoon & funny sounds',
     subcats: ['Cartoon', 'Boing', 'Pop', 'Slide Whistle'],
   },
   {
-    slug: 'magic', name: 'Magic & Fantasy', gradient: 'from-pink-500 to-violet-600',
+    slug: 'magic', name: 'Magic & Fantasy', gradient: 'from-carmine to-teal',
     desc: 'Spells & enchantments',
     subcats: ['Spell', 'Enchant', 'Fantasy', 'Mystical'],
   },
   {
-    slug: 'sports', name: 'Sports', gradient: 'from-emerald-500 to-green-600',
+    slug: 'sports', name: 'Sports', gradient: 'from-teal to-accent',
     desc: 'Athletic & action',
     subcats: ['Ball', 'Whistle', 'Crowd', 'Impact'],
   },
@@ -95,22 +95,22 @@ const SFX_CATS = [
 
 const MUSIC_CATS = [
   {
-    slug: 'sound-scoring', name: 'Sound Scoring', gradient: 'from-violet-600 to-indigo-700',
+    slug: 'sound-scoring', name: 'Sound Scoring', gradient: 'from-carmine to-accent',
     desc: 'Film & game scores',
     subcats: ['Dramatic', 'Tense', 'Emotional', 'Action'],
   },
   {
-    slug: 'cinematic', name: 'Cinematic', gradient: 'from-indigo-600 to-blue-800',
+    slug: 'cinematic', name: 'Cinematic', gradient: 'from-carmine-dim to-teal',
     desc: 'Epic orchestral tracks',
     subcats: ['Epic', 'Orchestral', 'Ambient', 'Trailer'],
   },
   {
-    slug: 'electronic-music', name: 'Electronic Music', gradient: 'from-cyan-500 to-teal-600',
+    slug: 'electronic-music', name: 'Electronic Music', gradient: 'from-teal to-accent',
     desc: 'Electronic & beats',
     subcats: ['EDM', 'Lo-fi', 'Ambient', 'Bass', 'Synth'],
   },
   {
-    slug: 'acoustic', name: 'Acoustic', gradient: 'from-amber-500 to-orange-600',
+    slug: 'acoustic', name: 'Acoustic', gradient: 'from-accent to-carmine',
     desc: 'Organic instruments',
     subcats: ['Guitar', 'Piano', 'Folk', 'Jazz'],
   },
@@ -335,6 +335,28 @@ const ACCESS_FILTERS = [
   { value: 'PURCHASE', label: 'Beli Satuan' },
 ];
 
+const MUSIC_GENRES = [
+  { value: '', label: 'Genre' },
+  { value: 'cinematic', label: 'Cinematic' },
+  { value: 'orchestral', label: 'Orchestral' },
+  { value: 'trailer', label: 'Trailer' },
+  { value: 'ambient', label: 'Ambient' },
+  { value: 'lo-fi', label: 'Lo-fi' },
+  { value: 'edm', label: 'EDM' },
+  { value: 'hip-hop', label: 'Hip Hop' },
+  { value: 'acoustic', label: 'Acoustic' },
+];
+
+const MUSIC_MOODS = [
+  { value: '', label: 'Mood' },
+  { value: 'upbeat', label: 'Upbeat' },
+  { value: 'calm', label: 'Calm' },
+  { value: 'epic', label: 'Epic' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'happy', label: 'Happy' },
+  { value: 'tense', label: 'Tense' },
+];
+
 // ─── Category Card ────────────────────────────────────────────────────────────
 
 function CategoryCard({ cat, onClick }: {
@@ -477,20 +499,38 @@ function SoundList({ category, filters, onBack }: {
 }) {
   const [sort, setSort] = useState('newest');
   const [access, setAccess] = useState('');
+  const [genre, setGenre] = useState('');
+  const [mood, setMood] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [subcat, setSubcat] = useState('');
+  const [subcat, setSubcat] = useState(filters.search ?? '');
+  const [page, setPage] = useState(filters.page ?? 1);
   const debouncedSearch = useDebounce(searchInput, 400);
 
-  const activeFilters: SoundFilters = {
+  useEffect(() => {
+    setSubcat(filters.search ?? '');
+    setSearchInput('');
+    setGenre('');
+    setMood('');
+    setPage(1);
+  }, [filters.categorySlug, filters.search, filters.soundType]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [sort, access, debouncedSearch, subcat, genre, mood]);
+
+  const activeFilters: SoundFilters = useMemo(() => ({
     ...filters,
     sortBy: sort as SoundFilters['sortBy'],
     accessLevel: (access || undefined) as SoundFilters['accessLevel'],
+    genreSlug: genre || undefined,
+    mood: mood || undefined,
     search: debouncedSearch || (subcat ? subcat : undefined),
-    page: 1,
-    limit: 40,
-  };
+    page,
+    limit: 30,
+  }), [access, debouncedSearch, filters, genre, mood, page, sort, subcat]);
 
-  const { data, isLoading, isError } = useSounds(activeFilters, true);
+  const { data, isLoading, isFetching, isError } = useSounds(activeFilters, true);
+  const isMusic = filters.soundType === 'music' || (category ? MUSIC_CATS.some(c => c.slug === category.slug) : false);
 
   return (
     <div className="flex flex-col h-full">
@@ -504,7 +544,8 @@ function SoundList({ category, filters, onBack }: {
           </button>
           <span className="text-[#2a2c3e]">/</span>
           <span className="text-white font-medium">{category?.name ?? 'Sounds'}</span>
-          {data && <span className="text-[#3a3c4e] text-xs ml-auto">{data.pagination.total} sounds</span>}
+          {isFetching && !isLoading && <span className="text-accent-bright text-xs ml-auto">Memuat...</span>}
+          {!isFetching && data && <span className="text-[#3a3c4e] text-xs ml-auto">{data.pagination.total} sounds</span>}
         </div>
 
         {/* Subcategory chips */}
@@ -528,9 +569,9 @@ function SoundList({ category, filters, onBack }: {
         )}
 
         {/* Filter bar */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-2">
           {/* Search */}
-          <div className="relative flex-1 max-w-xs">
+          <div className="relative flex-1 lg:max-w-xs">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-[#3a3c4e]" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
@@ -544,7 +585,7 @@ function SoundList({ category, filters, onBack }: {
           </div>
 
           {/* Access filter */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
             {ACCESS_FILTERS.map(f => (
               <button key={f.value}
                 onClick={() => setAccess(f.value)}
@@ -559,10 +600,20 @@ function SoundList({ category, filters, onBack }: {
           <select
             value={sort}
             onChange={e => setSort(e.target.value)}
-            className="px-3 py-1.5 input-dark rounded-lg text-xs text-[#c4c6d8] cursor-pointer ml-auto">
+            className="px-3 py-1.5 input-dark rounded-lg text-xs text-[#c4c6d8] cursor-pointer lg:ml-auto">
             {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
+        {isMusic && (
+          <div className="mt-2 flex items-center gap-2 overflow-x-auto scrollbar-none">
+            <select value={genre} onChange={e => setGenre(e.target.value)} className="px-3 py-1.5 input-dark rounded-lg text-xs text-[#c4c6d8] cursor-pointer">
+              {MUSIC_GENRES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+            </select>
+            <select value={mood} onChange={e => setMood(e.target.value)} className="px-3 py-1.5 input-dark rounded-lg text-xs text-[#c4c6d8] cursor-pointer">
+              {MUSIC_MOODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Sound list */}
@@ -587,6 +638,14 @@ function SoundList({ category, filters, onBack }: {
             <p className="text-sm text-[#5a5d72] mt-1">
               {subcat ? `Tidak ada sound "${subcat}" di kategori ini` : 'Belum ada sound di kategori ini'}
             </p>
+            {(subcat || searchInput || access || genre || mood) && (
+              <button
+                onClick={() => { setSubcat(''); setSearchInput(''); setAccess(''); setGenre(''); setMood(''); }}
+                className="mt-4 px-4 py-2 rounded-lg border border-accent/30 text-xs font-medium text-accent-bright hover:bg-accent/10 transition-colors"
+              >
+                Clear filters
+              </button>
+            )}
           </div>
         )}
 
@@ -597,10 +656,24 @@ function SoundList({ category, filters, onBack }: {
             </div>
 
             {data.pagination.totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-8">
+              <div className="flex items-center justify-center gap-3 mt-8">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={data.pagination.page <= 1}
+                  className="px-3 py-2 rounded-lg border border-rim text-xs text-[#8b8fa8] hover:text-white hover:border-white/10 disabled:opacity-40 disabled:hover:text-[#8b8fa8] disabled:hover:border-rim transition-colors"
+                >
+                  Prev
+                </button>
                 <span className="text-sm text-[#5a5d72]">
                   Halaman {data.pagination.page} dari {data.pagination.totalPages}
                 </span>
+                <button
+                  onClick={() => setPage(p => Math.min(data.pagination.totalPages, p + 1))}
+                  disabled={data.pagination.page >= data.pagination.totalPages}
+                  className="px-3 py-2 rounded-lg border border-rim text-xs text-[#8b8fa8] hover:text-white hover:border-white/10 disabled:opacity-40 disabled:hover:text-[#8b8fa8] disabled:hover:border-rim transition-colors"
+                >
+                  Next
+                </button>
               </div>
             )}
           </>
@@ -618,13 +691,16 @@ function BrowseContent() {
 
   const [categorySlug, setCategorySlug] = useState(searchParams.get('categorySlug') ?? '');
   const [soundType, setSoundType] = useState(searchParams.get('soundType') ?? '');
+  const [urlSearch, setUrlSearch] = useState(searchParams.get('search') ?? '');
 
   // Sync with URL
   useEffect(() => {
     const cat = searchParams.get('categorySlug') ?? '';
     const type = searchParams.get('soundType') ?? '';
+    const search = searchParams.get('search') ?? '';
     setCategorySlug(cat);
     setSoundType(type);
+    setUrlSearch(search);
   }, [searchParams]);
 
   const updateUrl = (params: Record<string, string>) => {
@@ -649,16 +725,17 @@ function BrowseContent() {
     }
   };
 
-  const allCats = [...SFX_CATS, ...MUSIC_CATS];
+  const allCats = useMemo(() => [...SFX_CATS, ...MUSIC_CATS], []);
   const activeCategory = categorySlug ? allCats.find(c => c.slug === categorySlug) ?? null : null;
 
-  const filters: SoundFilters = {
+  const filters: SoundFilters = useMemo(() => ({
     categorySlug: categorySlug || undefined,
     soundType: soundType || undefined,
+    search: urlSearch || undefined,
     sortBy: 'newest',
     page: 1,
-    limit: 40,
-  };
+    limit: 30,
+  }), [categorySlug, soundType, urlSearch]);
 
   if (activeCategory || (categorySlug && !activeCategory)) {
     return (

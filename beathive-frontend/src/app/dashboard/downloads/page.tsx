@@ -26,30 +26,30 @@ const SOURCE_OPTIONS = [
 
 const LICENSE_BADGE: Record<string, { label: string; cls: string }> = {
   personal:   { label: 'Personal',   cls: 'bg-teal-500/10 text-teal-400 border-teal-500/20' },
-  commercial: { label: 'Commercial', cls: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+  commercial: { label: 'Commercial', cls: 'bg-carmine/10 text-carmine border-carmine/20' },
 };
 
 const CAT_GRADIENT: Record<string, string> = {
-  'foley': 'from-rose-500 to-pink-600',
-  'ambience': 'from-amber-400 to-orange-500',
-  'soundscape': 'from-teal-500 to-cyan-600',
-  'nature': 'from-green-500 to-emerald-600',
-  'explosions': 'from-red-500 to-orange-600',
+  'foley': 'from-carmine to-accent',
+  'ambience': 'from-accent to-carmine',
+  'soundscape': 'from-teal to-accent',
+  'nature': 'from-teal to-teal-dim',
+  'explosions': 'from-carmine to-accent',
   'weapons': 'from-slate-600 to-zinc-700',
-  'vehicles': 'from-blue-500 to-indigo-600',
-  'ui-game': 'from-violet-500 to-purple-600',
-  'horror': 'from-purple-900 to-indigo-950',
-  'human': 'from-amber-400 to-yellow-500',
-  'animals': 'from-lime-500 to-green-600',
-  'electronic': 'from-cyan-500 to-blue-600',
-  'comedy': 'from-yellow-400 to-amber-500',
-  'magic': 'from-pink-500 to-violet-600',
-  'sports': 'from-emerald-500 to-green-600',
+  'vehicles': 'from-teal to-carmine',
+  'ui-game': 'from-accent to-teal',
+  'horror': 'from-carmine-dim to-carmine',
+  'human': 'from-accent to-teal',
+  'animals': 'from-teal to-accent',
+  'electronic': 'from-teal to-carmine',
+  'comedy': 'from-accent to-accent-dim',
+  'magic': 'from-carmine to-teal',
+  'sports': 'from-teal to-accent',
   'industrial': 'from-stone-500 to-zinc-600',
-  'sound-scoring': 'from-violet-600 to-indigo-700',
-  'cinematic': 'from-indigo-600 to-blue-800',
-  'electronic-music': 'from-cyan-500 to-teal-600',
-  'acoustic': 'from-amber-500 to-orange-600',
+  'sound-scoring': 'from-carmine to-accent',
+  'cinematic': 'from-carmine-dim to-teal',
+  'electronic-music': 'from-teal to-accent',
+  'acoustic': 'from-accent to-carmine',
 };
 
 function fmtDate(iso: string) {
@@ -139,7 +139,7 @@ export default function DownloadsPage() {
             className={clsx(
               'px-4 py-2.5 text-sm transition-all duration-150 border-b-2 -mb-px',
               sourceFilter === opt.value
-                ? 'text-white border-violet-600 font-medium'
+                ? 'text-white border-accent font-medium'
                 : 'text-[#6b6f82] border-transparent hover:text-[#c4c6d8]',
             )}
           >
@@ -264,7 +264,7 @@ export default function DownloadsPage() {
                   )}
                 >
                   {isCurrentlyPlaying ? (
-                    <svg width="8" height="8" viewBox="0 0 10 10" fill={isActive ? 'white' : '#8b5cf6'}>
+                    <svg width="8" height="8" viewBox="0 0 10 10" fill={isActive ? 'white' : '#F7941D'}>
                       <rect x="1" y="0" width="3" height="10" rx="1.5"/>
                       <rect x="6" y="0" width="3" height="10" rx="1.5"/>
                     </svg>
@@ -324,7 +324,7 @@ export default function DownloadsPage() {
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); setSelectedItem(item); }}
-                    className="text-[11px] font-medium px-2.5 py-1.5 rounded-lg border border-violet-500/25 bg-violet-500/8 text-violet-400 hover:bg-violet-500/15 hover:border-violet-500/40 transition-all whitespace-nowrap"
+                    className="text-[11px] font-medium px-2.5 py-1.5 rounded-lg border border-accent/25 bg-accent/10 text-accent-bright hover:bg-accent/15 hover:border-accent/40 transition-all whitespace-nowrap"
                   >
                     📄 Lisensi
                   </button>
@@ -357,7 +357,7 @@ export default function DownloadsPage() {
                 className={clsx(
                   'w-9 h-9 rounded-lg text-sm font-medium transition-all',
                   page === p
-                    ? 'bg-violet-500/15 border border-violet-500/30 text-violet-400'
+                    ? 'bg-accent/15 border border-accent/30 text-accent-bright'
                     : 'border border-rim text-[#6b6f82] hover:border-white/10 hover:text-white',
                 )}
               >

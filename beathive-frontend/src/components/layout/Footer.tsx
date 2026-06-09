@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import BrandLogo from '@/components/layout/BrandLogo';
 
 export default function Footer() {
   return (
@@ -9,16 +10,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="col-span-2">
             <Link href="/" className="flex items-center gap-2 mb-4 w-fit">
-              <div className="w-7 h-7 rounded-lg bg-accent/20 border border-accent/30 flex items-center justify-center">
-                <div className="flex items-end gap-[2px] h-3">
-                  {[40, 90, 65, 80].map((h, i) => (
-                    <span key={i} className="w-[3px] bg-accent/70 rounded-full" style={{ height: `${h}%` }} />
-                  ))}
-                </div>
-              </div>
-              <span className="text-base font-bold">
-                <span className="text-white">beat</span><span className="text-accent-bright">hive</span>
-              </span>
+              <BrandLogo frameClassName="h-7 w-7" textClassName="text-base" />
             </Link>
             <p className="text-sm text-[#6b6f82] leading-relaxed max-w-xs">
               Premium sound effects for content creators, game developers, and filmmakers. License-ready, instantly downloadable.

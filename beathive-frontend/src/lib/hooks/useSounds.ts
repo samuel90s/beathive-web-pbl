@@ -10,6 +10,8 @@ export function useSounds(filters: SoundFilters = {}, enabled = true) {
     queryFn: () => soundsApi.getAll(filters),
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 30,
+    placeholderData: (previousData) => previousData,
+    refetchOnWindowFocus: false,
     enabled,
   });
 }

@@ -157,12 +157,59 @@ model SoundEffect {
   downloads  Download[]
   wishlists  Wishlist[]
   ratings    Rating[]
+  sfxMetadata   SfxMetadata?
+  musicMetadata MusicMetadata?
+  genres        SoundGenre[]
 
   @@index([isPublished, categoryId])
   @@index([authorId])
   @@index([accessLevel])
   @@index([isPublished, accessLevel])
   @@map("sound_effects")
+}
+
+model SfxMetadata {
+  soundId     String  @id
+  subcategory String?
+
+  sound SoundEffect @relation(fields: [soundId], references: [id], onDelete: Cascade)
+
+  @@map("sfx_metadata")
+}
+
+model MusicMetadata {
+  soundId    String  @id
+  bpm        Int?
+  mood       String?
+  musicalKey String?
+  hasStems   Boolean @default(false)
+
+  sound SoundEffect @relation(fields: [soundId], references: [id], onDelete: Cascade)
+
+  @@index([mood])
+  @@index([bpm])
+  @@map("music_metadata")
+}
+
+model Genre {
+  id     String       @id @default(uuid())
+  name   String
+  slug   String       @unique
+  sounds SoundGenre[]
+
+  @@map("genres")
+}
+
+model SoundGenre {
+  soundId String
+  genreId String
+
+  sound SoundEffect @relation(fields: [soundId], references: [id], onDelete: Cascade)
+  genre Genre       @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([soundId, genreId])
+  @@index([genreId])
+  @@map("sound_genres")
 }
 
 enum AccessLevel {

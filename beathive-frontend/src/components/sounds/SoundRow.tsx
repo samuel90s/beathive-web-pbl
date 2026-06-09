@@ -1,6 +1,6 @@
 // src/components/sounds/SoundRow.tsx
 'use client';
-import { useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePlayerStore } from '@/lib/store/player.store';
 import { useCartStore } from '@/lib/store/cart.store';
@@ -16,55 +16,65 @@ import clsx from 'clsx';
 interface Props { sound: SoundEffect }
 
 const CAT_COLORS: Record<string, string> = {
-  'foley':            'from-rose-500 to-pink-600',
-  'ambience':         'from-amber-400 to-orange-500',
-  'soundscape':       'from-teal-500 to-cyan-600',
-  'nature':           'from-green-500 to-emerald-600',
-  'explosions':       'from-red-500 to-orange-600',
+  'foley':            'from-carmine to-accent',
+  'ambience':         'from-accent to-carmine',
+  'soundscape':       'from-teal to-accent',
+  'nature':           'from-teal to-teal-dim',
+  'explosions':       'from-carmine to-accent',
   'weapons':          'from-slate-600 to-zinc-700',
-  'vehicles':         'from-blue-500 to-indigo-600',
-  'ui-game':          'from-violet-500 to-purple-600',
-  'horror':           'from-purple-900 to-indigo-950',
-  'human':            'from-amber-400 to-yellow-500',
-  'animals':          'from-lime-500 to-green-600',
-  'electronic':       'from-cyan-500 to-blue-600',
-  'comedy':           'from-yellow-400 to-amber-500',
-  'magic':            'from-pink-500 to-violet-600',
-  'sports':           'from-emerald-500 to-green-600',
+  'vehicles':         'from-teal to-carmine',
+  'ui-game':          'from-accent to-teal',
+  'horror':           'from-carmine-dim to-carmine',
+  'human':            'from-accent to-teal',
+  'animals':          'from-teal to-accent',
+  'electronic':       'from-teal to-carmine',
+  'comedy':           'from-accent to-accent-dim',
+  'magic':            'from-carmine to-teal',
+  'sports':           'from-teal to-accent',
   'industrial':       'from-stone-500 to-zinc-600',
-  'sound-scoring':    'from-violet-600 to-indigo-700',
-  'cinematic':        'from-indigo-600 to-blue-800',
-  'electronic-music': 'from-cyan-500 to-teal-600',
-  'acoustic':         'from-amber-500 to-orange-600',
+  'sound-scoring':    'from-carmine to-accent',
+  'cinematic':        'from-carmine-dim to-teal',
+  'electronic-music': 'from-teal to-accent',
+  'acoustic':         'from-accent to-carmine',
 };
 
-export default function SoundRow({ sound }: Props) {
-  const { currentTrack, isPlaying, play, pause } = usePlayerStore();
-  const progress = usePlayerStore(s => s.progress);
+function SoundRow({ sound }: Props) {
+  const isActive = usePlayerStore(s => s.currentTrack?.id === sound.id);
+  const isCurrentlyPlaying = usePlayerStore(s => s.currentTrack?.id === sound.id && s.isPlaying);
+  const play = usePlayerStore(s => s.play);
+  const pause = usePlayerStore(s => s.pause);
+  const progress = usePlayerStore(s => s.currentTrack?.id === sound.id ? s.progress : 0);
   const { addItem, removeItem, hasItem } = useCartStore();
   const { user } = useAuthStore();
   const { download, downloading } = useDownload();
   const { toggle: toggleWishlist, loadingId } = useWishlist();
   const [liked, setLiked] = useState<boolean>(sound.isLiked ?? false);
-  const hoverTimer = useState<ReturnType<typeof setTimeout> | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isActive = currentTrack?.id === sound.id;
-  const isCurrentlyPlaying = isActive && isPlaying;
+  useEffect(() => {
+    return () => {
+      if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    };
+  }, []);
 
-  // Hover-to-preview: mulai play setelah 600ms hover
+  // Hover-to-preview: start playback after 600ms hover.
   const handleMouseEnter = () => {
     if (isActive) return;
-    hoverTimer[1](setTimeout(() => play(sound), 600));
+    hoverTimer.current = setTimeout(() => play(sound), 600);
   };
   const handleMouseLeave = () => {
-    if (hoverTimer[0]) { clearTimeout(hoverTimer[0]); hoverTimer[1](null); }
+    if (hoverTimer.current) {
+      clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
   };
+
   const inCart = hasItem(sound.id);
   const wishlistLoading = loadingId === sound.id;
   const isOwner = !!(user?.id && sound.author?.id && sound.author.id === user.id);
 
   const togglePlay = () => {
-    if (isActive) isPlaying ? pause() : usePlayerStore.getState().resume();
+    if (isActive) isCurrentlyPlaying ? pause() : usePlayerStore.getState().resume();
     else play(sound);
   };
 
@@ -88,10 +98,11 @@ export default function SoundRow({ sound }: Props) {
     await toggleWishlist(sound.id, liked, (newLiked) => setLiked(newLiked));
   };
 
+  // Badge: PRO di samping judul, FREE di kolom action
   const accessBadge = {
     FREE:     null,
     PRO:      { label: 'PRO',      cls: 'bg-accent/15 text-accent-bright border-accent/20' },
-    BUSINESS: { label: 'BUSINESS', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
+    BUSINESS: { label: 'BUSINESS', cls: 'bg-carmine/15 text-carmine border-carmine/20' },
     PURCHASE: null,
   }[sound.accessLevel];
 
@@ -134,7 +145,7 @@ export default function SoundRow({ sound }: Props) {
             <polygon points="0,0 10,6 0,12"/>
           </svg>
         )}
-        {/* Lock badge for restricted sounds (not shown for owner) */}
+        {/* Lock icon for restricted sounds */}
         {sound.accessLevel !== 'FREE' && !isActive && !isOwner && (
           <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#0c0d16] border border-rim flex items-center justify-center">
             <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="#6b6f82" strokeWidth="2.5" strokeLinecap="round">
@@ -154,6 +165,7 @@ export default function SoundRow({ sound }: Props) {
           >
             {sound.title}
           </Link>
+          {/* Badge PRO di samping judul */}
           {accessBadge && (
             <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium flex-shrink-0 ${accessBadge.cls}`}>
               {accessBadge.label}
@@ -206,7 +218,7 @@ export default function SoundRow({ sound }: Props) {
       {/* Price / Action */}
       <div className="flex items-center gap-2 flex-shrink-0 w-28 justify-end">
 
-        {/* Owner badge — replaces all actions */}
+        {/* Owner badge replaces all actions */}
         {isOwner ? (
           <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-accent/10 text-accent-bright border border-accent/20">
             <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -265,11 +277,14 @@ export default function SoundRow({ sound }: Props) {
             );
           }
 
-          // Subscription-gated (PRO/BUSINESS price=0) or FREE
+          // FREE atau PRO subscription-gated (price=0): tombol download
           return (
             <>
+              {/* Badge Free di sebelah kiri tombol download */}
               {sound.accessLevel === 'FREE' && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-teal/10 text-teal border border-teal/20 font-medium">Free</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-teal/10 text-teal border border-teal/20 font-medium">
+                  Free
+                </span>
               )}
               <button
                 onClick={handleDownload}
@@ -295,3 +310,5 @@ export default function SoundRow({ sound }: Props) {
     </div>
   );
 }
+
+export default memo(SoundRow);

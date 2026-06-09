@@ -1,7 +1,8 @@
 // src/app/studio/page.tsx
 'use client';
-import { useState, useRef, useEffect, Suspense } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/store/auth.store';
@@ -10,11 +11,18 @@ import { subscriptionsApi } from '@/lib/api/subscriptions';
 import { ordersApi } from '@/lib/api/orders';
 import { formatDuration, formatPrice, formatDate, mediaUrl } from '@/lib/utils';
 import { toast } from '@/lib/store/toast.store';
-import { soundsApi } from '@/lib/api/sounds';
 import { API_URL } from '@/lib/config';
 import type { SoundEffect } from '@/types';
 
 // ─── Constants ────────────────────────────────────────────
+
+const StudioAnalyticsPanel = dynamic(() => import('./StudioAnalyticsPanel'), {
+  loading: () => (
+    <div className="space-y-4">
+      {Array(2).fill(0).map((_, i) => <div key={i} className="h-32 card rounded-2xl animate-pulse" />)}
+    </div>
+  ),
+});
 
 const inputCls = 'w-full px-3 py-2 input-dark rounded-xl text-sm';
 const labelCls = 'block text-xs font-medium text-[#6b6f82] mb-1';
@@ -28,6 +36,7 @@ const REVIEW_STATUS: Record<string, { label: string; cls: string }> = {
 
 const MUSICAL_KEYS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B','Cm','C#m','Dm','D#m','Em','Fm','F#m','Gm','G#m','Am','A#m','Bm'];
 const MOODS = ['upbeat','calm','epic','sad','dark','happy','neutral','tense','romantic','mysterious'];
+const MUSIC_GENRES = ['cinematic','orchestral','trailer','ambient','lo-fi','edm','hip-hop','trap','acoustic','piano','corporate','rock','jazz'];
 
 const WITHDRAWAL_STATUS: Record<string, { label: string; cls: string }> = {
   PENDING:  { label: 'Diproses',  cls: 'bg-amber-500/10 text-amber-400 border border-amber-500/20' },
@@ -38,24 +47,6 @@ const WITHDRAWAL_STATUS: Record<string, { label: string; cls: string }> = {
 // ─── Tab types ────────────────────────────────────────────
 
 type StudioTab = 'sounds' | 'earnings' | 'analytics';
-
-// ─── Analytics Bar ────────────────────────────────────────
-
-function Bar({ value, max, label }: { value: number; max: number; label: string }) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-xs text-[#5a5d72] w-8 text-right flex-shrink-0">{label}</span>
-      <div className="flex-1 h-5 bg-white/[0.04] rounded-md overflow-hidden">
-        <div
-          className="h-full bg-gradient-to-r from-[#F7941D] to-[#00A79D] rounded-md transition-all duration-500"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className="text-xs text-[#6b6f82] w-8 flex-shrink-0">{value}</span>
-    </div>
-  );
-}
 
 // ─── Main Studio Page ─────────────────────────────────────
 
@@ -73,11 +64,11 @@ export default function StudioPage() {
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [fixingId, setFixingId] = useState<string | null>(null);
   const [editSound, setEditSound] = useState<SoundEffect | null>(null);
-  const [editForm, setEditForm] = useState({ title: '', description: '', price: '0', accessLevel: 'FREE', categorySlug: '', tags: '', bpm: '', mood: '', musicalKey: '', hasStems: false });
+  const [editForm, setEditForm] = useState({ title: '', description: '', price: '0', accessLevel: 'FREE', categorySlug: '', tags: '', genres: '', bpm: '', mood: '', musicalKey: '', hasStems: false });
   const [editError, setEditError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [form, setFormState] = useState({ title: '', categorySlug: '', description: '', price: '0', accessLevel: 'FREE', licenseType: 'personal', tags: '', bpm: '', mood: '', musicalKey: '', hasStems: false });
+  const [form, setFormState] = useState({ title: '', categorySlug: '', description: '', price: '0', accessLevel: 'FREE', licenseType: 'personal', tags: '', genres: '', bpm: '', mood: '', musicalKey: '', hasStems: false });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   // Earnings state
@@ -138,12 +129,6 @@ export default function StudioPage() {
     enabled: isAuthenticated,
   });
 
-  const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
-    queryKey: ['creatorAnalytics'],
-    queryFn: soundsApi.getCreatorAnalytics,
-    enabled: isAuthenticated && activeTab === 'analytics',
-  });
-
   const sounds = soundsData ?? [];
   const paidOrders = orders?.filter((o) => o.status === 'PAID') ?? [];
 
@@ -170,6 +155,7 @@ export default function StudioPage() {
       price: String(sound.price ?? 0), accessLevel: sound.accessLevel || 'FREE',
       categorySlug: sound.category?.slug || '',
       tags: (sound.tags?.map((t: any) => t.tag?.slug ?? t.slug ?? t.name ?? t) ?? []).join(', '),
+      genres: (sound.genres?.map((g: any) => g.slug ?? g.name ?? g) ?? []).join(', '),
       bpm: sound.bpm ? String(sound.bpm) : '', mood: sound.mood || '',
       musicalKey: sound.musicalKey || '', hasStems: sound.hasStems ?? false,
     });
@@ -184,6 +170,7 @@ export default function StudioPage() {
         title: editForm.title.trim(), description: editForm.description,
         price: Number(editForm.price), accessLevel: editForm.accessLevel,
         categorySlug: editForm.categorySlug || editSound.category?.slug, tags: tagSlugs,
+        genres: editForm.genres.split(',').map(g => g.trim().toLowerCase().replace(/\s+/g, '-')).filter(Boolean),
         bpm: editForm.bpm ? Number(editForm.bpm) : undefined,
         mood: editForm.mood || undefined, musicalKey: editForm.musicalKey || undefined,
         hasStems: editForm.hasStems,
@@ -230,6 +217,7 @@ export default function StudioPage() {
       formData.append('accessLevel', form.accessLevel);
       formData.append('licenseType', form.licenseType);
       if (form.tags.trim()) formData.append('tags', form.tags.trim());
+      if (form.genres.trim()) formData.append('genres', form.genres.trim());
       if (form.bpm) formData.append('bpm', form.bpm);
       if (form.mood) formData.append('mood', form.mood);
       if (form.musicalKey) formData.append('musicalKey', form.musicalKey);
@@ -239,7 +227,7 @@ export default function StudioPage() {
       });
       queryClient.setQueryData<SoundEffect[]>(['my-sounds'], prev => [data, ...(prev ?? [])]);
       setUploadSuccess(true); setShowModal(false);
-      setFormState({ title: '', categorySlug: '', description: '', price: '0', accessLevel: 'FREE', licenseType: 'personal', tags: '', bpm: '', mood: '', musicalKey: '', hasStems: false });
+      setFormState({ title: '', categorySlug: '', description: '', price: '0', accessLevel: 'FREE', licenseType: 'personal', tags: '', genres: '', bpm: '', mood: '', musicalKey: '', hasStems: false });
       setSelectedFile(null);
       toast.success('Sound berhasil diupload! Menunggu review admin.');
       setTimeout(() => setUploadSuccess(false), 4000);
@@ -277,9 +265,6 @@ export default function StudioPage() {
   const pendingCount = sounds.filter(s => s.reviewStatus === 'PENDING' || s.reviewStatus === 'NEEDS_RE_REVIEW').length;
   const planColor = subscription?.plan.slug === 'pro' ? 'orange' : 'gray';
 
-  const maxDownloads = Math.max(...(analyticsData?.monthlyDownloads?.map((d: any) => d.downloads) ?? [1]), 1);
-  const maxSoundDownloads = Math.max(...(analyticsData?.topSounds?.map((s: any) => s.downloadCount) ?? [1]), 1);
-
   return (
     <div className="px-8 py-8 pb-28">
 
@@ -297,24 +282,24 @@ export default function StudioPage() {
       )}
 
       {/* ── Overview Header ── */}
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center">
         <div className="w-14 h-14 rounded-full bg-accent/20 flex items-center justify-center text-accent-bright text-xl font-bold overflow-hidden ring-2 ring-accent/20 flex-shrink-0">
           {user.avatarUrl
             ? <img src={mediaUrl(user.avatarUrl) ?? ''} alt="avatar" className="w-full h-full object-cover" />
             : user.name?.[0]?.toUpperCase()}
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-white">{user.name}</h1>
-          <p className="text-sm text-[#5a5d72]">{user.email}</p>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-white truncate">{user.name}</h1>
+          <p className="text-sm text-[#5a5d72] truncate">{user.email}</p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
           <Link href="/profile" className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#6b6f82] hover:text-white border border-rim hover:border-white/10 rounded-xl transition-all">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             Edit Profil
           </Link>
           <button
             onClick={() => { setShowModal(true); setUploadError(null); setUploadSuccess(false); setActiveTab('sounds'); }}
-            className="flex items-center gap-1.5 px-4 py-1.5 btn-accent rounded-xl text-sm font-semibold"
+            className="ml-auto flex items-center gap-1.5 px-4 py-1.5 btn-accent rounded-xl text-sm font-semibold sm:ml-0"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -343,9 +328,9 @@ export default function StudioPage() {
       <div className="card rounded-2xl p-4 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${planColor === 'orange' ? 'bg-accent/20' : planColor === 'amber' ? 'bg-amber-500/20' : 'bg-white/[0.05]'}`}>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${planColor === 'orange' ? 'bg-accent/20' : 'bg-white/[0.05]'}`}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                stroke={planColor === 'orange' ? '#F7941D' : planColor === 'amber' ? '#f59e0b' : '#6b7280'}
+                stroke={planColor === 'orange' ? '#F7941D' : '#6b7280'}
                 strokeWidth="2">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
               </svg>
@@ -393,7 +378,7 @@ export default function StudioPage() {
       </div>
 
       {/* ── Tab navigation ── */}
-      <div className="flex items-center gap-1 border-b border-[#1a1b2e] mb-6">
+      <div className="sticky top-0 z-10 -mx-8 mb-6 flex items-center gap-1 overflow-x-auto border-b border-[#1a1b2e] bg-base/95 px-8 backdrop-blur scrollbar-none">
         {([
           { id: 'sounds', label: 'Sounds', icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> },
           { id: 'earnings', label: 'Earnings', icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> },
@@ -604,53 +589,7 @@ export default function StudioPage() {
       {/* ══════════════════════════════════════════════════ */}
       {/* ── Tab: Analytics ── */}
       {/* ══════════════════════════════════════════════════ */}
-      {activeTab === 'analytics' && (
-        <>
-          <p className="text-sm text-[#5a5d72] mb-5">Performa sound kamu dalam 6 bulan terakhir</p>
-          {analyticsLoading ? (
-            <div className="space-y-4">{Array(2).fill(0).map((_, i) => <div key={i} className="h-32 card rounded-2xl animate-pulse" />)}</div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-              <div className="card rounded-2xl p-6">
-                <h2 className="text-base font-semibold text-white mb-5">Download per Bulan</h2>
-                <div className="space-y-3">
-                  {analyticsData?.monthlyDownloads?.map((item: any) => (
-                    <Bar key={item.month} value={item.downloads} max={maxDownloads} label={item.label} />
-                  ))}
-                </div>
-                <p className="text-xs text-[#3a3c4e] mt-4">
-                  Total: <span className="text-[#6b6f82]">{analyticsData?.monthlyDownloads?.reduce((s: number, d: any) => s + d.downloads, 0) ?? 0} downloads</span> dalam 6 bulan
-                </p>
-              </div>
-              <div className="card rounded-2xl p-6">
-                <h2 className="text-base font-semibold text-white mb-5">Sound Terpopuler</h2>
-                {!analyticsData?.topSounds?.length ? (
-                  <div className="text-center py-8"><p className="text-sm text-[#5a5d72]">Belum ada sound yang diupload</p></div>
-                ) : (
-                  <div className="space-y-4">
-                    {analyticsData.topSounds.map((sound: any, i: number) => (
-                      <div key={sound.id} className="flex items-center gap-3">
-                        <span className="text-sm font-bold text-[#3a3c4e] w-6 text-right flex-shrink-0">{i + 1}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-[#c4c6d8] truncate font-medium">{sound.title}</p>
-                          <div className="mt-1.5 h-2 bg-white/[0.04] rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-[#00A79D] to-cyan-500 rounded-full transition-all duration-500"
-                              style={{ width: `${Math.round((sound.downloadCount / maxSoundDownloads) * 100)}%` }} />
-                          </div>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-sm text-[#c4c6d8] font-semibold">{sound.downloadCount}</p>
-                          <p className="text-[11px] text-[#3a3c4e]">{sound.playCount} plays</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </>
-      )}
+      {activeTab === 'analytics' && <StudioAnalyticsPanel />}
 
       {/* ══════════════════════════════════════════════════ */}
       {/* ── Edit Sound Modal ── */}
@@ -687,6 +626,20 @@ export default function StudioPage() {
               {categories.find(c => c.slug === (editForm.categorySlug || editSound?.category?.slug))?.type === 'music' && (
                 <div className="space-y-3 pt-1 border-t border-rim">
                   <p className="text-xs font-semibold text-accent-bright">Detail Musik</p>
+                  <div>
+                    <label className={labelCls}>Genre</label>
+                    <input
+                      type="text"
+                      value={editForm.genres}
+                      onChange={setEdit('genres')}
+                      placeholder="cinematic, orchestral, trailer"
+                      list="music-genres"
+                      className={inputCls}
+                    />
+                    <datalist id="music-genres">
+                      {MUSIC_GENRES.map(g => <option key={g} value={g} />)}
+                    </datalist>
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div><label className={labelCls}>BPM</label><input type="number" value={editForm.bpm} onChange={setEdit('bpm')} min="1" max="300" placeholder="120" className={inputCls} /></div>
                     <div>
@@ -770,6 +723,20 @@ export default function StudioPage() {
               {categories.find(c => c.slug === form.categorySlug)?.type === 'music' && (
                 <div className="space-y-3 pt-1 border-t border-rim">
                   <p className="text-xs font-semibold text-accent-bright">Detail Musik</p>
+                  <div>
+                    <label className={labelCls}>Genre</label>
+                    <input
+                      type="text"
+                      value={form.genres}
+                      onChange={set('genres')}
+                      placeholder="cinematic, orchestral, trailer"
+                      list="music-genres"
+                      className={inputCls}
+                    />
+                    <datalist id="music-genres">
+                      {MUSIC_GENRES.map(g => <option key={g} value={g} />)}
+                    </datalist>
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div><label className={labelCls}>BPM</label><input type="number" value={form.bpm} onChange={set('bpm')} min="1" max="300" placeholder="120" className={inputCls} /></div>
                     <div>

@@ -32,11 +32,11 @@ const PAYMENT_METHODS = [
     desc: 'BCA, Mandiri, BNI, BRI, Permata',
     icon: (
       <svg viewBox="0 0 40 40" fill="none" className="w-7 h-7">
-        <rect width="40" height="40" rx="8" fill="#4F46E5" fillOpacity=".12"/>
-        <rect x="8" y="13" width="24" height="14" rx="2.5" stroke="#818CF8" strokeWidth="1.5"/>
-        <path d="M8 18h24" stroke="#818CF8" strokeWidth="1.5"/>
-        <rect x="12" y="22" width="6" height="2" rx="1" fill="#818CF8"/>
-        <rect x="22" y="22" width="4" height="2" rx="1" fill="#818CF8"/>
+        <rect width="40" height="40" rx="8" fill="#BE1E2D" fillOpacity=".12"/>
+        <rect x="8" y="13" width="24" height="14" rx="2.5" stroke="#BE1E2D" strokeWidth="1.5"/>
+        <path d="M8 18h24" stroke="#BE1E2D" strokeWidth="1.5"/>
+        <rect x="12" y="22" width="6" height="2" rx="1" fill="#BE1E2D"/>
+        <rect x="22" y="22" width="4" height="2" rx="1" fill="#BE1E2D"/>
       </svg>
     ),
   },
@@ -195,7 +195,7 @@ export default function PaymentPage() {
             {order.items.map((item, i) => (
               <div key={i} className={`flex items-center gap-3 px-5 py-4 ${i > 0 ? 'border-t border-rim' : ''}`}>
                 <div className="w-9 h-9 rounded-xl bg-accent/[0.08] border border-accent/[0.12] flex items-center justify-center flex-shrink-0">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F7941D" strokeWidth="1.5" strokeLinecap="round">
                     <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
                   </svg>
                 </div>

@@ -12,6 +12,7 @@ import clsx from 'clsx';
 import { mediaUrl } from '@/lib/utils';
 import { useState, useRef, useEffect, Suspense, useCallback } from 'react';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import BrandLogo from '@/components/layout/BrandLogo';
 
 function EqIcon() {
   return (
@@ -146,23 +147,7 @@ export default function Navbar() {
 
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 mr-4 flex-shrink-0">
-            {/* Arsonus waveform icon */}
-            <svg width="28" height="22" viewBox="0 0 56 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-              {/* Outer dots */}
-              <ellipse cx="4" cy="22" rx="4" ry="6" fill="#F7941D"/>
-              <ellipse cx="52" cy="22" rx="4" ry="6" fill="#F7941D"/>
-              {/* Short bars */}
-              <rect x="10" y="14" width="5" height="16" rx="2.5" fill="#F7941D"/>
-              <rect x="41" y="14" width="5" height="16" rx="2.5" fill="#F7941D"/>
-              {/* Tall bars */}
-              <rect x="19" y="6" width="5" height="32" rx="2.5" fill="#F7941D"/>
-              <rect x="32" y="6" width="5" height="32" rx="2.5" fill="#F7941D"/>
-              {/* Center loop */}
-              <path d="M26 8 C26 2 30 0 30 0 C30 0 34 2 34 8 L34 36 C34 42 30 44 30 44 C30 44 26 42 26 36 Z" fill="none" stroke="#F7941D" strokeWidth="3" strokeLinejoin="round"/>
-            </svg>
-            <span className="text-[15px] font-bold tracking-[0.08em] uppercase text-white" style={{ fontFamily: 'Oswald, sans-serif' }}>
-              ARSONUS
-            </span>
+            <BrandLogo textClassName="text-[15px]" />
           </Link>
 
           {/* Desktop nav links — langsung setelah logo */}
@@ -270,7 +255,7 @@ export default function Navbar() {
                         {subscription && (
                           <span className={clsx(
                             'inline-block mt-1.5 text-[10px] px-2 py-0.5 rounded-full font-semibold',
-                            subscription.plan.slug === 'pro' ? 'bg-violet-500/20 text-violet-300' : 'bg-white/[0.05] text-[#6b6f82]'
+                            subscription.plan.slug === 'pro' ? 'bg-accent/20 text-accent-bright' : 'bg-white/[0.05] text-[#6b6f82]'
                           )}>
                             {subscription.plan.name}
                           </span>
@@ -339,18 +324,7 @@ export default function Navbar() {
             {/* Drawer header */}
             <div className="flex items-center justify-between px-4 py-4 border-b border-rim">
               <Link href="/" className="flex items-center gap-2" onClick={() => setMobileOpen(false)}>
-                <svg width="22" height="18" viewBox="0 0 56 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <ellipse cx="4" cy="22" rx="4" ry="6" fill="#F7941D"/>
-                  <ellipse cx="52" cy="22" rx="4" ry="6" fill="#F7941D"/>
-                  <rect x="10" y="14" width="5" height="16" rx="2.5" fill="#F7941D"/>
-                  <rect x="41" y="14" width="5" height="16" rx="2.5" fill="#F7941D"/>
-                  <rect x="19" y="6" width="5" height="32" rx="2.5" fill="#F7941D"/>
-                  <rect x="32" y="6" width="5" height="32" rx="2.5" fill="#F7941D"/>
-                  <path d="M26 8 C26 2 30 0 30 0 C30 0 34 2 34 8 L34 36 C34 42 30 44 30 44 C30 44 26 42 26 36 Z" fill="none" stroke="#F7941D" strokeWidth="3" strokeLinejoin="round"/>
-                </svg>
-                <span className="text-sm font-bold tracking-[0.08em] uppercase text-white" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                  ARSONUS
-                </span>
+                <BrandLogo frameClassName="h-7 w-7" textClassName="text-sm" />
               </Link>
               <button
                 onClick={() => setMobileOpen(false)}
@@ -380,7 +354,7 @@ export default function Navbar() {
                   <div className="mt-2 flex items-center gap-2">
                     <span className={clsx(
                       'text-[10px] px-2 py-0.5 rounded-full font-semibold',
-                      subscription.plan.slug === 'pro' ? 'bg-violet-500/20 text-violet-300' :
+                      subscription.plan.slug === 'pro' ? 'bg-accent/20 text-accent-bright' :
                       'bg-white/[0.05] text-[#6b6f82]'
                     )}>
                       {subscription.plan.name}

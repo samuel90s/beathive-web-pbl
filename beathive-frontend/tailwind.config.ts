@@ -9,27 +9,27 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Oswald', 'Tall Films Expanded', 'sans-serif'],
-        heading: ['Tall Films Expanded', 'Oswald', 'sans-serif'],
+        sans: ['Inter', 'sans-serif'],
+        heading: ['Inter', 'sans-serif'],
       },
       colors: {
         base:    '#0c0d10',
         surface: '#111318',
         lift:    '#191b22',
         rim:     'rgba(255,255,255,0.07)',
-        // Arsonus primary — Carrot Orange
+        // Arsonus primary: carrot orange
         accent: {
           DEFAULT: '#F7941D',
           dim:     '#e07e0a',
           bright:  '#ffaa4d',
           glow:    'rgba(247,148,29,0.22)',
         },
-        // Arsonus secondary — Verdigris
+        // Arsonus secondary: verdigris
         teal: {
           DEFAULT: '#00A79D',
           dim:     '#008c83',
         },
-        // Arsonus tertiary — Carmine
+        // Arsonus tertiary: carmine
         carmine: {
           DEFAULT: '#BE1E2D',
           dim:     '#a01828',

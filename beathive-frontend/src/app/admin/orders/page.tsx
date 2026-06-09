@@ -45,7 +45,7 @@ export default function AdminOrdersPage() {
 
       {loading ? (
         <div className="flex justify-center py-20">
-          <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
         <div className="card rounded-2xl border border-rim overflow-hidden">

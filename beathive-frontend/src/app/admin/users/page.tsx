@@ -55,12 +55,12 @@ export default function AdminUsersPage() {
         placeholder="Search by name or email..."
         value={search}
         onChange={e => { setSearch(e.target.value); fetchUsers(e.target.value); }}
-        className="w-full px-4 py-2.5 border border-rim rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 mb-4 bg-surface"
+        className="w-full px-4 py-2.5 border border-rim rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent mb-4 bg-surface"
       />
 
       {loading ? (
         <div className="flex justify-center py-20">
-          <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
         <div className="card rounded-2xl border border-rim overflow-hidden">

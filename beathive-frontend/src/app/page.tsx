@@ -152,7 +152,7 @@ export default async function HomePage() {
         <div className="card rounded-2xl px-2 py-2 grid grid-cols-4 divide-x divide-rim">
           {STATS.map((s) => (
             <div key={s.label} className="text-center py-4 px-3">
-              <p className="text-xl font-bold text-gradient-violet">{s.value}</p>
+              <p className="text-xl font-bold text-gradient-brand">{s.value}</p>
               <p className="text-xs text-[#6b6f82] mt-0.5">{s.label}</p>
             </div>
           ))}

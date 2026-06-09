@@ -54,7 +54,7 @@ export default function SoundDetailClient({ slug }: { slug: string }) {
   if (loading) {
     return (
       <div className="px-8 pt-12 flex items-center justify-center min-h-[300px]">
-        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -113,7 +113,7 @@ export default function SoundDetailClient({ slug }: { slug: string }) {
   const accessLabels = {
     FREE:     { label: 'Free',     cls: 'bg-teal-500/10 text-teal-400 border-teal-500/20' },
     PRO:      { label: 'Pro',      cls: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
-    BUSINESS: { label: 'Business', cls: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
+    BUSINESS: { label: 'Business', cls: 'bg-carmine/10 text-carmine border-carmine/20' },
     PURCHASE: { label: 'Beli',     cls: 'bg-white/[0.05] text-[#c4c6d8] border-rim' },
   };
   const badge = accessLabels[sound.accessLevel] ?? accessLabels.FREE;
@@ -177,7 +177,7 @@ export default function SoundDetailClient({ slug }: { slug: string }) {
             }`}
           >
             {isCurrentlyPlaying ? (
-              <svg width="12" height="12" viewBox="0 0 10 10" fill={isActive ? 'white' : '#7c3aed'}>
+              <svg width="12" height="12" viewBox="0 0 10 10" fill={isActive ? 'white' : '#F7941D'}>
                 <rect x="1" y="0" width="3" height="10" rx="1"/>
                 <rect x="6" y="0" width="3" height="10" rx="1"/>
               </svg>
@@ -238,12 +238,12 @@ export default function SoundDetailClient({ slug }: { slug: string }) {
         {(sound.bpm || sound.mood || sound.musicalKey || sound.hasStems) && (
           <div className="flex flex-wrap gap-2 mb-5">
             {sound.bpm && (
-              <span className="text-xs px-2.5 py-1 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 font-medium">
+              <span className="text-xs px-2.5 py-1 rounded-full bg-accent/10 text-accent-bright border border-accent/20 font-medium">
                 ♩ {sound.bpm} BPM
               </span>
             )}
             {sound.musicalKey && (
-              <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium">
+              <span className="text-xs px-2.5 py-1 rounded-full bg-teal/10 text-teal border border-teal/20 font-medium">
                 🎵 {sound.musicalKey}
               </span>
             )}
@@ -406,7 +406,7 @@ function DownloadCTA({ sound, user, inCart, isAuthenticated, downloading, onDown
     <button
       onClick={isAuthenticated ? onDownload : onLogin}
       disabled={downloading === sound.id}
-      className="flex-1 py-2.5 btn-accent rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+      className="flex-1 py-2.5 btn-accent rounded-xl text-sm font-medium hover:bg-accent-dim transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
     >
       {downloading === sound.id ? (
         <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Downloading...</>

@@ -26,8 +26,8 @@ export default function AdminDashboard() {
   }, []);
 
   const cards = stats ? [
-    { label: 'Total Users', value: stats.users.toLocaleString('id'), color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Total Sounds', value: stats.sounds.toLocaleString('id'), color: 'text-accent-bright', bg: 'bg-violet-50' },
+    { label: 'Total Users', value: stats.users.toLocaleString('id'), color: 'text-teal', bg: 'bg-teal/10' },
+    { label: 'Total Sounds', value: stats.sounds.toLocaleString('id'), color: 'text-accent-bright', bg: 'bg-accent/10' },
     { label: 'Pending Review', value: stats.pendingSounds.toLocaleString('id'), color: 'text-amber-600', bg: 'bg-amber-50', urgent: stats.pendingSounds > 0 },
     { label: 'Active Subscribers', value: stats.activeSubscriptions.toLocaleString('id'), color: 'text-teal', bg: 'bg-teal-50' },
     { label: 'Completed Orders', value: stats.orders.toLocaleString('id'), color: 'text-[#8b8fa8]', bg: 'bg-white/[0.03]' },
@@ -43,7 +43,7 @@ export default function AdminDashboard() {
 
       {!stats ? (
         <div className="flex justify-center py-20">
-          <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">

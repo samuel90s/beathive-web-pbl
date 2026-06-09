@@ -10,9 +10,9 @@ import { getPreviewStreamUrl } from '@/lib/api/sounds';
 import { formatDuration } from '@/lib/utils';
 import { toast } from '@/lib/store/toast.store';
 
-// SFX: 30s preview, Music: 60s preview
+// Preview limits: SFX = 10s (singkat, cukup untuk dengar karakternya), Music = 30s
 function getPreviewLimit(categoryType?: string): number {
-  return categoryType === 'music' ? 60 : 30;
+  return categoryType === 'music' ? 30 : 10;
 }
 
 function canPlayFull(accessLevel: string, userPlanSlug?: string): boolean {
@@ -34,7 +34,7 @@ export default function GlobalPlayer() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [seeking, setSeeking] = useState(false);
 
-  // Keyboard shortcuts: Space=play/pause, ←/→=seek 10s, M=mute
+  // Keyboard shortcuts: Space=play/pause, ArrowLeft/ArrowRight=seek 10s, M=mute.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -48,6 +48,7 @@ export default function GlobalPlayer() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [currentTrack, isPlaying, pause, resume]);
+
   const [liked, setLiked] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
   const [previewLocked, setPreviewLocked] = useState(false);
@@ -57,7 +58,7 @@ export default function GlobalPlayer() {
   const planSlug = user?.subscription?.plan?.slug;
   const isOwner = !!(user?.id && currentTrack?.author?.id && currentTrack.author.id === user.id);
   const fullAccess = currentTrack ? (isOwner || canPlayFull(currentTrack.accessLevel, planSlug)) : false;
-  const PREVIEW_LIMIT = currentTrack ? getPreviewLimit(currentTrack.category?.type) : 30;
+  const PREVIEW_LIMIT = currentTrack ? getPreviewLimit(currentTrack.category?.type) : 10;
 
   useEffect(() => {
     setLiked(currentTrack?.isLiked ?? false);
@@ -100,7 +101,7 @@ export default function GlobalPlayer() {
     setProgress((cur / dur) * 100);
     setDuration(audio.duration || 0);
 
-    // Enforce 30s preview for restricted sounds
+    // Enforce preview limit for restricted sounds
     if (!fullAccess && cur >= PREVIEW_LIMIT) {
       audio.pause();
       pause();
@@ -113,7 +114,7 @@ export default function GlobalPlayer() {
     if (!audio) return;
     const pct = Number(e.target.value);
     const target = (pct / 100) * (audio.duration || 0);
-    // Block seeking past 30s for restricted sounds
+    // Block seeking past preview limit for restricted sounds
     if (!fullAccess && target >= PREVIEW_LIMIT) return;
     audio.currentTime = target;
     setProgress(pct);
@@ -129,7 +130,7 @@ export default function GlobalPlayer() {
     : progress;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50">
+    <div className="fixed bottom-0 left-0 right-0 z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <style>{`
         input[type=range].player-range{-webkit-appearance:none;height:3px;background:transparent;border-radius:99px;cursor:pointer;outline:none}
         input[type=range].player-range::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#F7941D;cursor:pointer;box-shadow:0 0 8px rgba(247,148,29,0.6);transition:transform .1s}
@@ -259,12 +260,12 @@ export default function GlobalPlayer() {
                 className="absolute inset-y-0 left-0 flex items-center"
                 style={{ width: `${displayProgress}%` }}
               >
-                <div className="w-full h-[3px] bg-violet-500 rounded-full" />
+                <div className="w-full h-[3px] bg-accent rounded-full" />
               </div>
-              {/* 30s marker for restricted sounds */}
+              {/* Preview limit marker */}
               {!fullAccess && totalSec > 0 && (
                 <div
-                  className="absolute top-1/2 -translate-y-1/2 w-[2px] h-3 bg-violet-400/60 rounded-full"
+                  className="absolute top-1/2 -translate-y-1/2 w-[2px] h-3 bg-accent/60 rounded-full"
                   style={{ left: `${Math.min((PREVIEW_LIMIT / totalSec) * 100, 100)}%` }}
                 />
               )}
@@ -281,7 +282,7 @@ export default function GlobalPlayer() {
             <span className="text-[10px] text-[#4a4d5e] w-8 tabular-nums flex-shrink-0">
               {fmt(displayTotal)}
               {!fullAccess && totalSec > PREVIEW_LIMIT && (
-                <span className="text-violet-500"> /30s</span>
+                <span className="text-accent-bright"> /{PREVIEW_LIMIT}s</span>
               )}
             </span>
           </div>

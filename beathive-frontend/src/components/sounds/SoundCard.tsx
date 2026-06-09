@@ -1,6 +1,6 @@
 // src/components/sounds/SoundCard.tsx
 'use client';
-import { useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePlayerStore } from '@/lib/store/player.store';
 import { useCartStore } from '@/lib/store/cart.store';
@@ -14,10 +14,12 @@ import clsx from 'clsx';
 
 interface Props { sound: SoundEffect }
 
-function MiniWaveform({ data, isActive, progress }: { data: number[]; isActive: boolean; progress: number }) {
-  const raw = data?.length ? data : Array(40).fill(0).map((_, i) => Math.abs(Math.sin(i * 0.5)) * 60 + 15);
-  const max = Math.max(...raw, 1);
-  const bars = raw.map(v => (v as number) / max);
+const MiniWaveform = memo(function MiniWaveform({ data, isActive, progress }: { data: number[]; isActive: boolean; progress: number }) {
+  const bars = useMemo(() => {
+    const raw = data?.length ? data : Array(40).fill(0).map((_, i) => Math.abs(Math.sin(i * 0.5)) * 60 + 15);
+    const max = Math.max(...raw, 1);
+    return raw.map(v => (v as number) / max);
+  }, [data]);
   const progressIdx = Math.floor((progress / 100) * bars.length);
 
   return (
@@ -43,19 +45,20 @@ function MiniWaveform({ data, isActive, progress }: { data: number[]; isActive: 
       })}
     </div>
   );
-}
+});
 
-export default function SoundCard({ sound }: Props) {
-  const { currentTrack, isPlaying, play, pause } = usePlayerStore();
-  const progress = usePlayerStore(s => s.progress);
+function SoundCard({ sound }: Props) {
+  const isActive = usePlayerStore(s => s.currentTrack?.id === sound.id);
+  const isCurrentlyPlaying = usePlayerStore(s => s.currentTrack?.id === sound.id && s.isPlaying);
+  const play = usePlayerStore(s => s.play);
+  const pause = usePlayerStore(s => s.pause);
+  const progress = usePlayerStore(s => s.currentTrack?.id === sound.id ? s.progress : 0);
   const { addItem, hasItem } = useCartStore();
   const { user } = useAuthStore();
   const { download, downloading } = useDownload();
   const { toggle: toggleWishlist, loadingId } = useWishlist();
   const [liked, setLiked] = useState(sound.isLiked ?? false);
 
-  const isActive = currentTrack?.id === sound.id;
-  const isCurrentlyPlaying = isActive && isPlaying;
   const inCart = hasItem(sound.id);
   const isOwner = !!(user?.id && sound.author?.id && sound.author.id === user.id);
 
@@ -65,7 +68,7 @@ export default function SoundCard({ sound }: Props) {
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isActive) {
-      isPlaying ? pause() : usePlayerStore.getState().resume();
+      isCurrentlyPlaying ? pause() : usePlayerStore.getState().resume();
     } else {
       play(sound);
     }
@@ -177,10 +180,15 @@ export default function SoundCard({ sound }: Props) {
             {formatDuration(sound.durationMs)}
           </span>
 
-          {/* Access badge */}
+          {/* Badge: FREE = hijau, PRO = oranye */}
           {sound.accessLevel === 'FREE' && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium">
               Free
+            </span>
+          )}
+          {sound.accessLevel === 'PRO' && !isPurchasable && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/15 text-accent-bright border border-accent/20 font-medium">
+              PRO
             </span>
           )}
           {isPurchasable && !sound.isPurchased && !isOwner && sound.price > 0 && (
@@ -259,3 +267,5 @@ export default function SoundCard({ sound }: Props) {
     </div>
   );
 }
+
+export default memo(SoundCard);
