@@ -40,8 +40,8 @@ COPY --from=builder /app/package.json ./
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-# Copy seed script dependencies
-COPY --from=builder /app/prisma/seed.ts ./prisma/seed.ts
+# Copy production maintenance scripts
+COPY --from=builder /app/scripts/prepare-production-data.js ./scripts/prepare-production-data.js
 
 # Create uploads directories
 RUN mkdir -p uploads/sounds uploads/previews uploads/avatars
