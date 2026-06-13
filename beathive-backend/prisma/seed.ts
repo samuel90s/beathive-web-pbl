@@ -10,6 +10,7 @@ async function main() {
   const plans = [
     { name: 'Free', slug: 'free', priceMonthly: 0,     priceYearly: 0,      downloadLimit: 3,  commercialLicense: false, unlimited: false },
     { name: 'Pro',  slug: 'pro',  priceMonthly: 25000, priceYearly: 220000, downloadLimit: 20, commercialLicense: true,  unlimited: false },
+    { name: 'Business', slug: 'business', priceMonthly: 299000, priceYearly: 2500000, downloadLimit: -1, commercialLicense: true, unlimited: true },
   ]
 
   for (const plan of plans) {
@@ -126,6 +127,11 @@ async function main() {
 
   // ─── Dummy Audio Assets ───────────────────────────────────
   // Generate fake waveform data (array of bar heights)
+  if (process.env.SEED_DUMMY_DATA !== 'true') {
+    console.log('Dummy audio dilewati. Set SEED_DUMMY_DATA=true untuk data demo.')
+    return
+  }
+
   const fakeWaveform = (len = 80) =>
     Array.from({ length: len }, () => Math.round(Math.random() * 100))
 

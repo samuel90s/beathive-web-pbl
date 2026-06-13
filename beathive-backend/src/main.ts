@@ -107,7 +107,7 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Range', 'Accept-Ranges'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Range', 'Accept-Ranges', 'X-Requested-With'],
     exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length'],
   });
 
@@ -131,4 +131,3 @@ async function bootstrap() {
 }
 
 bootstrap();
-

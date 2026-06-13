@@ -182,7 +182,7 @@ export interface SoundFilters {
   limit?: number;
 }
 
-export type LicenseType = 'personal' | 'commercial' | 'sync' | 'broadcast';
+export type LicenseType = 'personal' | 'commercial';
 
 export interface CartItem {
   sound: AudioAsset;
@@ -206,7 +206,7 @@ export interface DownloadHistoryItem {
   authorName: string | null;
   authorId: string | null;
   source: 'subscription' | 'purchase';
-  licenseType: 'personal' | 'commercial' | 'sync' | 'broadcast';
+  licenseType: LicenseType;
   priceAtPurchase: number | null;
   downloadedAt: string;
 }

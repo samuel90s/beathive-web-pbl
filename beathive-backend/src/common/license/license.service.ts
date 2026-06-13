@@ -132,6 +132,7 @@ export class LicenseService {
       if (isCommercial) {
         const allowed = [
           'Use in commercial projects (ads, films, games, paid content)',
+          'Use in television, radio, streaming, and other broadcasts',
           'Use in YouTube / social media (monetized or non-monetized)',
           'Modify and adapt the sound to fit your project needs',
           'Perpetual worldwide license — no expiry, no renewal required',

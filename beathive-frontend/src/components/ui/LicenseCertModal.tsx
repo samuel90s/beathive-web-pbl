@@ -35,45 +35,11 @@ const LICENSE_INFO = {
     allowed: [
       'Iklan & konten promosi bisnis',
       'YouTube monetized & brand content',
-      'Aplikasi & produk digital',
-      'Platform streaming komersial',
+      'Film, game, aplikasi, & produk digital',
+      'Platform streaming, TV, & radio',
     ],
     disallowed: [
-      'Siaran TV / radio nasional',
       'Redistribusi / dijual kembali',
-    ],
-  },
-  sync: {
-    label: 'Sync License',
-    color: 'text-accent-bright',
-    border: 'border-accent/20',
-    bg: 'bg-accent/10',
-    allowed: [
-      'Film, series, & video production',
-      'Iklan TV & digital advertising',
-      'Game & aplikasi interaktif',
-      'Platform streaming internasional',
-      'Distribusi global tanpa batas',
-    ],
-    disallowed: [
-      'Siaran TV frekuensi publik',
-      'Redistribusi audio mentah',
-    ],
-  },
-  broadcast: {
-    label: 'Broadcast License',
-    color: 'text-amber-400',
-    border: 'border-amber-500/20',
-    bg: 'bg-amber-500/10',
-    allowed: [
-      'Siaran TV & radio nasional',
-      'Semua hak Sync License',
-      'Distribusi fisik (DVD, Blu-ray)',
-      'Hak global tanpa batasan',
-      'Penggunaan komersial skala besar',
-    ],
-    disallowed: [
-      'Redistribusi file audio mentah',
     ],
   },
 } as const;

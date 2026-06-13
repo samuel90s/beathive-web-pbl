@@ -13,6 +13,10 @@ interface CartState {
   hasItem: (soundId: string) => boolean;
 }
 
+type PersistedCartItem = Omit<CartItem, 'licenseType'> & {
+  licenseType: string;
+};
+
 export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
@@ -41,10 +45,8 @@ export const useCartStore = create<CartState>()(
       totalAmount: () => {
         return get().items.reduce((sum, item) => {
           const price =
-            item.licenseType === 'commercial' || item.licenseType === 'sync'
+            item.licenseType === 'commercial'
               ? item.sound.price * 2
-              : item.licenseType === 'broadcast'
-              ? item.sound.price * 3
               : item.sound.price;
           return sum + price;
         }, 0);
@@ -52,6 +54,26 @@ export const useCartStore = create<CartState>()(
 
       hasItem: (soundId) => get().items.some((i) => i.sound.id === soundId),
     }),
-    { name: 'beathive-cart' },
+    {
+      name: 'beathive-cart',
+      version: 1,
+      migrate: (persistedState: unknown) => {
+        const state = persistedState as Omit<Partial<CartState>, 'items'> & {
+          items?: PersistedCartItem[];
+        };
+        return {
+          ...state,
+          items: (state.items ?? []).map((item): CartItem => ({
+            ...item,
+            licenseType:
+              item.licenseType === 'sync' || item.licenseType === 'broadcast'
+                ? 'commercial'
+                : item.licenseType === 'commercial'
+                  ? 'commercial'
+                  : 'personal',
+          })),
+        };
+      },
+    },
   ),
 );

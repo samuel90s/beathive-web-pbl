@@ -38,6 +38,7 @@ function OrderSuccessContent() {
   const [invoice, setInvoice] = useState<InvoiceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [redirectSeconds, setRedirectSeconds] = useState(10);
 
   useEffect(() => {
     // If user cancelled/error — don't verify or fetch invoice, just show the error state
@@ -68,6 +69,23 @@ function OrderSuccessContent() {
     };
     init();
   }, [orderId, isError, clearCart]);
+
+  useEffect(() => {
+    if (loading || isError || isPending || !invoice) return;
+
+    setRedirectSeconds(10);
+    const interval = window.setInterval(() => {
+      setRedirectSeconds((seconds) => Math.max(0, seconds - 1));
+    }, 1000);
+    const timeout = window.setTimeout(() => {
+      router.replace('/dashboard/orders');
+    }, 10_000);
+
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+    };
+  }, [invoice, isError, isPending, loading, router]);
 
   const handleDownloadPdf = async () => {
     if (!invoice) return;
@@ -267,12 +285,15 @@ function OrderSuccessContent() {
             {downloadingPdf ? 'Downloading...' : 'Invoice PDF'}
           </button>
           <button
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push('/dashboard/orders')}
             className="flex-1 py-2.5 btn-accent rounded-xl text-sm font-semibold transition-colors"
           >
             Lihat Pembelian
           </button>
         </div>
+        <p className="mt-3 text-center text-xs text-[#5a5d72]">
+          Otomatis menuju riwayat pembelian dalam {redirectSeconds} detik.
+        </p>
       </div>
     </div>
   );

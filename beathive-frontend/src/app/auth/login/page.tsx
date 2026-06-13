@@ -36,7 +36,12 @@ export default function LoginPage() {
       if ('requiresTwoFactor' in result) { setNeeds2FA(true); setLoading(false); return; }
       router.push('/browse');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid email or password');
+      setError(
+        err.response?.data?.message ||
+        (err.request
+          ? 'Unable to reach the server. Check that the backend is running and allows this site.'
+          : 'Sign in failed. Please try again.'),
+      );
     } finally { setLoading(false); }
   };
 

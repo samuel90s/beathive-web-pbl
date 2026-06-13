@@ -7,6 +7,20 @@ import { useCartStore } from '@/lib/store/cart.store';
 import { ordersApi } from '@/lib/api/orders';
 import { formatPrice } from '@/lib/utils';
 import { calcOrderTotals, SERVICE_FEE_PERCENT, TAX_PERCENT } from '@/lib/constants';
+import type { LicenseType } from '@/types';
+
+const LICENSE_OPTIONS: { type: LicenseType; label: string; desc: string }[] = [
+  {
+    type: 'personal',
+    label: 'Personal',
+    desc: 'Proyek pribadi dan konten non-komersial',
+  },
+  {
+    type: 'commercial',
+    label: 'Commercial (2x)',
+    desc: 'Konten monetisasi, pekerjaan klien, iklan, film, game, dan produk berbayar',
+  },
+];
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -72,23 +86,9 @@ export default function CheckoutPage() {
       {/* Items */}
       <div className="rounded-2xl border border-rim overflow-hidden mb-4">
         {items.map((item, i) => {
-          const isMusic = item.sound.category?.type === 'music';
-          const price = item.licenseType === 'commercial' || item.licenseType === 'sync'
+          const price = item.licenseType === 'commercial'
             ? item.sound.price * 2
-            : item.licenseType === 'broadcast'
-            ? item.sound.price * 3
             : item.sound.price;
-
-          const licenseOptions = isMusic
-            ? [
-                { type: 'personal',   label: 'Personal',        desc: 'Proyek personal, podcast, konten non-komersial' },
-                { type: 'sync',       label: 'Sync (2×)',        desc: 'Video monetized, YouTube, film independen' },
-                { type: 'broadcast',  label: 'Broadcast (3×)',   desc: 'TV, radio, iklan, distribusi komersial luas' },
-              ]
-            : [
-                { type: 'personal',   label: 'Personal',        desc: 'Proyek personal, podcast, social media' },
-                { type: 'commercial', label: 'Commercial (2×)',  desc: 'Iklan, film, game, produk berbayar' },
-              ];
 
           return (
             <div key={item.sound.id} className={`p-4 bg-surface ${i > 0 ? 'border-t border-rim' : ''}`}>
@@ -122,10 +122,10 @@ export default function CheckoutPage() {
 
                   {/* License picker */}
                   <div className="flex flex-wrap gap-1.5 mt-2.5">
-                    {licenseOptions.map(({ type, label }) => (
+                    {LICENSE_OPTIONS.map(({ type, label }) => (
                       <button
                         key={type}
-                        onClick={() => updateLicense(item.sound.id, type as any)}
+                        onClick={() => updateLicense(item.sound.id, type)}
                         className={`px-2.5 py-1 text-xs rounded-lg border transition-all ${
                           item.licenseType === type
                             ? 'border-accent/50 bg-accent/10 text-accent-bright font-medium'
@@ -137,7 +137,7 @@ export default function CheckoutPage() {
                     ))}
                   </div>
                   <p className="text-[11px] text-[#4a4d5e] mt-1.5 leading-relaxed">
-                    {licenseOptions.find(l => l.type === item.licenseType)?.desc}
+                    {LICENSE_OPTIONS.find(l => l.type === item.licenseType)?.desc}
                   </p>
                 </div>
               </div>

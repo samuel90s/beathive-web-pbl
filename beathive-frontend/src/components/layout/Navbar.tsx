@@ -80,6 +80,7 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const isAdminArea = pathname.startsWith('/admin');
 
   // Close mobile menu on route change
   useEffect(() => { setMobileOpen(false); setMenuOpen(false); }, [pathname]);
@@ -107,7 +108,7 @@ export default function Navbar() {
   const { data: subscription } = useQuery({
     queryKey: ['subscription'],
     queryFn: subscriptionsApi.getMy,
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && !isAdminArea,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -120,7 +121,7 @@ export default function Navbar() {
   ];
 
   // Banner verifikasi email jika belum verified
-  const showVerifyBanner = isAuthenticated && user && !(user as any).emailVerified;
+  const showVerifyBanner = !isAdminArea && isAuthenticated && user && !(user as any).emailVerified;
 
   return (
     <>
@@ -146,38 +147,58 @@ export default function Navbar() {
         <div className="px-5 h-16 flex items-center gap-1">
 
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 mr-4 flex-shrink-0">
+          <Link href={isAdminArea ? '/admin' : '/'} className="flex items-center gap-2.5 mr-4 flex-shrink-0">
             <BrandLogo textClassName="text-[15px]" />
           </Link>
 
           {/* Desktop nav links — langsung setelah logo */}
-          <div className="hidden md:flex items-center gap-0.5">
-            {navLinks.map((link) => (
-              <Link key={link.href} href={link.href}
-                className={clsx('px-3 py-1.5 text-sm rounded-lg transition-all duration-150',
-                  pathname.startsWith(link.href)
-                    ? 'text-white font-medium'
-                    : 'text-[#5a5d72] hover:text-white hover:bg-white/[0.04]')}>
-                {link.label}
-              </Link>
-            ))}
-            {isAuthenticated && user?.role === 'ADMIN' && (
-              <Link href="/admin"
-                className={clsx('px-3 py-1.5 text-sm rounded-lg transition-all duration-150',
-                  pathname.startsWith('/admin') ? 'text-red-400 font-medium' : 'text-[#5a5d72] hover:text-white hover:bg-white/[0.04]')}>
-                Admin
-              </Link>
-            )}
-          </div>
+          {isAdminArea ? (
+            <div className="hidden sm:flex items-center gap-2 border-l border-rim pl-4">
+              <span className="text-sm font-semibold text-white">Admin Panel</span>
+              <span className="text-[10px] uppercase tracking-wider text-[#5a5d72] bg-white/[0.04] px-2 py-0.5 rounded-full">
+                Workspace
+              </span>
+            </div>
+          ) : (
+            <div className="hidden md:flex items-center gap-0.5">
+              {navLinks.map((link) => (
+                <Link key={link.href} href={link.href}
+                  className={clsx('px-3 py-1.5 text-sm rounded-lg transition-all duration-150',
+                    pathname.startsWith(link.href)
+                      ? 'text-white font-medium'
+                      : 'text-[#5a5d72] hover:text-white hover:bg-white/[0.04]')}>
+                  {link.label}
+                </Link>
+              ))}
+              {isAuthenticated && user?.role === 'ADMIN' && (
+                <Link href="/admin"
+                  className="px-3 py-1.5 text-sm rounded-lg text-[#5a5d72] hover:text-white hover:bg-white/[0.04] transition-all duration-150">
+                  Admin
+                </Link>
+              )}
+            </div>
+          )}
 
-          <SearchBar />
+          {!isAdminArea && <SearchBar />}
 
           <div className="flex-1" />
 
           {/* Right actions */}
           <div className="flex items-center gap-1">
 
-            {isAuthenticated && (
+            {isAdminArea && (
+              <Link href="/browse"
+                aria-label="View public site"
+                className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-[#8b8fa8] hover:text-white hover:bg-white/[0.04] rounded-lg transition-colors">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                <span className="hidden sm:inline">View site</span>
+              </Link>
+            )}
+
+            {isAuthenticated && !isAdminArea && (
               <Link
                 href="/wishlist"
                 title="Wishlist"
@@ -200,27 +221,29 @@ export default function Navbar() {
               <ThemeToggle />
             </div>
 
-            <Link
-              href="/checkout"
-              className="relative p-2 text-[#6b6f82] hover:text-white hover:bg-white/[0.05] rounded-lg transition-all duration-150"
-            >
-              <svg width="17" height="17" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <path d="M1 1h2l2.4 9.6a1 1 0 001 .8h7.2a1 1 0 001-.76L16 5H4"/>
-                <circle cx="7.5" cy="15.5" r="1.5" fill="currentColor" stroke="none"/>
-                <circle cx="13.5" cy="15.5" r="1.5" fill="currentColor" stroke="none"/>
-              </svg>
-              {cartCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-accent text-white text-[9px] rounded-full flex items-center justify-center font-bold shadow-glow-sm">
-                  {cartCount}
-                </span>
-              )}
-            </Link>
+            {!isAdminArea && (
+              <Link
+                href="/checkout"
+                className="relative p-2 text-[#6b6f82] hover:text-white hover:bg-white/[0.05] rounded-lg transition-all duration-150"
+              >
+                <svg width="17" height="17" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M1 1h2l2.4 9.6a1 1 0 001 .8h7.2a1 1 0 001-.76L16 5H4"/>
+                  <circle cx="7.5" cy="15.5" r="1.5" fill="currentColor" stroke="none"/>
+                  <circle cx="13.5" cy="15.5" r="1.5" fill="currentColor" stroke="none"/>
+                </svg>
+                {cartCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-accent text-white text-[9px] rounded-full flex items-center justify-center font-bold shadow-glow-sm">
+                    {cartCount}
+                  </span>
+                )}
+              </Link>
+            )}
 
             {/* Desktop user */}
             {isAuthenticated ? (
               <div className="hidden md:flex items-center gap-1.5 ml-1" ref={menuRef}>
                 {/* Subscription quota chip */}
-                {subscription && !subscription.plan.unlimited && subscription.usage && (
+                {!isAdminArea && subscription && !subscription.plan.unlimited && subscription.usage && (
                   <span className="text-[11px] text-[#5a5d72] bg-white/[0.04] border border-[#1a1b2e] px-2.5 py-1 rounded-full hidden lg:block">
                     {subscription.usage.downloadsThisMonth}/{subscription.plan.downloadLimit}/hari
                   </span>
@@ -297,21 +320,23 @@ export default function Navbar() {
             )}
 
             {/* Mobile hamburger */}
-            <button
-              onClick={() => setMobileOpen(true)}
-              className="md:hidden p-2 rounded-lg text-[#8b8fa8] hover:text-white hover:bg-white/[0.05] transition-colors"
-              aria-label="Open menu"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-              </svg>
-            </button>
+            {!isAdminArea && (
+              <button
+                onClick={() => setMobileOpen(true)}
+                className="md:hidden p-2 rounded-lg text-[#8b8fa8] hover:text-white hover:bg-white/[0.05] transition-colors"
+                aria-label="Open menu"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+              </button>
+            )}
           </div>
         </div>
       </nav>
 
       {/* Mobile slide-in drawer */}
-      {mobileOpen && (
+      {mobileOpen && !isAdminArea && (
         <div className="fixed inset-0 z-50 md:hidden flex">
           {/* Backdrop */}
           <div

@@ -16,7 +16,7 @@ const midtransClient = require('midtrans-client');
 export interface CreateOrderDto {
   items: {
     audioAssetId: string;
-    licenseType: 'personal' | 'commercial' | 'sync' | 'broadcast';
+    licenseType: 'personal' | 'commercial';
   }[];
 }
 
@@ -40,6 +40,20 @@ export class OrdersService {
   // ─── Buat order baru + Midtrans Snap token ──────────────
 
   async createOrder(userId: string, dto: CreateOrderDto) {
+    if (
+      !Array.isArray(dto.items) ||
+      dto.items.length === 0 ||
+      dto.items.some(
+        (item) =>
+          !item.audioAssetId ||
+          !['personal', 'commercial'].includes(item.licenseType),
+      )
+    ) {
+      throw new BadRequestException(
+        'License type must be personal or commercial',
+      );
+    }
+
     // 1. Ambil data semua sound yang dipesan
     const sounds = await this.prisma.audioAsset.findMany({
       where: {
@@ -73,11 +87,7 @@ export class OrdersService {
     const itemsWithPrice = dto.items.map((item) => {
       const sound = sounds.find((s) => s.id === item.audioAssetId)!;
       const price =
-        item.licenseType === 'commercial' || item.licenseType === 'sync'
-          ? sound.price * 2
-          : item.licenseType === 'broadcast'
-          ? sound.price * 3
-          : sound.price;
+        item.licenseType === 'commercial' ? sound.price * 2 : sound.price;
       return { ...item, sound, price };
     });
 
