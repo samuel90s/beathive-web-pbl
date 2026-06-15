@@ -14,5 +14,6 @@ import { EmailModule } from '../email/email.module';
   imports: [ConfigModule, LicenseModule, SubscriptionsModule, EarningsModule, EmailModule],
   controllers: [OrdersController],
   providers: [OrdersService, WebhookService, PrismaService],
+  exports: [WebhookService],
 })
 export class OrdersModule {}

@@ -8,6 +8,10 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { EarningsService } from '../earnings/earnings.service';
 import { EmailService } from '../email/email.service';
 
+// Midtrans does not publish complete TypeScript types for its Node client.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const midtransClient = require('midtrans-client');
+
 @Injectable()
 export class WebhookService {
   private readonly logger = new Logger(WebhookService.name);
@@ -93,6 +97,68 @@ export class WebhookService {
 
     this.logger.log(`Webhook processed: ${order_id} → ${transaction_status}`);
     return { received: true };
+  }
+
+  async syncOrderStatus(orderId: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new BadRequestException('Order not found');
+    if (order.status !== 'PENDING') {
+      return { status: order.status, changed: false };
+    }
+
+    const gatewayOrderId = order.gatewayOrderId || order.id;
+    const coreApi = new midtransClient.CoreApi({
+      isProduction: this.config.get('MIDTRANS_IS_PRODUCTION') === 'true',
+      serverKey: this.config.get('MIDTRANS_SERVER_KEY'),
+      clientKey: this.config.get('MIDTRANS_CLIENT_KEY'),
+    });
+
+    let result: any;
+    try {
+      result = await coreApi.transaction.status(gatewayOrderId);
+    } catch (error: any) {
+      const statusCode = String(error?.ApiResponse?.status_code || '');
+      const ageMs = Date.now() - order.createdAt.getTime();
+      if (statusCode === '404' && ageMs >= 24 * 60 * 60 * 1000) {
+        await this.prisma.order.update({
+          where: { id: order.id },
+          data: { status: 'CANCELLED' },
+        });
+        return {
+          status: 'CANCELLED',
+          gatewayStatus: 'not_found',
+          changed: true,
+          message: 'Payment was never started and the 24-hour payment window has expired',
+        };
+      }
+      throw new BadRequestException(
+        statusCode === '404'
+          ? 'Payment has not been started in Midtrans'
+          : 'Unable to retrieve payment status from Midtrans',
+      );
+    }
+
+    const transactionStatus = result.transaction_status;
+    const isSuccess = transactionStatus === 'capture' || transactionStatus === 'settlement';
+    const isFailed = ['deny', 'cancel', 'expire'].includes(transactionStatus);
+
+    if (isSuccess && result.fraud_status !== 'challenge') {
+      await this.handlePaymentSuccess(gatewayOrderId);
+    } else if (isFailed) {
+      await this.handlePaymentFailed(gatewayOrderId);
+    }
+
+    const updated = await this.prisma.order.findUnique({
+      where: { id: order.id },
+      select: { status: true, paidAt: true },
+    });
+    return {
+      status: updated?.status || order.status,
+      paidAt: updated?.paidAt,
+      gatewayStatus: transactionStatus,
+      expiryTime: result.expiry_time || null,
+      changed: updated?.status !== order.status,
+    };
   }
 
   // ─── Subscription berhasil dibayar ──────────────────────

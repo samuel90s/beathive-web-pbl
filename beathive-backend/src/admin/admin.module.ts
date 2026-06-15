@@ -4,9 +4,10 @@ import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailModule } from '../email/email.module';
+import { OrdersModule } from '../orders/orders.module';
 
 @Module({
-  imports: [EmailModule],
+  imports: [EmailModule, OrdersModule],
   controllers: [AdminController],
   providers: [AdminService, PrismaService],  // PrismaService used by AdminService
 })

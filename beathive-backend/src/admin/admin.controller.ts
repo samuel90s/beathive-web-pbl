@@ -12,6 +12,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { WebhookService } from '../orders/webhook.service';
 
 class RejectSoundDto {
   @IsOptional()
@@ -110,7 +111,10 @@ class CategoryDto {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
 export class AdminController {
-  constructor(private adminService: AdminService) {}
+  constructor(
+    private adminService: AdminService,
+    private webhookService: WebhookService,
+  ) {}
 
   // GET /admin/stats
   @Get('stats')
@@ -223,6 +227,12 @@ export class AdminController {
     const p = Math.max(1, Number(page) || 1);
     const l = Math.min(100, Math.max(1, Number(limit) || 20));
     return this.adminService.getOrders(p, l);
+  }
+
+  @Patch('orders/:id/sync')
+  @HttpCode(HttpStatus.OK)
+  async syncOrderStatus(@Param('id') id: string) {
+    return this.webhookService.syncOrderStatus(id);
   }
 
   // ─── Categories ──────────────────────────────────────────
