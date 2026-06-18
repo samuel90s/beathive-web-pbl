@@ -13,6 +13,7 @@ import { mediaUrl } from '@/lib/utils';
 import { useState, useRef, useEffect, Suspense, useCallback } from 'react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import BrandLogo from '@/components/layout/BrandLogo';
+import NotificationBell from '@/components/notifications/NotificationBell';
 
 function EqIcon() {
   return (
@@ -142,7 +143,7 @@ export default function Navbar() {
           </button>
         </div>
       )}
-      <nav className="sticky top-0 z-40 bg-[#0c0d16] border-b border-[#1a1b2e]">
+      <nav className="sticky top-0 z-40 bg-surface border-b border-rim">
         <div className="px-5 h-16 flex items-center gap-1">
 
           {/* Logo */}
@@ -219,6 +220,12 @@ export default function Navbar() {
             <div className="hidden sm:block">
               <ThemeToggle />
             </div>
+
+            {!isAdminArea && (
+              <div className="hidden sm:block">
+                <NotificationBell />
+              </div>
+            )}
 
             {!isAdminArea && (
               <Link
@@ -483,6 +490,10 @@ export default function Navbar() {
                 <div className="flex items-center gap-2 mb-3">
                   <ThemeToggle />
                   <span className="text-xs text-[#6b6f82]">Toggle theme</span>
+                </div>
+                <div className="flex items-center gap-2 mb-3">
+                  <NotificationBell />
+                  <span className="text-xs text-[#6b6f82]">Notifikasi</span>
                 </div>
                 <button
                   onClick={() => { setMobileOpen(false); logout(); }}

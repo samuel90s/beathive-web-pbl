@@ -13,10 +13,10 @@ const config: Config = {
         heading: ['Inter', 'sans-serif'],
       },
       colors: {
-        base:    '#0c0d10',
-        surface: '#111318',
-        lift:    '#191b22',
-        rim:     'rgba(255,255,255,0.07)',
+        base:    'var(--bg-base)',
+        surface: 'var(--bg-surface)',
+        lift:    'var(--bg-lift)',
+        rim:     'var(--bg-rim)',
         // Arsonus primary: carrot orange
         accent: {
           DEFAULT: '#F7941D',

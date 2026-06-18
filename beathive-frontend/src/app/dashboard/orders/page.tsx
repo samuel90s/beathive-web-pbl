@@ -105,6 +105,29 @@ function OrdersContent() {
     } finally { setActionLoading(null); }
   };
 
+  const handleCheckStatus = async (orderId: string) => {
+    setActionLoading(orderId + '-sync');
+    try {
+      const result = await ordersApi.syncStatus(orderId);
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      if (result.status === 'PAID') {
+        toast.success('Pembayaran sudah berhasil. Invoice dan download siap.');
+        try {
+          const inv = await ordersApi.getInvoice(orderId);
+          setPopupInvoice(inv);
+        } catch { /* invoice may still be generated */ }
+      } else if (result.status === 'CANCELLED' || result.status === 'FAILED') {
+        toast.warning(result.message || 'Order sudah tidak aktif.');
+      } else {
+        toast.info('Order masih menunggu pembayaran.');
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Gagal cek status pembayaran');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const doCancelOrder = async (orderId: string) => {
     setActionLoading(orderId + '-cancel');
     try {
@@ -264,7 +287,14 @@ function OrdersContent() {
                             disabled={actionLoading === order.id + '-pay'}
                             className="text-xs font-medium px-3 py-1.5 rounded-lg btn-accent disabled:opacity-50 transition-colors"
                           >
-                            {actionLoading === order.id + '-pay' ? '...' : 'Pay'}
+                            {actionLoading === order.id + '-pay' ? '...' : 'Lanjutkan Pembayaran'}
+                          </button>
+                          <button
+                            onClick={() => handleCheckStatus(order.id)}
+                            disabled={actionLoading === order.id + '-sync'}
+                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-rim text-[#8b8fa8] hover:text-white hover:border-accent/30 transition-colors disabled:opacity-50"
+                          >
+                            {actionLoading === order.id + '-sync' ? '...' : 'Cek Status'}
                           </button>
                           <button
                             onClick={() => setConfirmModal({ message: 'Cancel this order?', onConfirm: () => doCancelOrder(order.id) })}

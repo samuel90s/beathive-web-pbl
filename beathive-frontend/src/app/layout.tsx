@@ -24,7 +24,7 @@ const midtransSnapUrl = isProduction
 // Dijalankan sebelum React hydrate untuk mencegah flash of unstyled content (FOUC)
 // Script ini hanya membaca sessionStorage dan menambahkan class ke <html>,
 // tidak menerima input user sama sekali sehingga tidak bisa di-XSS.
-const THEME_SCRIPT = `(function(){try{var t=JSON.parse(sessionStorage.getItem('beathive-auth')||sessionStorage.getItem('beathive-theme')||'{}');var theme=(t.state&&t.state.theme)||t.theme||'dark';document.documentElement.classList.add(theme);}catch(e){document.documentElement.classList.add('dark');}})();`;
+const THEME_SCRIPT = `(function(){try{var raw=localStorage.getItem('beathive-theme')||sessionStorage.getItem('beathive-theme')||'{}';var t=JSON.parse(raw);var theme=(t.state&&t.state.theme)||t.theme||'dark';document.documentElement.classList.add(theme);}catch(e){document.documentElement.classList.add('dark');}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -41,7 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }}
         />
       </head>
-      <body className={`${inter.className} bg-base text-[#e2e3ef] antialiased`}>
+      <body className={`${inter.className} bg-base text-[var(--text-primary)] antialiased`}>
         <Providers>
           <Navbar />
           <AppSidebarWrapper>

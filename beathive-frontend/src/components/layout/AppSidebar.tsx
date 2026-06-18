@@ -73,7 +73,7 @@ function BrowseTypeItem({ type, label, icon, collapsed }: {
 }
 
 function SectionLabel({ children, collapsed }: { children: React.ReactNode; collapsed: boolean }) {
-  if (collapsed) return <div className="h-px bg-[#1a1b2e] my-2 mx-2" />;
+  if (collapsed) return <div className="h-px bg-rim my-2 mx-2" />;
   return (
     <p className="text-[10px] font-bold text-[#3a3c4e] uppercase tracking-[0.12em] px-3 mb-1.5 mt-0.5">
       {children}
@@ -89,7 +89,7 @@ function AppSidebarInner() {
 
   return (
     <aside className={clsx(
-      'flex-shrink-0 hidden md:flex flex-col border-r border-[#1a1b2e] transition-all duration-200',
+      'flex-shrink-0 hidden md:flex flex-col border-r border-rim bg-base transition-all duration-200',
       collapsed ? 'w-14' : 'w-52',
     )}>
       {/* Toggle button */}
@@ -147,7 +147,7 @@ function AppSidebarInner() {
 
         {/* Not logged in */}
         {!isAuthenticated && !collapsed && (
-          <div className="border-t border-[#1a1b2e] pt-4 px-1 space-y-2">
+          <div className="border-t border-rim pt-4 px-1 space-y-2">
             <p className="text-xs text-[#3a3c4e] px-2">Log in to download and save favorites</p>
             <Link href="/auth/login"
               className="block w-full text-center py-2 text-sm border border-[#2a2c3e] rounded-lg text-[#6b6f82] hover:text-white hover:border-white/10 transition-all">
@@ -178,7 +178,7 @@ function AppSidebarInner() {
 
 export function AppSidebar() {
   return (
-    <Suspense fallback={<aside className="w-52 flex-shrink-0 border-r border-[#1a1b2e]" />}>
+    <Suspense fallback={<aside className="w-52 flex-shrink-0 border-r border-rim bg-base" />}>
       <AppSidebarInner />
     </Suspense>
   );

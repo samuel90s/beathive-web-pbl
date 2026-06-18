@@ -6,6 +6,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class AdminService {
@@ -14,6 +15,7 @@ export class AdminService {
   constructor(
     private prisma: PrismaService,
     private email: EmailService,
+    private notifications: NotificationsService,
   ) {}
 
   // ─── Dashboard stats ─────────────────────────────────────
@@ -94,6 +96,14 @@ export class AdminService {
 
     // Notify creator via email (fire-and-forget)
     if (sound.authorId) {
+      this.notifications.create({
+        userId: sound.authorId,
+        type: 'SOUND_APPROVED',
+        title: 'Upload disetujui',
+        message: `"${sound.title}" sudah tampil di marketplace.`,
+        actionUrl: `/sounds/${updated.slug}`,
+      }).catch((err: any) => this.logger.error(`Notification failed: ${err?.message}`));
+
       this.prisma.user.findUnique({ where: { id: sound.authorId }, select: { email: true, name: true } })
         .then(author => {
           if (author) this.email.sendSoundReviewNotification(author.email, sound.title, 'APPROVED', undefined, author.name).catch((err: any) => this.logger.error(`Email notification failed: ${err?.message}`));
@@ -122,6 +132,14 @@ export class AdminService {
 
     // Notify creator via email (fire-and-forget)
     if (sound.authorId) {
+      this.notifications.create({
+        userId: sound.authorId,
+        type: 'SOUND_REJECTED',
+        title: 'Upload ditolak',
+        message: `"${sound.title}" perlu diperbaiki. Alasan: ${reason}`,
+        actionUrl: '/studio',
+      }).catch((err: any) => this.logger.error(`Notification failed: ${err?.message}`));
+
       this.prisma.user.findUnique({ where: { id: sound.authorId }, select: { email: true, name: true } })
         .then(author => {
           if (author) this.email.sendSoundReviewNotification(author.email, sound.title, 'REJECTED', reason, author.name).catch((err: any) => this.logger.error(`Email notification failed: ${err?.message}`));

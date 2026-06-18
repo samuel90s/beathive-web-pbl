@@ -25,6 +25,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../common/storage/storage.service';
 import { AudioService } from '../common/audio/audio.service';
 import { EarningsService } from '../earnings/earnings.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 
@@ -301,6 +302,7 @@ export class SoundsService {
     private audio: AudioService,
     private config: ConfigService,
     private earnings: EarningsService,
+    private notifications: NotificationsService,
   ) {}
 
   private parseOptionalInt(value: unknown, fieldName: string, max = 10_000_000): number | undefined {
@@ -945,6 +947,15 @@ export class SoundsService {
     await this.prisma.wishlist.create({
       data: { userId, audioAssetId: soundId },
     });
+    if (sound.authorId && sound.authorId !== userId) {
+      this.notifications.create({
+        userId: sound.authorId,
+        type: 'WISHLIST_ADDED',
+        title: 'Sound masuk wishlist',
+        message: `"${sound.title}" baru saja disimpan ke wishlist user.`,
+        actionUrl: `/sounds/${sound.slug}`,
+      }).catch(() => null);
+    }
     return { liked: true, message: 'Ditambahkan ke wishlist' };
   }
 

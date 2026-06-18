@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { EarningsService } from '../earnings/earnings.service';
 import { EmailService } from '../email/email.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 // Midtrans tidak punya tipe resmi, pakai require
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -29,6 +30,7 @@ export class OrdersService {
     private config: ConfigService,
     private earnings: EarningsService,
     private email: EmailService,
+    private notifications: NotificationsService,
   ) {
     this.snap = new midtransClient.Snap({
       isProduction: config.get('MIDTRANS_IS_PRODUCTION') === 'true',
@@ -163,6 +165,14 @@ export class OrdersService {
       where: { id: order.id },
       data: { gatewayOrderId: order.id, snapToken },
     });
+
+    await this.notifications.create({
+      userId,
+      type: 'ORDER_PENDING',
+      title: 'Order menunggu pembayaran',
+      message: `Order #${order.id.slice(0, 8).toUpperCase()} masih pending. Selesaikan pembayaran agar sound bisa didownload.`,
+      actionUrl: `/orders/${order.id}/pay`,
+    }).catch(() => null);
 
     return {
       orderId: order.id,
@@ -396,6 +406,13 @@ export class OrdersService {
     // Record purchase earnings (idempotent via dedup key 'order:<itemId>')
     if (activated) {
       await this.earnings.recordOrderEarnings(order.id);
+      await this.notifications.create({
+        userId,
+        type: 'PAYMENT_SUCCESS',
+        title: 'Pembayaran berhasil',
+        message: `Order #${order.id.slice(0, 8).toUpperCase()} sudah berhasil. Sound siap didownload.`,
+        actionUrl: `/orders/${order.id}/success`,
+      }).catch(() => null);
       // Notify creators (fire-and-forget)
       this.notifyCreatorsOnSale(order.id).catch(() => {});
     }
@@ -448,6 +465,13 @@ export class OrdersService {
       where: { id: orderId },
       data: { status: 'CANCELLED' },
     });
+    await this.notifications.create({
+      userId,
+      type: 'PAYMENT_FAILED',
+      title: 'Order dibatalkan',
+      message: `Order #${order.id.slice(0, 8).toUpperCase()} sudah dibatalkan.`,
+      actionUrl: '/dashboard/orders',
+    }).catch(() => null);
     return { cancelled: true };
   }
 

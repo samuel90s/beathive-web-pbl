@@ -55,6 +55,17 @@ export const ordersApi = {
     return data as { snapToken: string };
   },
 
+  syncStatus: async (orderId: string) => {
+    const { data } = await apiClient.patch(`/orders/${orderId}/sync`);
+    return data as {
+      status: string;
+      paidAt?: string;
+      gatewayStatus?: string;
+      changed: boolean;
+      message?: string;
+    };
+  },
+
   getInvoice: async (orderId: string) => {
     const { data } = await apiClient.get(`/orders/${orderId}/invoice`);
     return data;

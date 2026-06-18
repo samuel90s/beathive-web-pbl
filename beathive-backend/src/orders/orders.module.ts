@@ -9,9 +9,10 @@ import { LicenseModule } from '../common/license/license.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { EarningsModule } from '../earnings/earnings.module';
 import { EmailModule } from '../email/email.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [ConfigModule, LicenseModule, SubscriptionsModule, EarningsModule, EmailModule],
+  imports: [ConfigModule, LicenseModule, SubscriptionsModule, EarningsModule, EmailModule, NotificationsModule],
   controllers: [OrdersController],
   providers: [OrdersService, WebhookService, PrismaService],
   exports: [WebhookService],

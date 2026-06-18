@@ -69,6 +69,17 @@ export class OrdersController {
   }
 
   // GET /orders/:id  — detail order (untuk halaman payment)
+  @Patch(':id/sync')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async syncOrderStatus(
+    @CurrentUser() userId: string,
+    @Param('id') orderId: string,
+  ) {
+    await this.ordersService.getOrderForPayment(userId, orderId);
+    return this.webhookService.syncOrderStatus(orderId);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   async getOrder(

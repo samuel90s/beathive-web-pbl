@@ -13,6 +13,7 @@ import { EarningsModule } from './earnings/earnings.module';
 import { EmailModule } from './email/email.module';
 import { RatingsModule } from './ratings/ratings.module';
 import { HealthModule } from './health/health.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { HealthModule } from './health/health.module';
     EarningsModule,
     RatingsModule,
     HealthModule,
+    NotificationsModule,
   ],
   providers: [
     PrismaService,

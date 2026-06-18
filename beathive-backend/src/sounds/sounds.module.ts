@@ -6,10 +6,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageModule } from '../common/storage/storage.module';
 import { AudioService } from '../common/audio/audio.service';
 import { EarningsModule } from '../earnings/earnings.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [StorageModule, ConfigModule, EarningsModule],
+  imports: [StorageModule, ConfigModule, EarningsModule, NotificationsModule],
   controllers: [SoundsController],
   providers: [SoundsService, PrismaService, AudioService],
   exports: [SoundsService],

@@ -7,6 +7,7 @@ import { LicenseService } from '../common/license/license.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { EarningsService } from '../earnings/earnings.service';
 import { EmailService } from '../email/email.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 // Midtrans does not publish complete TypeScript types for its Node client.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -23,6 +24,7 @@ export class WebhookService {
     private subscriptionsService: SubscriptionsService,
     private earnings: EarningsService,
     private email: EmailService,
+    private notifications: NotificationsService,
   ) {}
 
   // ─── Verifikasi signature dari Midtrans ─────────────────
@@ -262,6 +264,14 @@ export class WebhookService {
     // Record purchase earnings — await agar tidak hilang; idempotent via dedup key
     await this.earnings.recordOrderEarnings(order.id);
 
+    await this.notifications.create({
+      userId: order.userId,
+      type: 'PAYMENT_SUCCESS',
+      title: 'Pembayaran berhasil',
+      message: `Order #${order.id.slice(0, 8).toUpperCase()} sudah berhasil. Sound siap didownload.`,
+      actionUrl: `/orders/${order.id}/success`,
+    }).catch(() => null);
+
     // Notify creators (fire-and-forget)
     this.notifyCreatorsOnSale(order).catch(() => {});
   }
@@ -310,6 +320,12 @@ export class WebhookService {
     });
 
     this.logger.log(`Order ${order.id} gagal dibayar`);
-    // TODO: kirim email notif gagal ke user
+    await this.notifications.create({
+      userId: order.userId,
+      type: 'PAYMENT_FAILED',
+      title: 'Pembayaran gagal',
+      message: `Order #${order.id.slice(0, 8).toUpperCase()} gagal atau kedaluwarsa.`,
+      actionUrl: '/dashboard/orders',
+    }).catch(() => null);
   }
 }

@@ -183,6 +183,43 @@
   .light .text-\[\#6b6f82\] { color: #9ca3af; }
   .light .text-\[\#5a5d72\] { color: #9ca3af; }
   .light .text-\[\#4a4d5e\] { color: #d1d5db; }
+  .light .text-\[\#3a3c4e\] { color: #cbd5e1; }
+  .light .text-white { color: #111827; }
+  .light .btn-accent,
+  .light .btn-accent *,
+  .light .bg-accent,
+  .light .bg-accent * {
+    color: #fff;
+  }
+  .light .bg-\[\#0c0d16\],
+  .light .bg-\[\#0c0d10\],
+  .light .bg-\[\#0e0f1a\],
+  .light .bg-\[\#0e0f1a\]\/80,
+  .light .bg-\[\#111318\],
+  .light .bg-\[\#13141f\],
+  .light .bg-\[\#16172a\],
+  .light .bg-\[\#17182a\],
+  .light .bg-\[\#191b22\],
+  .light .bg-\[\#1a1b2e\] {
+    background-color: var(--bg-surface);
+  }
+  .light .hover\:bg-\[\#16172a\]:hover,
+  .light .hover\:bg-white\/\[0\.02\]:hover,
+  .light .hover\:bg-white\/\[0\.04\]:hover,
+  .light .hover\:bg-white\/\[0\.05\]:hover,
+  .light .hover\:bg-white\/\[0\.08\]:hover {
+    background-color: var(--bg-lift);
+  }
+  .light .border-\[\#1a1b2e\],
+  .light .border-\[\#1e2030\],
+  .light .border-\[\#2a2c3e\],
+  .light .border-white\/\[0\.04\],
+  .light .border-white\/\[0\.06\],
+  .light .border-white\/\[0\.08\],
+  .light .border-white\/\[0\.10\],
+  .light .border-white\/\[0\.12\] {
+    border-color: var(--bg-rim);
+  }
 
   .animate-slide-in { animation: slideIn 0.22s ease-out; }
   .animate-fade-up  { animation: fadeUp 0.35s ease-out; }

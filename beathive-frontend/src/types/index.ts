@@ -149,6 +149,16 @@ export interface Invoice {
   issuedAt: string;
 }
 
+export interface UserNotification {
+  id: string;
+  type: 'SOUND_APPROVED' | 'SOUND_REJECTED' | 'PAYMENT_SUCCESS' | 'PAYMENT_FAILED' | 'ORDER_PENDING' | 'WISHLIST_ADDED';
+  title: string;
+  message: string;
+  actionUrl?: string | null;
+  readAt?: string | null;
+  createdAt: string;
+}
+
 export interface SoundsResponse {
   items: AudioAsset[];
   pagination: {
