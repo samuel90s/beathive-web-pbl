@@ -1,6 +1,6 @@
 // src/components/sounds/SoundRow.tsx
 'use client';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useState } from 'react';
 import Link from 'next/link';
 import { usePlayerStore } from '@/lib/store/player.store';
 import { useCartStore } from '@/lib/store/cart.store';
@@ -52,25 +52,6 @@ function SoundRow({ sound, onWishlistChange }: Props) {
   const { download, downloading } = useDownload();
   const { toggle: toggleWishlist, loadingId } = useWishlist();
   const [liked, setLiked] = useState<boolean>(sound.isLiked ?? false);
-  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    };
-  }, []);
-
-  // Hover-to-preview: start playback after 600ms hover.
-  const handleMouseEnter = () => {
-    if (isActive) return;
-    hoverTimer.current = setTimeout(() => play(sound), 600);
-  };
-  const handleMouseLeave = () => {
-    if (hoverTimer.current) {
-      clearTimeout(hoverTimer.current);
-      hoverTimer.current = null;
-    }
-  };
 
   const inCart = hasItem(sound.id);
   const wishlistLoading = loadingId === sound.id;
@@ -119,15 +100,12 @@ function SoundRow({ sound, onWishlistChange }: Props) {
   return (
     <div
       onClick={togglePlay}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
       className={clsx(
-        'flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer group transition-all duration-150',
+        'flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer group transition-all duration-150 overflow-hidden',
         isActive
-          ? 'border-accent/40 bg-accent/8'
-          : 'border-rim bg-surface hover:border-white/[0.12] hover:bg-lift',
+          ? 'border-accent/40 bg-accent/10 shadow-sm dark:bg-accent/[0.08]'
+          : 'border-rim bg-surface hover:border-accent/25 hover:bg-lift',
       )}
-      style={isActive ? { backgroundColor: 'rgba(247,148,29,0.08)' } : undefined}
     >
       {/* Category color thumbnail */}
       <div className={clsx(
@@ -143,7 +121,7 @@ function SoundRow({ sound, onWishlistChange }: Props) {
           'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-150 relative',
           isActive
             ? 'bg-accent shadow-[0_0_12px_rgba(247,148,29,0.4)]'
-            : 'bg-white/[0.06] group-hover:bg-accent/20',
+            : 'bg-slate-100 text-slate-500 group-hover:bg-accent/15 dark:bg-white/[0.06] dark:group-hover:bg-accent/20',
         )}
       >
         {isCurrentlyPlaying ? (
@@ -158,7 +136,7 @@ function SoundRow({ sound, onWishlistChange }: Props) {
         )}
         {/* Lock icon for restricted sounds */}
         {sound.accessLevel !== 'FREE' && !isActive && !isOwner && (
-          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#0c0d16] border border-rim flex items-center justify-center">
+          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-surface border border-rim flex items-center justify-center">
             <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="#6b6f82" strokeWidth="2.5" strokeLinecap="round">
               <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
             </svg>
@@ -172,7 +150,7 @@ function SoundRow({ sound, onWishlistChange }: Props) {
           <Link
             href={`/sounds/${sound.slug}`}
             onClick={(e) => e.stopPropagation()}
-            className="text-sm font-medium text-[#c4c6d8] truncate hover:text-accent-bright transition-colors"
+            className="text-sm font-semibold text-slate-900 dark:text-[#c4c6d8] truncate hover:text-accent-bright transition-colors"
           >
             {sound.title}
           </Link>
@@ -184,7 +162,7 @@ function SoundRow({ sound, onWishlistChange }: Props) {
           )}
         </div>
         <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-          <span className="text-xs text-[#5a5d72] truncate">{sound.category.name}</span>
+          <span className="text-xs text-slate-500 dark:text-[#5a5d72] truncate">{sound.category.name}</span>
           {isMusic && musicMood && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal/10 text-teal border border-teal/20 capitalize flex-shrink-0">
               {musicMood}
@@ -196,18 +174,18 @@ function SoundRow({ sound, onWishlistChange }: Props) {
             </span>
           )}
           {isMusic && hasStems && (
-            <span className="hidden md:inline-flex text-[10px] px-1.5 py-0.5 rounded bg-white/[0.05] text-[#8b8fa8] border border-white/[0.06] flex-shrink-0">
+            <span className="hidden md:inline-flex text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-rim dark:bg-white/[0.05] dark:text-[#8b8fa8] dark:border-white/[0.06] flex-shrink-0">
               Stems
             </span>
           )}
         </div>
-        <p className="text-[10px] text-[#3a3c4e] mt-0.5 tabular-nums">
+        <p className="text-[10px] text-slate-400 dark:text-[#3a3c4e] mt-0.5 tabular-nums">
           {sound.playCount.toLocaleString()} plays · {sound.downloadCount.toLocaleString()} dl
         </p>
       </div>
 
       {/* Waveform */}
-      <div className="flex-1 hidden sm:block">
+      <div className="flex-1 hidden sm:block min-w-0 max-w-[300px] opacity-80 transition-opacity group-hover:opacity-100">
         <WaveformBar
           data={sound.waveformData}
           isActive={isActive}
@@ -216,7 +194,7 @@ function SoundRow({ sound, onWishlistChange }: Props) {
       </div>
 
       {/* Duration */}
-      <span className="text-xs text-[#5a5d72] w-10 text-right flex-shrink-0 tabular-nums">
+      <span className="text-xs text-slate-500 dark:text-[#5a5d72] w-10 text-right flex-shrink-0 tabular-nums">
         {formatDuration(sound.durationMs)}
       </span>
 
@@ -229,7 +207,7 @@ function SoundRow({ sound, onWishlistChange }: Props) {
           aria-label={liked ? `Remove ${sound.title} from wishlist` : `Add ${sound.title} to wishlist`}
           className={clsx(
             'flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-150',
-            liked ? 'text-rose-400' : 'text-[#3a3c4e] hover:text-rose-400',
+            liked ? 'text-rose-400' : 'text-slate-300 hover:text-rose-400 dark:text-[#3a3c4e]',
             wishlistLoading && 'opacity-50',
           )}
         >
@@ -275,7 +253,7 @@ function SoundRow({ sound, onWishlistChange }: Props) {
             }
             return (
               <>
-                <span className="text-xs text-[#5a5d72] font-medium">
+                <span className="text-xs text-slate-500 dark:text-[#5a5d72] font-medium">
                   Rp {(sound.price / 1000).toFixed(0)}k
                 </span>
                 <button

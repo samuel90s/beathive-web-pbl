@@ -135,13 +135,15 @@ export default function GlobalPlayer() {
         input[type=range].player-range{-webkit-appearance:none;height:3px;background:transparent;border-radius:99px;cursor:pointer;outline:none}
         input[type=range].player-range::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#F7941D;cursor:pointer;box-shadow:0 0 8px rgba(247,148,29,0.6);transition:transform .1s}
         input[type=range].player-range:hover::-webkit-slider-thumb{transform:scale(1.2)}
-        input[type=range].vol-range{-webkit-appearance:none;height:3px;background:rgba(255,255,255,0.1);border-radius:99px;cursor:pointer;outline:none}
-        input[type=range].vol-range::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:rgba(255,255,255,0.6);cursor:pointer}
+        input[type=range].vol-range{-webkit-appearance:none;height:3px;background:rgba(148,163,184,0.28);border-radius:99px;cursor:pointer;outline:none}
+        input[type=range].vol-range::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:#64748b;cursor:pointer}
+        .dark input[type=range].vol-range{background:rgba(255,255,255,0.1)}
+        .dark input[type=range].vol-range::-webkit-slider-thumb{background:rgba(255,255,255,0.6)}
       `}</style>
 
       {/* Preview locked banner */}
       {previewLocked && (
-        <div className="bg-gradient-to-r from-[#1a0e00]/95 to-[#0e1a18]/95 backdrop-blur-xl border-t border-accent/30 px-4 py-2.5 flex items-center justify-between gap-4">
+        <div className="bg-orange-50/95 text-slate-900 backdrop-blur-xl border-t border-accent/30 px-4 py-2.5 flex items-center justify-between gap-4 dark:bg-gradient-to-r dark:from-[#1a0e00]/95 dark:to-[#0e1a18]/95 dark:text-white">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center flex-shrink-0">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffaa4d" strokeWidth="2.5" strokeLinecap="round">
@@ -149,7 +151,7 @@ export default function GlobalPlayer() {
               </svg>
             </div>
             <div>
-              <p className="text-xs font-semibold text-orange-100">{PREVIEW_LIMIT}s preview only</p>
+              <p className="text-xs font-semibold text-slate-900 dark:text-orange-100">{PREVIEW_LIMIT}s preview only</p>
               <p className="text-[10px] text-accent-bright">
                 {currentTrack.accessLevel === 'PURCHASE'
                   ? 'Purchase this sound to play the full version'
@@ -160,7 +162,7 @@ export default function GlobalPlayer() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => { setPreviewLocked(false); audioRef.current && (audioRef.current.currentTime = 0); resume(); }}
-              className="px-3 py-1 text-xs text-orange-200 hover:text-white border border-accent/30 rounded-lg hover:bg-accent/10 transition-colors"
+              className="px-3 py-1 text-xs text-accent-bright hover:text-accent border border-accent/30 rounded-lg hover:bg-accent/10 transition-colors dark:text-orange-200 dark:hover:text-white"
             >
               Replay
             </button>
@@ -183,7 +185,7 @@ export default function GlobalPlayer() {
       )}
 
       {/* Main player bar */}
-      <div className="bg-[#0e0f1a]/95 backdrop-blur-xl border-t border-white/[0.06] px-4 py-2.5">
+      <div className="bg-surface/95 backdrop-blur-xl border-t border-rim px-4 py-2.5 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] dark:bg-[#0e0f1a]/95 dark:border-white/[0.06] dark:shadow-none">
         <audio
           ref={audioRef}
           crossOrigin="anonymous"
@@ -219,7 +221,7 @@ export default function GlobalPlayer() {
             </button>
             <button
               onClick={stop}
-              className="hidden sm:flex w-7 h-7 rounded-full text-[#3a3c4e] hover:text-[#6b6f82] items-center justify-center transition-colors"
+              className="hidden sm:flex w-7 h-7 rounded-full text-slate-400 hover:text-slate-600 items-center justify-center transition-colors dark:text-[#3a3c4e] dark:hover:text-[#6b6f82]"
             >
               <svg width="11" height="11" viewBox="0 0 14 14" fill="currentColor">
                 <rect x="1" y="1" width="12" height="12" rx="2"/>
@@ -229,9 +231,9 @@ export default function GlobalPlayer() {
 
           {/* Track info */}
           <div className="flex-shrink-0 min-w-0 w-28 sm:w-40">
-            <p className="text-[12px] sm:text-[13px] font-semibold text-white truncate leading-tight">{currentTrack.title}</p>
+            <p className="text-[12px] sm:text-[13px] font-semibold text-slate-900 truncate leading-tight dark:text-white">{currentTrack.title}</p>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <p className="text-[10px] text-[#5a5d72] truncate">
+              <p className="text-[10px] text-slate-500 truncate dark:text-[#5a5d72]">
                 {currentTrack.category.name}
                 {audioError
                   ? <span className="text-red-400 ml-1">· Error</span>
@@ -247,13 +249,13 @@ export default function GlobalPlayer() {
 
           {/* Progress bar */}
           <div className="flex-1 flex items-center gap-2.5 min-w-0">
-            <span className="text-[10px] text-[#4a4d5e] w-8 text-right tabular-nums flex-shrink-0">
+            <span className="text-[10px] text-slate-500 w-8 text-right tabular-nums flex-shrink-0 dark:text-[#4a4d5e]">
               {fmt(currentSec)}
             </span>
             <div className="flex-1 relative h-3 flex items-center group">
               {/* Track background */}
               <div className="absolute inset-y-0 left-0 right-0 flex items-center">
-                <div className="w-full h-[3px] bg-white/[0.08] rounded-full" />
+                <div className="w-full h-[3px] bg-slate-200 rounded-full dark:bg-white/[0.08]" />
               </div>
               {/* Played portion */}
               <div
@@ -279,7 +281,7 @@ export default function GlobalPlayer() {
                 style={{ position: 'absolute', inset: 0, height: '100%' }}
               />
             </div>
-            <span className="text-[10px] text-[#4a4d5e] w-8 tabular-nums flex-shrink-0">
+            <span className="text-[10px] text-slate-500 w-8 tabular-nums flex-shrink-0 dark:text-[#4a4d5e]">
               {fmt(displayTotal)}
               {!fullAccess && totalSec > PREVIEW_LIMIT && (
                 <span className="text-accent-bright"> /{PREVIEW_LIMIT}s</span>
@@ -289,16 +291,16 @@ export default function GlobalPlayer() {
 
           {/* Volume */}
           <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
-            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" className="text-[#4a4d5e]">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" className="text-slate-400 dark:text-[#4a4d5e]">
               <path d="M2 5h2l3-3v10l-3-3H2V5z" fill="currentColor"/>
               <path d="M9 4.5c1 .8 1.5 1.5 1.5 2.5s-.5 1.7-1.5 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
             </svg>
             <div className="relative w-16 h-3 flex items-center">
               <div className="absolute inset-y-0 left-0 right-0 flex items-center">
-                <div className="w-full h-[3px] bg-white/[0.08] rounded-full" />
+                <div className="w-full h-[3px] bg-slate-200 rounded-full dark:bg-white/[0.08]" />
               </div>
               <div className="absolute inset-y-0 left-0 flex items-center" style={{ width: `${Math.round(volume * 100)}%` }}>
-                <div className="w-full h-[3px] bg-white/30 rounded-full" />
+                <div className="w-full h-[3px] bg-slate-400 rounded-full dark:bg-white/30" />
               </div>
               <input
                 type="range" min={0} max={100} value={Math.round(volume * 100)}
@@ -313,7 +315,7 @@ export default function GlobalPlayer() {
             onClick={async () => await toggleWishlist(currentTrack.id, liked, setLiked)}
             disabled={loadingId === currentTrack.id}
             className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all ${
-              liked ? 'text-rose-400' : 'text-[#3a3c4e] hover:text-rose-400'
+              liked ? 'text-rose-400' : 'text-slate-400 hover:text-rose-400 dark:text-[#3a3c4e]'
             }`}
           >
             <svg width="15" height="15" viewBox="0 0 24 24"

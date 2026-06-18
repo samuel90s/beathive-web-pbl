@@ -25,6 +25,8 @@
 
   --shadow-surface: 0 1px 4px rgba(0,0,0,0.1);
   --shadow-elevated: 0 8px 24px rgba(0,0,0,0.15);
+  --wave-muted: rgba(148,163,184,0.45);
+  --wave-active: rgba(247,148,29,0.34);
 }
 
 .dark {
@@ -47,6 +49,8 @@
 
   --shadow-surface: 0 2px 8px rgba(0,0,0,0.5);
   --shadow-elevated: 0 8px 32px rgba(0,0,0,0.6);
+  --wave-muted: rgba(255,255,255,0.1);
+  --wave-active: rgba(247,148,29,0.35);
 }
 
 /* Base */

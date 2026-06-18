@@ -24,11 +24,30 @@ const getCreatedAtMs = (sound: AudioAsset) => (
   sound.createdAt ? new Date(sound.createdAt).getTime() : 0
 );
 
+type CreatorAssetFilter = 'all' | 'sfx' | 'music';
+type CreatorSort = 'popular' | 'latest' | 'plays' | 'downloads';
+
+const assetFilters: { value: CreatorAssetFilter; label: string }[] = [
+  { value: 'all', label: 'Semua' },
+  { value: 'sfx', label: 'SFX' },
+  { value: 'music', label: 'Music' },
+];
+
+const sortOptions: { value: CreatorSort; label: string }[] = [
+  { value: 'popular', label: 'Terpopuler' },
+  { value: 'latest', label: 'Terbaru' },
+  { value: 'plays', label: 'Paling Diputar' },
+  { value: 'downloads', label: 'Paling Diunduh' },
+];
+
 export default function CreatorProfilePage() {
   const { id } = useParams<{ id: string }>();
   const [profile, setProfile] = useState<CreatorProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [assetFilter, setAssetFilter] = useState<CreatorAssetFilter>('all');
+  const [sortBy, setSortBy] = useState<CreatorSort>('popular');
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -49,14 +68,27 @@ export default function CreatorProfilePage() {
     }
     return Array.from(map.values()).sort((a, b) => b.count - a.count).slice(0, 5);
   }, [sounds]);
-  const latestSounds = useMemo(
-    () => [...sounds].sort((a, b) => getCreatedAtMs(b) - getCreatedAtMs(a)).slice(0, 6),
-    [sounds],
-  );
-  const popularSounds = useMemo(
-    () => [...sounds].sort((a, b) => (b.downloadCount + b.playCount) - (a.downloadCount + a.playCount)).slice(0, 6),
-    [sounds],
-  );
+  const filteredSounds = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return sounds
+      .filter((sound) => {
+        const type = sound.assetType?.toLowerCase() ?? sound.category?.type ?? 'sfx';
+        if (assetFilter !== 'all' && type !== assetFilter) return false;
+        if (!normalizedQuery) return true;
+        return [
+          sound.title,
+          sound.category?.name,
+          ...(sound.tags ?? []).map((tag) => tag.name),
+          ...(sound.genres ?? []).map((genre) => genre.name),
+        ].some((value) => value?.toLowerCase().includes(normalizedQuery));
+      })
+      .sort((a, b) => {
+        if (sortBy === 'latest') return getCreatedAtMs(b) - getCreatedAtMs(a);
+        if (sortBy === 'plays') return b.playCount - a.playCount;
+        if (sortBy === 'downloads') return b.downloadCount - a.downloadCount;
+        return (b.downloadCount + b.playCount) - (a.downloadCount + a.playCount);
+      });
+  }, [assetFilter, query, sortBy, sounds]);
 
   if (loading) {
     return (
@@ -104,7 +136,7 @@ export default function CreatorProfilePage() {
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-semibold text-white">{profile.name}</h1>
-            <p className="text-sm text-[#5a5d72] mt-0.5">Creator sejak {joinYear}</p>
+            <p className="text-sm text-slate-500 dark:text-[#5a5d72] mt-0.5">Creator sejak {joinYear}</p>
             {profile.bio && (
               <p className="text-sm text-[#8b8fa8] mt-2 leading-relaxed">{profile.bio}</p>
             )}
@@ -136,7 +168,7 @@ export default function CreatorProfilePage() {
           ].map(({ label, value }) => (
             <div key={label} className="text-center">
               <p className="text-lg font-bold text-white">{value}</p>
-              <p className="text-xs text-[#5a5d72] mt-0.5">{label}</p>
+              <p className="text-xs text-slate-500 dark:text-[#5a5d72] mt-0.5">{label}</p>
             </div>
           ))}
         </div>
@@ -144,9 +176,9 @@ export default function CreatorProfilePage() {
 
       <section className="grid gap-4 md:grid-cols-3 mb-7">
         <div className="card rounded-2xl p-5 md:col-span-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#5a5d72] mb-3">Kategori Utama</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-[#5a5d72] mb-3">Kategori Utama</p>
           {topCategories.length === 0 ? (
-            <p className="text-sm text-[#5a5d72]">Belum ada kategori aktif.</p>
+            <p className="text-sm text-slate-500 dark:text-[#5a5d72]">Belum ada kategori aktif.</p>
           ) : (
             <div className="space-y-3">
               {topCategories.map((cat) => (
@@ -166,7 +198,7 @@ export default function CreatorProfilePage() {
           )}
         </div>
         <div className="card rounded-2xl p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#5a5d72]">Rata-rata performa</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-[#5a5d72]">Rata-rata performa</p>
           <p className="mt-4 text-2xl font-bold text-white">
             {profile.soundCount ? Math.round((profile.totalPlays + profile.totalDownloads) / profile.soundCount).toLocaleString() : '0'}
           </p>
@@ -175,32 +207,76 @@ export default function CreatorProfilePage() {
       </section>
 
       {profile.sounds.length === 0 ? (
-        <div className="text-center py-12 text-sm text-[#5a5d72]">
+        <div className="text-center py-12 text-sm text-slate-500 dark:text-[#5a5d72]">
           No published sounds yet.
         </div>
       ) : (
-        <div className="grid gap-8 lg:grid-cols-2">
-          <section>
-            <h2 className="text-sm font-semibold text-[#4a4d5e] uppercase tracking-widest mb-3">
-              Sound Terpopuler
-            </h2>
-            <div className="space-y-1.5">
-              {popularSounds.map(sound => (
+        <section className="card rounded-3xl border border-rim p-4 sm:p-5">
+          <div className="flex flex-col gap-4 mb-5">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-widest">
+                  Katalog Sound
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-[#5a5d72] mt-1">
+                  {filteredSounds.length.toLocaleString()} dari {profile.sounds.length.toLocaleString()} sound tampil
+                </p>
+              </div>
+              <Link href={`/browse?authorId=${encodeURIComponent(profile.id)}`} className="text-xs font-semibold text-accent-bright hover:underline">
+                Buka di Browse
+              </Link>
+            </div>
+
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+              <div className="flex flex-wrap gap-2">
+                {assetFilters.map((filter) => (
+                  <button
+                    key={filter.value}
+                    type="button"
+                    onClick={() => setAssetFilter(filter.value)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      assetFilter === filter.value
+                        ? 'border-accent bg-accent text-white'
+                        : 'border-rim bg-surface text-slate-500 hover:border-accent/40 hover:text-accent-bright dark:text-[#8b8fa8]'
+                    }`}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex flex-1 flex-col gap-2 sm:flex-row">
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Cari judul, kategori, tag..."
+                  className="input-dark min-w-0 flex-1 rounded-xl px-3 py-2 text-sm"
+                />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as CreatorSort)}
+                  className="input-dark rounded-xl px-3 py-2 text-sm sm:w-44"
+                >
+                  {sortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {filteredSounds.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-rim py-10 text-center text-sm text-slate-500 dark:text-[#6b6f82]">
+              Tidak ada sound yang cocok dengan filter ini.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredSounds.map(sound => (
                 <SoundRow key={sound.id} sound={sound} />
               ))}
             </div>
-          </section>
-          <section>
-            <h2 className="text-sm font-semibold text-[#4a4d5e] uppercase tracking-widest mb-3">
-              Upload Terbaru
-            </h2>
-            <div className="space-y-1.5">
-              {latestSounds.map(sound => (
-                <SoundRow key={sound.id} sound={sound} />
-              ))}
-            </div>
-          </section>
-        </div>
+          )}
+        </section>
       )}
     </div>
   );

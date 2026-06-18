@@ -31,8 +31,8 @@ function WaveformBar({ data, isActive, progress }: Props) {
               backgroundColor: played
                 ? '#F7941D'
                 : active
-                ? 'rgba(247,148,29,0.35)'
-                : 'rgba(255,255,255,0.1)',
+                ? 'var(--wave-active)'
+                : 'var(--wave-muted)',
               minWidth: '2px',
             }}
           />
