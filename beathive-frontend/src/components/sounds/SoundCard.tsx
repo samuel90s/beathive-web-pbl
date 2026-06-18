@@ -53,7 +53,7 @@ function SoundCard({ sound }: Props) {
   const play = usePlayerStore(s => s.play);
   const pause = usePlayerStore(s => s.pause);
   const progress = usePlayerStore(s => s.currentTrack?.id === sound.id ? s.progress : 0);
-  const { addItem, hasItem } = useCartStore();
+  const { addItem, removeItem, hasItem } = useCartStore();
   const { user } = useAuthStore();
   const { download, downloading } = useDownload();
   const { toggle: toggleWishlist, loadingId } = useWishlist();
@@ -94,8 +94,8 @@ function SoundCard({ sound }: Props) {
 
   const handleCart = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (inCart) return;
-    addItem(sound, 'personal');
+    if (inCart) removeItem(sound.id);
+    else addItem(sound, 'personal');
   };
 
   return (
@@ -246,14 +246,14 @@ function SoundCard({ sound }: Props) {
             ) : isPurchasable && !sound.isPurchased ? (
               <button
                 onClick={handleCart}
-                aria-label={inCart ? `${sound.title} is in cart` : `Add ${sound.title} to cart`}
+                aria-label={inCart ? `Remove ${sound.title} from cart` : `Add ${sound.title} to cart`}
                 className={clsx(
                   'w-7 h-7 rounded-lg flex items-center justify-center transition-all',
                   inCart
                     ? 'bg-accent/20 text-accent-bright border border-accent/20'
                     : 'bg-accent text-white hover:bg-accent-dim',
                 )}
-                title={inCart ? 'Di keranjang' : `Tambah ke keranjang`}
+                title={inCart ? 'Hapus dari keranjang' : `Tambah ke keranjang`}
               >
                 {inCart ? (
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
