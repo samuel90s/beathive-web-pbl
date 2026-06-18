@@ -549,26 +549,36 @@ function CategoryLanding({ soundType, onCategoryClick, onSubcatClick, onMoodClic
           <h2 className="text-[11px] font-bold text-[#5a5d72] uppercase tracking-[0.12em]">Semua Kategori</h2>
           <div className="flex-1 h-px bg-rim" />
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 rounded-2xl overflow-hidden border border-rim bg-surface divide-x divide-y divide-rim">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
           {allCats.map(cat => (
-            <div key={cat.slug} className="bg-surface p-4 hover:bg-lift transition-colors group">
+            <div
+              key={cat.slug}
+              className="rounded-2xl border border-rim bg-surface p-4 shadow-sm hover:border-accent/25 hover:bg-lift transition-all group"
+            >
               {/* Category header */}
               <button
                 onClick={() => onCategoryClick(cat.slug)}
-                className="flex items-center gap-2 mb-3 w-full text-left">
-                <div className={`w-3 h-3 rounded flex-shrink-0 bg-gradient-to-br ${cat.gradient}`} />
-                <span className="text-[13px] font-semibold text-[#c4c6d8] group-hover:text-white transition-colors">
-                  {cat.name}
-                </span>
+                className="flex items-center gap-3 mb-3 w-full text-left"
+              >
+                <div className={`w-9 h-9 rounded-xl flex-shrink-0 bg-gradient-to-br ${cat.gradient} shadow-sm`} />
+                <div className="min-w-0">
+                  <span className="block text-sm font-bold text-[#111827] dark:text-[#f4f5fb] group-hover:text-accent-bright transition-colors">
+                    {cat.name}
+                  </span>
+                  <span className="text-[11px] text-[#64748b] dark:text-[#6b6f82]">
+                    {cat.subcats.length} subkategori
+                  </span>
+                </div>
               </button>
 
               {/* Subcategory list */}
-              <div className="space-y-1">
+              <div className="flex flex-wrap gap-1.5">
                 {cat.subcats.map(sub => (
                   <button
                     key={sub}
                     onClick={() => onSubcatClick(cat.slug, sub)}
-                    className="block text-left text-xs text-[#4a4d5e] hover:text-[#a0a3b8] transition-colors py-0.5 w-full leading-relaxed">
+                    className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:border-accent/40 hover:bg-accent/10 hover:text-accent-dim dark:border-white/[0.06] dark:bg-white/[0.04] dark:text-[#8b8fa8] dark:hover:text-accent-bright transition-colors"
+                  >
                     {sub}
                   </button>
                 ))}
