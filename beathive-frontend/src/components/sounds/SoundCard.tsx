@@ -36,8 +36,8 @@ const MiniWaveform = memo(function MiniWaveform({ data, isActive, progress }: { 
               backgroundColor: played
                 ? '#ffaa4d'
                 : isActive
-                ? 'rgba(255,170,77,0.35)'
-                : 'rgba(255,255,255,0.12)',
+                ? 'var(--wave-active)'
+                : 'var(--wave-muted)',
               minWidth: '1.5px',
             }}
           />
@@ -104,8 +104,8 @@ function SoundCard({ sound }: Props) {
       className={clsx(
         'group rounded-xl border cursor-pointer flex flex-col overflow-hidden transition-all duration-150',
         isActive
-          ? 'border-accent/40 bg-[#17182a]'
-          : 'border-[#1e2030] bg-[#13141f] hover:border-[#2a2c3e] hover:bg-[#16172a]',
+          ? 'border-accent/40 bg-accent/5 dark:bg-[#17182a]'
+          : 'border-rim bg-surface hover:border-accent/25 hover:bg-lift dark:border-[#1e2030] dark:bg-[#13141f] dark:hover:border-[#2a2c3e] dark:hover:bg-[#16172a]',
       )}
     >
       {/* Waveform area */}
@@ -126,7 +126,7 @@ function SoundCard({ sound }: Props) {
             'absolute bottom-2 right-2 w-9 h-9 rounded-full flex items-center justify-center transition-all shadow-md z-10',
             isActive
               ? 'bg-accent shadow-[0_0_14px_rgba(247,148,29,0.45)]'
-              : 'bg-[#0e0f1a]/80 border border-[#2a2c3e] group-hover:bg-accent/20 group-hover:border-accent/30',
+              : 'bg-white/90 border border-rim text-slate-500 group-hover:bg-accent/15 group-hover:border-accent/30 dark:bg-[#0e0f1a]/80 dark:border-[#2a2c3e] dark:group-hover:bg-accent/20',
           )}
         >
           {isCurrentlyPlaying ? (
@@ -151,13 +151,13 @@ function SoundCard({ sound }: Props) {
             onClick={e => e.stopPropagation()}
             className={clsx(
               'text-[13px] font-semibold leading-snug line-clamp-2 block transition-colors',
-              isActive ? 'text-white' : 'text-[#c4c6d8] hover:text-white',
+              isActive ? 'text-slate-900 dark:text-white' : 'text-slate-900 hover:text-accent-bright dark:text-[#c4c6d8] dark:hover:text-white',
             )}
           >
             {sound.title}
           </Link>
           {sound.author?.name && (
-            <p className="text-[11px] text-[#4a4d5e] truncate mt-0.5">{sound.author.name}</p>
+            <p className="text-[11px] text-slate-400 dark:text-[#4a4d5e] truncate mt-0.5">{sound.author.name}</p>
           )}
         </div>
 
@@ -166,12 +166,12 @@ function SoundCard({ sound }: Props) {
           <div className="flex flex-wrap gap-1">
             {sound.tags.slice(0, 3).map(t => (
               <span key={t.id ?? t.name}
-                className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.05] text-[#5a5d72] border border-white/[0.04]">
+                className="text-[10px] px-1.5 py-0.5 rounded bg-slate-50 text-slate-500 border border-rim dark:bg-white/[0.05] dark:text-[#5a5d72] dark:border-white/[0.04]">
                 {t.name}
               </span>
             ))}
             {sound.tags.length > 3 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.05] text-[#3a3c4e]">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-50 text-slate-400 dark:bg-white/[0.05] dark:text-[#3a3c4e]">
                 +{sound.tags.length - 3}
               </span>
             )}
@@ -196,7 +196,7 @@ function SoundCard({ sound }: Props) {
         {/* Bottom row */}
         <div className="flex items-center gap-2 mt-auto pt-0.5">
           {/* Duration */}
-          <span className="text-[11px] text-[#4a4d5e] tabular-nums flex-shrink-0">
+          <span className="text-[11px] text-slate-400 dark:text-[#4a4d5e] tabular-nums flex-shrink-0">
             {formatDuration(sound.durationMs)}
           </span>
 
@@ -212,7 +212,7 @@ function SoundCard({ sound }: Props) {
             </span>
           )}
           {isPurchasable && !sound.isPurchased && !isOwner && sound.price > 0 && (
-            <span className="text-[11px] font-semibold text-[#6b6f82]">
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-[#6b6f82]">
               Rp {(sound.price / 1000).toFixed(0)}k
             </span>
           )}
@@ -226,7 +226,7 @@ function SoundCard({ sound }: Props) {
                 aria-label={liked ? `Remove ${sound.title} from wishlist` : `Add ${sound.title} to wishlist`}
                 className={clsx(
                   'w-7 h-7 rounded-lg flex items-center justify-center transition-all',
-                  liked ? 'text-rose-400' : 'text-[#3a3c4e] hover:text-rose-400',
+                  liked ? 'text-rose-400' : 'text-slate-300 hover:text-rose-400 dark:text-[#3a3c4e]',
                 )}
                 title={liked ? 'Remove from wishlist' : 'Add to wishlist'}
               >
@@ -269,7 +269,7 @@ function SoundCard({ sound }: Props) {
                 onClick={handleDownload}
                 disabled={downloading === sound.id}
                 aria-label={`Download ${sound.title}`}
-                className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#1a1b2e] border border-[#2a2c3e] text-[#6b6f82] hover:text-white hover:border-white/10 transition-all disabled:opacity-40"
+                className="w-7 h-7 rounded-lg flex items-center justify-center bg-white border border-rim text-slate-400 hover:text-teal hover:border-teal/30 transition-all disabled:opacity-40 dark:bg-[#1a1b2e] dark:border-[#2a2c3e] dark:text-[#6b6f82] dark:hover:text-white dark:hover:border-white/10"
                 title="Download"
               >
                 {downloading === sound.id ? (
