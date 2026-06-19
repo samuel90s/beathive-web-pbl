@@ -3,12 +3,16 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  BadGatewayException,
+  GatewayTimeoutException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const midtransClient = require('midtrans-client');
+
+const MIDTRANS_TIMEOUT_MS = 15_000;
 
 @Injectable()
 export class SubscriptionsService {
@@ -30,7 +34,7 @@ export class SubscriptionsService {
     });
   }
 
-  // ─── Status subscription user ───────────────────────────
+  // Status subscription user
 
   async getMySubscription(userId: string) {
     const sub = await this.prisma.subscription.findUnique({
@@ -65,7 +69,7 @@ export class SubscriptionsService {
     };
   }
 
-  // ─── Upgrade / ganti plan ───────────────────────────────
+  // Upgrade / ganti plan
 
   async upgradePlan(
     userId: string,
@@ -108,36 +112,45 @@ export class SubscriptionsService {
       data: { orderId, userId, planSlug, billingCycle },
     });
 
-    const transaction = await this.snap.createTransaction({
-      transaction_details: {
-        order_id: orderId,
-        gross_amount: totalAmount,
-      },
-      item_details: [
-        {
-          id: plan.id,
-          price: basePrice,
-          quantity: 1,
-          name: `Plan ${plan.name} - ${billingCycle === 'yearly' ? 'Tahunan' : 'Bulanan'}`,
+    let transaction: { token: string };
+    try {
+      transaction = await this.createSnapTransactionWithTimeout({
+        transaction_details: {
+          order_id: orderId,
+          gross_amount: totalAmount,
         },
-        {
-          id: 'service-fee',
-          price: serviceFee,
-          quantity: 1,
-          name: `Biaya Layanan (${SERVICE_FEE_PERCENT}%)`,
+        item_details: [
+          {
+            id: plan.id,
+            price: basePrice,
+            quantity: 1,
+            name: `Plan ${plan.name} - ${billingCycle === 'yearly' ? 'Tahunan' : 'Bulanan'}`,
+          },
+          {
+            id: 'service-fee',
+            price: serviceFee,
+            quantity: 1,
+            name: `Biaya Layanan (${SERVICE_FEE_PERCENT}%)`,
+          },
+          {
+            id: 'ppn',
+            price: tax,
+            quantity: 1,
+            name: `PPN (${TAX_PERCENT}%)`,
+          },
+        ],
+        customer_details: {
+          first_name: user.name,
+          email: user.email,
         },
-        {
-          id: 'ppn',
-          price: tax,
-          quantity: 1,
-          name: `PPN (${TAX_PERCENT}%)`,
-        },
-      ],
-      customer_details: {
-        first_name: user.name,
-        email: user.email,
-      },
-    });
+      });
+    } catch (err: any) {
+      await this.prisma.subscriptionIntent.deleteMany({ where: { orderId } });
+      if (err?.getStatus?.() === 504) throw err;
+      throw new BadGatewayException(
+        err?.message || 'Gagal membuat sesi pembayaran Midtrans. Coba lagi sebentar.',
+      );
+    }
 
     return {
       snapToken: transaction.token,
@@ -148,8 +161,19 @@ export class SubscriptionsService {
     };
   }
 
-  // ─── Aktifkan subscription setelah bayar ────────────────
+  // Aktifkan subscription setelah bayar
   // Dipanggil dari WebhookService setelah konfirmasi Midtrans
+
+  private async createSnapTransactionWithTimeout(params: Record<string, unknown>): Promise<{ token: string }> {
+    return Promise.race([
+      this.snap.createTransaction(params),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new GatewayTimeoutException('Midtrans terlalu lama merespons. Coba lagi sebentar.'));
+        }, MIDTRANS_TIMEOUT_MS);
+      }),
+    ]);
+  }
 
   async activateSubscription(
     userId: string,
@@ -196,7 +220,7 @@ export class SubscriptionsService {
     });
   }
 
-  // ─── Verify payment & aktifkan subscription ─────────────
+  // Verify payment & aktifkan subscription
   // Dipanggil frontend di onSuccess Snap sebagai backup dari webhook
 
   async verifyAndActivate(userId: string, orderId: string) {
@@ -206,7 +230,7 @@ export class SubscriptionsService {
     });
 
     if (!intent) {
-      // Mungkin sudah diproses webhook duluan — cek subscription aktif
+      // Mungkin sudah diproses webhook duluan, cek subscription aktif
       const sub = await this.prisma.subscription.findUnique({
         where: { userId },
         include: { plan: true },
@@ -252,7 +276,7 @@ export class SubscriptionsService {
     return { activated: true, subscription: sub };
   }
 
-  // ─── Downgrade / ganti plan ──────────────────────────────
+  // Downgrade / ganti plan
 
   async changePlan(userId: string, planSlug: string, billingCycle: 'monthly' | 'yearly') {
     const plan = await this.prisma.plan.findUnique({ where: { slug: planSlug } });
@@ -271,7 +295,7 @@ export class SubscriptionsService {
     return { message: `Plan berhasil diubah ke ${plan.name}`, plan: plan.name };
   }
 
-  // ─── Cancel subscription ────────────────────────────────
+  // Cancel subscription
 
   async cancelSubscription(userId: string) {
     const sub = await this.prisma.subscription.findUnique({
@@ -287,7 +311,7 @@ export class SubscriptionsService {
       throw new BadRequestException('Free plan cannot be cancelled');
     }
 
-    // Set cancelled — akses tetap aktif sampai currentPeriodEnd
+    // Set cancelled; akses tetap aktif sampai currentPeriodEnd
     await this.prisma.subscription.update({
       where: { userId },
       data: {
@@ -302,3 +326,4 @@ export class SubscriptionsService {
     };
   }
 }
+

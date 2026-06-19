@@ -193,7 +193,9 @@ export default function PricingPage() {
       });
     } catch (err: any) {
       setLoading(null);
-      const message = err?.response?.data?.message || err?.message || 'Gagal membuat pembayaran Pro.';
+      const message = err?.code === 'ECONNABORTED'
+        ? 'Server payment terlalu lama merespons. Coba lagi sebentar.'
+        : err?.response?.data?.message || err?.message || 'Gagal membuat pembayaran Pro.';
       toast.error(Array.isArray(message) ? message.join(', ') : message);
     }
   };

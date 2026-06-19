@@ -8,11 +8,11 @@ export const subscriptionsApi = {
     return data;
   },
 
-  upgrade: async (planSlug: string, billingCycle: 'monthly' | 'yearly') => {
+  upgrade: async (planSlug: string, billingCycle: 'monthly' | 'yearly' | '1month' | '3months' | '6months' | '12months') => {
     const { data } = await apiClient.post('/subscriptions/upgrade', {
       planSlug,
       billingCycle,
-    });
+    }, { timeout: 20_000 });
     return data as { snapToken: string; orderId: string; price: number };
   },
 
