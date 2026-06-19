@@ -27,7 +27,7 @@ export class SubscriptionsController {
   @UseGuards(JwtAuthGuard)
   async upgradePlan(
     @CurrentUser() userId: string,
-    @Body() body: { planSlug: string; billingCycle: 'monthly' | 'yearly' },
+    @Body() body: { planSlug: string; billingCycle: 'monthly' | 'yearly' | '1month' | '3months' | '6months' | '12months' },
   ) {
     return this.subscriptionsService.upgradePlan(
       userId,

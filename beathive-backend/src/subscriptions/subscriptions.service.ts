@@ -70,7 +70,7 @@ export class SubscriptionsService {
   async upgradePlan(
     userId: string,
     planSlug: string,
-    billingCycle: 'monthly' | 'yearly' | '3months' | '6months' | '12months',
+    billingCycle: 'monthly' | 'yearly' | '1month' | '3months' | '6months' | '12months',
   ) {
     const plan = await this.prisma.plan.findUnique({ where: { slug: planSlug } });
     if (!plan) throw new NotFoundException('Plan not found');

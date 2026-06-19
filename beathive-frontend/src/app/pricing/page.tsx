@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { subscriptionsApi } from '@/lib/api/subscriptions';
 import { formatPrice } from '@/lib/utils';
+import { toast } from '@/lib/store/toast.store';
 
 const SERVICE_FEE_PERCENT = 5;
 const TAX_PERCENT = 11;
@@ -35,6 +36,37 @@ interface ConfirmPlan {
   price: number;
   duration: Duration;
   durationLabel: string;
+}
+
+type MidtransSnap = {
+  pay: (
+    token: string,
+    callbacks: {
+      onSuccess?: () => void | Promise<void>;
+      onPending?: () => void;
+      onError?: () => void;
+      onClose?: () => void;
+    },
+  ) => void;
+};
+
+declare global {
+  interface Window {
+    snap?: MidtransSnap;
+  }
+}
+
+async function waitForMidtransSnap(timeoutMs = 8000): Promise<MidtransSnap | null> {
+  if (typeof window === 'undefined') return null;
+  if (window.snap) return window.snap;
+
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    if (window.snap) return window.snap;
+  }
+
+  return null;
 }
 
 function ConfirmModal({ plan, onConfirm, onClose, loading }: {
@@ -136,17 +168,34 @@ export default function PricingPage() {
     try {
       const result = await subscriptionsApi.upgrade(confirm.slug, confirm.duration as any);
       setConfirm(null);
-      if ((window as any).snap) {
-        (window as any).snap.pay(result.snapToken, {
-          onSuccess: async () => {
-            try { await subscriptionsApi.verifyPayment(result.orderId); } catch { /* webhook */ }
-            router.push('/studio?upgrade=success');
-          },
-          onError: () => setLoading(null),
-          onClose: () => setLoading(null),
-        });
+      const snap = await waitForMidtransSnap();
+      if (!snap) {
+        setLoading(null);
+        toast.error('Payment gateway belum siap. Refresh halaman lalu coba lagi.');
+        return;
       }
-    } catch { setLoading(null); }
+
+      snap.pay(result.snapToken, {
+        onSuccess: async () => {
+          try { await subscriptionsApi.verifyPayment(result.orderId); } catch { /* webhook */ }
+          setLoading(null);
+          router.push('/studio?upgrade=success');
+        },
+        onPending: () => {
+          setLoading(null);
+          router.push('/dashboard/orders?status=pending');
+        },
+        onError: () => {
+          setLoading(null);
+          toast.error('Pembayaran gagal diproses. Silakan coba lagi.');
+        },
+        onClose: () => setLoading(null),
+      });
+    } catch (err: any) {
+      setLoading(null);
+      const message = err?.response?.data?.message || err?.message || 'Gagal membuat pembayaran Pro.';
+      toast.error(Array.isArray(message) ? message.join(', ') : message);
+    }
   };
 
   return (
