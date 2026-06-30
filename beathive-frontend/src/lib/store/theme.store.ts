@@ -18,7 +18,7 @@ function applyTheme(theme: Theme) {
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
-      theme: 'dark',
+      theme: 'light',
       toggle: () => {
         const next: Theme = get().theme === 'dark' ? 'light' : 'dark';
         set({ theme: next });
@@ -29,6 +29,6 @@ export const useThemeStore = create<ThemeState>()(
         applyTheme(t);
       },
     }),
-    { name: 'beathive-theme' },
+    { name: 'arsonus-theme' },
   ),
 );

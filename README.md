@@ -1,6 +1,6 @@
-# Beathive Web
+# Arsonus Web
 
-Beathive is a full-stack audio marketplace project with a NestJS backend and a Next.js frontend.
+Arsonus is a full-stack audio marketplace project with a NestJS backend and a Next.js frontend.
 
 ## Project Structure
 
@@ -15,8 +15,8 @@ docker-compose.yml  Local Docker setup
 Clone the repository:
 
 ```bash
-git clone https://github.com/samuel90s/beathive-web-pbl.git
-cd beathive-web-pbl
+git clone https://github.com/samuel90s/arsonus-web-pbl.git
+cd arsonus-web-pbl
 ```
 
 Install backend:

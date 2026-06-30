@@ -47,7 +47,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'beathive-auth',
+      name: 'arsonus-auth',
       storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         user: state.user,

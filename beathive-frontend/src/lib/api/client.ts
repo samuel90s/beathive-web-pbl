@@ -19,7 +19,7 @@ function getToken(key: 'accessToken' | 'refreshToken'): string | null {
   const direct = sessionStorage.getItem(key);
   if (direct) return direct;
   try {
-    const raw = sessionStorage.getItem('beathive-auth');
+    const raw = sessionStorage.getItem('arsonus-auth');
     if (raw) return JSON.parse(raw)?.state?.[key] ?? null;
   } catch { /* ignore */ }
   return null;
@@ -29,12 +29,12 @@ function updateStoredTokens(accessToken: string, refreshToken: string) {
   sessionStorage.setItem('accessToken', accessToken);
   sessionStorage.setItem('refreshToken', refreshToken);
   try {
-    const raw = sessionStorage.getItem('beathive-auth');
+    const raw = sessionStorage.getItem('arsonus-auth');
     if (raw) {
       const parsed = JSON.parse(raw);
       parsed.state.accessToken = accessToken;
       parsed.state.refreshToken = refreshToken;
-      sessionStorage.setItem('beathive-auth', JSON.stringify(parsed));
+      sessionStorage.setItem('arsonus-auth', JSON.stringify(parsed));
     }
   } catch { /* ignore */ }
 }
@@ -92,7 +92,12 @@ apiClient.interceptors.response.use(
   async (error) => {
     const original = error.config;
 
-    if (error.response?.status !== 401 || original._retry) {
+    // 401 dari endpoint auth itu sendiri (login/register/refresh) berarti
+    // kredensial salah, bukan sesi yang kedaluwarsa — jangan trigger
+    // alur refresh+redirect, biar komponen pemanggil bisa tampilkan error inline.
+    const isAuthEndpoint = typeof original?.url === 'string' && /\/auth\/(login|register|refresh)(\?|$)/.test(original.url);
+
+    if (error.response?.status !== 401 || original._retry || isAuthEndpoint) {
       return Promise.reject(error);
     }
 
@@ -127,7 +132,7 @@ apiClient.interceptors.response.use(
       flushQueue(err, null);
       sessionStorage.removeItem('accessToken');
       sessionStorage.removeItem('refreshToken');
-      sessionStorage.removeItem('beathive-auth');
+      sessionStorage.removeItem('arsonus-auth');
       try {
         const { useAuthStore } = await import('@/lib/store/auth.store');
         useAuthStore.getState().logout();

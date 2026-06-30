@@ -11,7 +11,7 @@ import { AppSidebarWrapper } from '@/components/layout/AppSidebarWrapper';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'BeatHive — Premium Sound Effects & Music',
+  title: 'Arsonus — Premium Sound Effects & Music',
   description: 'Thousands of premium sound effects for content creators, game developers, and video creators.',
 };
 
@@ -24,7 +24,7 @@ const midtransSnapUrl = isProduction
 // Dijalankan sebelum React hydrate untuk mencegah flash of unstyled content (FOUC)
 // Script ini hanya membaca sessionStorage dan menambahkan class ke <html>,
 // tidak menerima input user sama sekali sehingga tidak bisa di-XSS.
-const THEME_SCRIPT = `(function(){try{var raw=localStorage.getItem('beathive-theme')||sessionStorage.getItem('beathive-theme')||'{}';var t=JSON.parse(raw);var theme=(t.state&&t.state.theme)||t.theme||'dark';document.documentElement.classList.add(theme);}catch(e){document.documentElement.classList.add('dark');}})();`;
+const THEME_SCRIPT = `(function(){try{var raw=localStorage.getItem('arsonus-theme')||sessionStorage.getItem('arsonus-theme')||'{}';var t=JSON.parse(raw);var theme=(t.state&&t.state.theme)||t.theme||'light';document.documentElement.classList.add(theme);}catch(e){document.documentElement.classList.add('light');}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

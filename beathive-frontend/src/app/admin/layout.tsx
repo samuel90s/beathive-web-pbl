@@ -16,6 +16,7 @@ const CONTENT_LINKS = [
   { href: '/admin/sounds', label: 'Sound Review' },
   { href: '/admin/categories', label: 'Categories' },
   { href: '/admin/tags', label: 'Tags' },
+  { href: '/admin/testimonials', label: 'Testimonials' },
 ];
 
 const FINANCE_LINKS = [

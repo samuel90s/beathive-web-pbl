@@ -439,33 +439,29 @@ function CategoryCard({ cat, onClick }: {
   const icon = CAT_ICONS[cat.slug];
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`relative rounded-2xl overflow-hidden group cursor-pointer bg-gradient-to-br ${cat.gradient} flex flex-col justify-end p-5 transition-all duration-200 hover:scale-[1.02] hover:shadow-2xl text-left`}
-      style={{ aspectRatio: '16/10' }}
+      className="group flex min-h-[132px] flex-col justify-between rounded-xl border border-rim bg-surface p-4 text-left transition-colors hover:border-accent/35 hover:bg-lift focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
     >
-      {/* Decorative background icon */}
-      {icon && (
-        <div className="absolute top-1/2 right-4 -translate-y-1/2 w-28 h-28 pointer-events-none">
-          {icon}
+      <div className="flex items-start justify-between gap-4">
+        <div className={`h-10 w-10 rounded-xl bg-gradient-to-br ${cat.gradient} p-2 shadow-sm`}>
+          <div className="h-full w-full opacity-80">
+            {icon}
+          </div>
         </div>
-      )}
-
-      {/* Gradient overlay at bottom */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-
-      {/* Hover glow */}
-      <div className="absolute inset-0 bg-white/0 group-hover:bg-white/[0.06] transition-colors rounded-2xl" />
-
-      {/* Text */}
-      <div className="relative z-10">
-        <p className="text-base font-bold text-white leading-tight">{cat.name}</p>
-        <p className="text-[12px] text-white/70 mt-0.5 font-medium">{cat.desc}</p>
+        <span className="rounded-full border border-white/[0.06] bg-white/[0.03] px-2 py-1 text-[11px] font-medium text-[#8b8fa8]">
+          {cat.subcats.length} sub
+        </span>
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-white transition-colors group-hover:text-accent-bright">{cat.name}</p>
+        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[#8b8fa8]">{cat.desc}</p>
       </div>
     </button>
   );
 }
 
-// ─── Category Landing (no category selected) ─────────────────────────────────
+// Category Landing (no category selected) ─────────────────────────────────
 
 function CategoryLanding({ soundType, onCategoryClick, onSubcatClick, onMoodClick }: {
   soundType: string;
@@ -477,23 +473,32 @@ function CategoryLanding({ soundType, onCategoryClick, onSubcatClick, onMoodClic
 
   return (
     <div className="px-6 py-6 pb-28">
-
-      {/* Type selector */}
-      <div className="flex items-center gap-1 mb-8">
-        {[
-          { value: '', label: 'Semua' },
-          { value: 'sfx', label: 'Sound Effects' },
-          { value: 'music', label: 'Music' },
-        ].map(opt => (
-          <button key={opt.value}
-            onClick={() => opt.value === '' ? onCategoryClick('') : onSubcatClick('__type__', opt.value)}
-            className={clsx(
-              'px-4 py-2 rounded-lg text-sm font-medium transition-all',
-              soundType === opt.value ? 'bg-accent text-white' : 'text-[#6b6f82] hover:text-white hover:bg-white/[0.06]',
-            )}>
-            {opt.label}
-          </button>
-        ))}
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#5a5d72]">Browse</p>
+          <h1 className="mt-1 text-2xl font-semibold text-white">Cari sound yang pas</h1>
+        </div>
+        <div className="inline-flex w-fit rounded-xl border border-rim bg-surface p-1">
+          {[
+            { value: '', label: 'Semua' },
+            { value: 'sfx', label: 'SFX' },
+            { value: 'music', label: 'Music' },
+          ].map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onSubcatClick('__type__', opt.value)}
+              className={clsx(
+                'rounded-lg px-4 py-2 text-sm font-medium transition-colors',
+                soundType === opt.value
+                  ? 'bg-accent text-white shadow-sm'
+                  : 'text-[#8b8fa8] hover:bg-white/[0.04] hover:text-white',
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Sound Effects section */}
@@ -503,7 +508,7 @@ function CategoryLanding({ soundType, onCategoryClick, onSubcatClick, onMoodClic
             <h2 className="text-[11px] font-bold text-[#5a5d72] uppercase tracking-[0.12em]">Sound Effects</h2>
             <div className="flex-1 h-px bg-rim" />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {FEATURED_SFX.map(cat => (
               <CategoryCard key={cat.slug} cat={cat} onClick={() => onCategoryClick(cat.slug)} />
             ))}
@@ -518,12 +523,12 @@ function CategoryLanding({ soundType, onCategoryClick, onSubcatClick, onMoodClic
             <h2 className="text-[11px] font-bold text-[#5a5d72] uppercase tracking-[0.12em]">Music</h2>
             <div className="flex-1 h-px bg-rim" />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {FEATURED_MUSIC.map(cat => (
               <CategoryCard key={cat.slug} cat={cat} onClick={() => onCategoryClick(cat.slug)} />
             ))}
           </div>
-          <div className="mt-4 rounded-2xl border border-rim bg-surface p-4">
+          <div className="mt-4 rounded-xl border border-rim bg-surface p-4">
             <div className="flex items-center gap-3 mb-3">
               <h3 className="text-[11px] font-bold text-[#5a5d72] uppercase tracking-[0.12em]">Mood Musik</h3>
               <div className="flex-1 h-px bg-rim" />
@@ -553,16 +558,16 @@ function CategoryLanding({ soundType, onCategoryClick, onSubcatClick, onMoodClic
           {allCats.map(cat => (
             <div
               key={cat.slug}
-              className="rounded-2xl border border-rim bg-surface p-4 shadow-sm hover:border-accent/25 hover:bg-lift transition-all group"
+              className="rounded-xl border border-rim bg-surface p-4 shadow-sm transition-colors hover:border-accent/25 hover:bg-lift group"
             >
               {/* Category header */}
               <button
                 onClick={() => onCategoryClick(cat.slug)}
                 className="flex items-center gap-3 mb-3 w-full text-left"
               >
-                <div className={`w-9 h-9 rounded-xl flex-shrink-0 bg-gradient-to-br ${cat.gradient} shadow-sm`} />
+                <div className={`w-9 h-9 rounded-lg flex-shrink-0 bg-gradient-to-br ${cat.gradient} shadow-sm`} />
                 <div className="min-w-0">
-                  <span className="block text-sm font-bold text-[#111827] dark:text-[#f4f5fb] group-hover:text-accent-bright transition-colors">
+                  <span className="block text-sm font-semibold text-[#111827] dark:text-[#f4f5fb] group-hover:text-accent-bright transition-colors">
                     {cat.name}
                   </span>
                   <span className="text-[11px] text-[#64748b] dark:text-[#6b6f82]">
@@ -879,32 +884,42 @@ function BrowseContent() {
     setUrlGenre(genreSlug);
   }, [searchParams]);
 
-  const updateUrl = (params: Record<string, string>) => {
-    const p = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => { if (v) p.set(k, v); });
-    const query = p.toString();
-    window.location.assign(query ? `/browse?${query}` : '/browse');
+  const resetBrowseState = () => {
+    setCategorySlug('');
+    setUrlSearch('');
+    setUrlAuthorId('');
+    setUrlMood('');
+    setUrlGenre('');
   };
 
   const handleCategoryClick = (slug: string) => {
-    if (!slug) {
-      updateUrl({ soundType });
-    } else {
-      const nextType = MUSIC_CATS.some(c => c.slug === slug) ? 'music' : 'sfx';
-      updateUrl({ categorySlug: slug, soundType: nextType });
-    }
+    resetBrowseState();
+    if (!slug) return;
+    setCategorySlug(slug);
+    setSoundType(MUSIC_CATS.some(c => c.slug === slug) ? 'music' : 'sfx');
   };
 
   const handleSubcatClick = (catSlug: string, sub: string) => {
     if (catSlug === '__type__') {
-      updateUrl({ soundType: sub });
-    } else {
-      updateUrl({ categorySlug: catSlug, search: sub });
+      resetBrowseState();
+      setSoundType(sub);
+      return;
     }
+    setCategorySlug(catSlug);
+    setSoundType(MUSIC_CATS.some(c => c.slug === catSlug) ? 'music' : 'sfx');
+    setUrlSearch(sub);
+    setUrlAuthorId('');
+    setUrlMood('');
+    setUrlGenre('');
   };
 
   const handleMoodClick = (mood: string) => {
-    updateUrl({ soundType: 'music', mood });
+    setCategorySlug('');
+    setSoundType('music');
+    setUrlSearch('');
+    setUrlAuthorId('');
+    setUrlGenre('');
+    setUrlMood(mood);
   };
 
   const allCats = useMemo(() => [...SFX_CATS, ...MUSIC_CATS], []);
@@ -927,7 +942,9 @@ function BrowseContent() {
       <SoundList
         category={activeCategory}
         filters={filters}
-        onBack={() => updateUrl({ soundType })}
+        onBack={() => {
+          resetBrowseState();
+        }}
       />
     );
   }

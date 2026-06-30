@@ -46,6 +46,17 @@ function GlowOrb({ className }: { className: string }) {
   );
 }
 
+const CATEGORY_GRADIENTS = [
+  'from-accent to-carmine',
+  'from-teal to-accent',
+  'from-carmine to-teal',
+  'from-accent to-teal',
+  'from-teal-dim to-accent',
+  'from-carmine-dim to-accent',
+  'from-accent-dim to-teal',
+  'from-teal to-carmine',
+];
+
 const FEATURES = [
   {
     icon: (
@@ -104,8 +115,8 @@ export default async function HomePage() {
         {/* Background effects */}
         <div className="absolute inset-0 bg-hero-glow pointer-events-none" />
         <div className="absolute inset-0 bg-grid opacity-[0.4] pointer-events-none" />
-        <GlowOrb className="w-96 h-96 bg-accent/20 -top-20 -left-20" />
-        <GlowOrb className="w-72 h-72 bg-teal/15 top-1/3 -right-10" />
+        <GlowOrb className="w-96 h-96 bg-accent/25 -top-20 -left-20" />
+        <GlowOrb className="w-72 h-72 bg-teal/20 top-1/3 -right-10" />
 
         {/* Badge */}
         <div className="relative inline-flex items-center gap-2 px-4 py-2 rounded-full border border-accent/30 bg-accent/10 text-accent-bright text-xs font-medium mb-8 animate-fade-up">
@@ -173,15 +184,17 @@ export default async function HomePage() {
             </Link>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {categories.slice(0, 8).map((cat) => (
+            {categories.slice(0, 8).map((cat, i) => (
               <Link
                 key={cat.slug}
                 href={`/browse?categorySlug=${cat.slug}`}
-                className="card rounded-xl p-4 hover:border-accent/30 hover:bg-accent/5 transition-all group flex items-center gap-3"
+                className="card rounded-xl p-4 hover:border-accent/30 hover:shadow-md transition-all group flex items-center gap-3"
               >
-                <span className="text-2xl">{cat.icon || '🎵'}</span>
+                <span className={`flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br ${CATEGORY_GRADIENTS[i % CATEGORY_GRADIENTS.length]} text-xl flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform`}>
+                  {cat.icon || '🎵'}
+                </span>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-[#c4c6d8] group-hover:text-white transition-colors truncate">{cat.name}</p>
+                  <p className="text-sm font-medium text-[#c4c6d8] group-hover:text-accent-bright transition-colors truncate">{cat.name}</p>
                   <p className="text-xs text-[#5a5d72] mt-0.5">{cat._count.audioAssets} sounds</p>
                 </div>
               </Link>
@@ -215,7 +228,7 @@ export default async function HomePage() {
         <div className="card rounded-2xl p-8 relative overflow-hidden">
           <div className="absolute inset-0 bg-hero-glow opacity-50 pointer-events-none" />
           <div className="relative">
-            <h2 className="text-xl font-semibold text-white mb-6 text-center">How BeatHive works</h2>
+            <h2 className="text-xl font-semibold text-white mb-6 text-center">How Arsonus works</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
                 { step: '01', title: 'Search & Preview', desc: 'Explore the catalog and preview audio directly in your browser.' },
@@ -244,7 +257,7 @@ export default async function HomePage() {
           <div className="absolute inset-0 bg-grid opacity-30" />
           <GlowOrb className="w-64 h-64 bg-accent/30 -top-10 -right-10" />
           <div className="relative px-8 py-12 text-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-white/80 text-xs font-medium mb-5 border border-white/10">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/70 text-slate-700 text-xs font-medium mb-5 border border-white/80 shadow-sm">
               <span className="w-1.5 h-1.5 bg-teal rounded-full animate-pulse" />
               Free plan · No credit card
             </div>

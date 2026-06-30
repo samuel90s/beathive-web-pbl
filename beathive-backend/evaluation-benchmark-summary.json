@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-06-27T05:10:03.953Z",
+  "datasetLabel": "Controlled simulated Arsonus recommendation evaluation dataset",
+  "prefix": "SIM-EVAL-2026",
+  "k": 10,
+  "usersEvaluated": 20,
+  "assetCount": 600,
+  "interactionCounts": {
+    "downloads": 1280,
+    "wishlists": 800,
+    "ratings": 800,
+    "paidOrderItems": 80
+  },
+  "results": {
+    "hybrid": {
+      "label": "Hybrid multi-signal",
+      "precisionAt10": 0.46,
+      "recallAt10": 0.46,
+      "ndcgAt10": 0.3893,
+      "mapAt10": 0.2097,
+      "avgLatencyMsPerUser": 1.469
+    },
+    "contentBased": {
+      "label": "Content-based only",
+      "precisionAt10": 0.46,
+      "recallAt10": 0.46,
+      "ndcgAt10": 0.4282,
+      "mapAt10": 0.2371,
+      "avgLatencyMsPerUser": 0.968
+    },
+    "trending": {
+      "label": "Trending-only",
+      "precisionAt10": 0.02,
+      "recallAt10": 0.02,
+      "ndcgAt10": 0.0139,
+      "mapAt10": 0.0025,
+      "avgLatencyMsPerUser": 0.675
+    },
+    "random": {
+      "label": "Random baseline",
+      "precisionAt10": 0.035,
+      "recallAt10": 0.035,
+      "ndcgAt10": 0.0373,
+      "mapAt10": 0.0124,
+      "avgLatencyMsPerUser": 0.947
+    }
+  },
+  "note": "Offline evaluation over seeded simulated behavior. Results are suitable as a controlled prototype study, not as evidence of organic production behavior."
+}

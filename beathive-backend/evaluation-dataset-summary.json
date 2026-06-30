@@ -1,0 +1,12 @@
+{
+  "generatedAt": "2026-06-27T05:01:00.014Z",
+  "datasetLabel": "Controlled simulated Arsonus recommendation evaluation dataset",
+  "prefix": "SIM-EVAL-2026",
+  "users": 20,
+  "assets": 600,
+  "downloads": 1280,
+  "wishlists": 800,
+  "ratings": 800,
+  "paidOrders": 80,
+  "note": "This dataset is synthetic and must be reported as simulated evaluation data, not organic production traffic."
+}

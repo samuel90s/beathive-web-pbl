@@ -276,4 +276,30 @@ export class AdminController {
   async deleteTag(@Param('id') id: string) {
     return this.adminService.deleteTag(id);
   }
+
+  // ─── Testimonials ────────────────────────────────────────
+
+  // GET /admin/testimonials?status=pending&page=1&limit=20
+  @Get('testimonials')
+  async getTestimonials(
+    @Query('status') status?: 'pending' | 'approved',
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+  ) {
+    const p = Math.max(1, Number(page) || 1);
+    const l = Math.min(100, Math.max(1, Number(limit) || 20));
+    return this.adminService.getTestimonials(status, p, l);
+  }
+
+  @Patch('testimonials/:id/approve')
+  @HttpCode(HttpStatus.OK)
+  async approveTestimonial(@Param('id') id: string) {
+    return this.adminService.approveTestimonial(id);
+  }
+
+  @Delete('testimonials/:id')
+  @HttpCode(HttpStatus.OK)
+  async deleteTestimonial(@Param('id') id: string) {
+    return this.adminService.deleteTestimonial(id);
+  }
 }

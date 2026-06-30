@@ -58,6 +58,9 @@ const securityHeaders = [
 
 const nextConfig = {
   output: 'standalone',
+  // Izinkan akses dev server dari IP LAN (mis. testing dari HP/device lain di WiFi yang sama).
+  // Tanpa ini, Next.js dev server menolak request dari origin selain localhost.
+  allowedDevOrigins: ['192.168.18.131'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },

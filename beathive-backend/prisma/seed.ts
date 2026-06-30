@@ -110,14 +110,14 @@ async function main() {
   // ─── Admin account ──────────────────────────────────────────
   const freePlan = await prisma.plan.findUnique({ where: { slug: 'free' } })
 
-  const adminEmail    = 'admin@beathive.com'
+  const adminEmail    = 'admin@arsonus.com'
   const adminPassword = 'password123'
   const admin = await prisma.user.upsert({
     where:  { email: adminEmail },
     update: {},
     create: {
       email:        adminEmail,
-      name:         'Admin BeatHive',
+      name:         'Admin Arsonus',
       passwordHash: await bcrypt.hash(adminPassword, 10),
       role:         'ADMIN',
       provider:     'email',
@@ -560,7 +560,175 @@ async function main() {
   }
   console.log('✓ Music assets seeded')
 
-  console.log('\n✅ Seed complete!')
+  // Admin dashboard demo statistics
+  const addMonths = (date: Date, months: number) => {
+    const next = new Date(date)
+    next.setMonth(next.getMonth() + months)
+    return next
+  }
+
+  const makeDate = (monthsAgo: number, day: number) => {
+    const date = new Date()
+    date.setDate(1)
+    date.setHours(10, 0, 0, 0)
+    date.setMonth(date.getMonth() - monthsAgo)
+    date.setDate(Math.min(day, 25))
+    return date
+  }
+
+  const planMap: Record<string, string> = {}
+  for (const plan of await prisma.plan.findMany()) planMap[plan.slug] = plan.id
+
+  const demoUsers = [
+    { email: 'maya.creator@arsonus.local', name: 'Maya Creator', planSlug: 'pro' },
+    { email: 'raka.editor@arsonus.local', name: 'Raka Editor', planSlug: 'business' },
+    { email: 'nina.studio@arsonus.local', name: 'Nina Studio', planSlug: 'pro' },
+    { email: 'dimas.film@arsonus.local', name: 'Dimas Film', planSlug: 'free' },
+    { email: 'sari.games@arsonus.local', name: 'Sari Games', planSlug: 'business' },
+  ]
+
+  const demoUserIds: string[] = []
+  for (const demoUser of demoUsers) {
+    const user = await prisma.user.upsert({
+      where: { email: demoUser.email },
+      update: { name: demoUser.name, role: 'USER', emailVerified: true },
+      create: {
+        email: demoUser.email,
+        name: demoUser.name,
+        passwordHash: await bcrypt.hash('password123', 10),
+        role: 'USER',
+        provider: 'email',
+        emailVerified: true,
+      },
+    })
+    demoUserIds.push(user.id)
+
+    if (planMap[demoUser.planSlug]) {
+      await prisma.subscription.upsert({
+        where: { userId: user.id },
+        update: {
+          planId: planMap[demoUser.planSlug],
+          status: 'ACTIVE',
+          billingCycle: 'MONTHLY',
+          currentPeriodEnd: addMonths(new Date(), 1),
+          cancelledAt: null,
+        },
+        create: {
+          userId: user.id,
+          planId: planMap[demoUser.planSlug],
+          status: 'ACTIVE',
+          billingCycle: 'MONTHLY',
+          currentPeriodEnd: addMonths(new Date(), 1),
+        },
+      })
+    }
+  }
+
+  const statusOverrides = [
+    { slug: 'footsteps-on-gravel', reviewStatus: 'APPROVED', isPublished: true },
+    { slug: 'glass-shatter-impact', reviewStatus: 'PENDING', isPublished: false },
+    { slug: 'wooden-door-creak', reviewStatus: 'REJECTED', isPublished: false },
+    { slug: 'busy-city-street', reviewStatus: 'APPROVED', isPublished: true },
+    { slug: 'rainy-night-cafe', reviewStatus: 'NEEDS_RE_REVIEW', isPublished: false },
+    { slug: 'spaceship-interior-hum', reviewStatus: 'APPROVED', isPublished: true },
+    { slug: 'tropical-forest-morning', reviewStatus: 'APPROVED', isPublished: true },
+    { slug: 'ocean-waves-sunset', reviewStatus: 'PENDING', isPublished: false },
+    { slug: 'thunderstorm-wilderness', reviewStatus: 'APPROVED', isPublished: true },
+    { slug: 'epic-hero-theme', reviewStatus: 'APPROVED', isPublished: true },
+    { slug: 'suspense-thriller-score', reviewStatus: 'NEEDS_RE_REVIEW', isPublished: false },
+    { slug: 'emotional-piano-ballad', reviewStatus: 'REJECTED', isPublished: false },
+    { slug: 'cinematic-trailer-rise', reviewStatus: 'APPROVED', isPublished: true },
+    { slug: 'dark-ambient-drone', reviewStatus: 'PENDING', isPublished: false },
+    { slug: 'victorious-fanfare', reviewStatus: 'APPROVED', isPublished: true },
+    { slug: 'lofi-chill-beat', reviewStatus: 'APPROVED', isPublished: true },
+    { slug: 'cyberpunk-synth-wave', reviewStatus: 'APPROVED', isPublished: true },
+    { slug: 'festival-drop-anthem', reviewStatus: 'APPROVED', isPublished: true },
+  ]
+
+  for (const item of statusOverrides) {
+    await prisma.audioAsset.updateMany({
+      where: { slug: item.slug },
+      data: {
+        reviewStatus: item.reviewStatus,
+        isPublished: item.isPublished,
+        publishedAt: item.isPublished ? new Date() : null,
+        reviewedAt: item.reviewStatus === 'PENDING' ? null : new Date(),
+        reviewNote: item.reviewStatus === 'REJECTED' ? 'Demo rejected item for admin statistics.' : null,
+      },
+    })
+  }
+
+  const demoAssets = await prisma.audioAsset.findMany({
+    where: { slug: { in: [...sfxAssets.map((asset) => asset.slug), ...musicAssets.map((asset) => asset.slug)] } },
+    select: { id: true, slug: true },
+  })
+  const demoAssetBySlug = new Map(demoAssets.map((asset) => [asset.slug, asset]))
+
+  const demoOrders = [
+    { code: 'DEMO-ORDER-001', monthsAgo: 5, day: 5, status: 'PAID', amount: 45000, assetSlug: 'emotional-piano-ballad', userIndex: 0 },
+    { code: 'DEMO-ORDER-002', monthsAgo: 5, day: 18, status: 'PAID', amount: 65000, assetSlug: 'festival-drop-anthem', userIndex: 1 },
+    { code: 'DEMO-ORDER-003', monthsAgo: 4, day: 9, status: 'PAID', amount: 25000, assetSlug: 'spaceship-interior-hum', userIndex: 2 },
+    { code: 'DEMO-ORDER-004', monthsAgo: 4, day: 21, status: 'FAILED', amount: 55000, assetSlug: 'victorious-fanfare', userIndex: 3 },
+    { code: 'DEMO-ORDER-005', monthsAgo: 3, day: 3, status: 'PAID', amount: 35000, assetSlug: 'thunderstorm-wilderness', userIndex: 4 },
+    { code: 'DEMO-ORDER-006', monthsAgo: 3, day: 17, status: 'PAID', amount: 55000, assetSlug: 'victorious-fanfare', userIndex: 0 },
+    { code: 'DEMO-ORDER-007', monthsAgo: 2, day: 7, status: 'PENDING', amount: 65000, assetSlug: 'festival-drop-anthem', userIndex: 1 },
+    { code: 'DEMO-ORDER-008', monthsAgo: 2, day: 14, status: 'PAID', amount: 15000, assetSlug: 'wooden-door-creak', userIndex: 2 },
+    { code: 'DEMO-ORDER-009', monthsAgo: 1, day: 4, status: 'PAID', amount: 45000, assetSlug: 'emotional-piano-ballad', userIndex: 3 },
+    { code: 'DEMO-ORDER-010', monthsAgo: 1, day: 20, status: 'CANCELLED', amount: 25000, assetSlug: 'spaceship-interior-hum', userIndex: 4 },
+    { code: 'DEMO-ORDER-011', monthsAgo: 0, day: 6, status: 'PAID', amount: 65000, assetSlug: 'festival-drop-anthem', userIndex: 0 },
+    { code: 'DEMO-ORDER-012', monthsAgo: 0, day: 19, status: 'PAID', amount: 55000, assetSlug: 'victorious-fanfare', userIndex: 1 },
+    { code: 'DEMO-ORDER-013', monthsAgo: 0, day: 23, status: 'REFUNDED', amount: 35000, assetSlug: 'thunderstorm-wilderness', userIndex: 2 },
+  ]
+
+  for (const demoOrder of demoOrders) {
+    const asset = demoAssetBySlug.get(demoOrder.assetSlug)
+    const userId = demoUserIds[demoOrder.userIndex % demoUserIds.length]
+    if (!asset || !userId) continue
+
+    const createdAt = makeDate(demoOrder.monthsAgo, demoOrder.day)
+    const paidAt = demoOrder.status === 'PAID' ? createdAt : null
+    const existingOrder = await prisma.order.findFirst({ where: { gatewayOrderId: demoOrder.code } })
+
+    const order = existingOrder
+      ? await prisma.order.update({
+          where: { id: existingOrder.id },
+          data: {
+            userId,
+            totalAmount: demoOrder.amount,
+            status: demoOrder.status as any,
+            paidAt,
+            createdAt,
+            updatedAt: createdAt,
+          },
+        })
+      : await prisma.order.create({
+          data: {
+            userId,
+            totalAmount: demoOrder.amount,
+            status: demoOrder.status as any,
+            gatewayOrderId: demoOrder.code,
+            paidAt,
+            createdAt,
+            updatedAt: createdAt,
+          },
+        })
+
+    const existingItem = await prisma.orderItem.findFirst({ where: { orderId: order.id, audioAssetId: asset.id } })
+    if (!existingItem) {
+      await prisma.orderItem.create({
+        data: {
+          orderId: order.id,
+          audioAssetId: asset.id,
+          priceSnapshot: demoOrder.amount,
+          licenseType: demoOrder.amount >= 45000 ? 'commercial' : 'personal',
+        },
+      })
+    }
+  }
+
+  console.log('Admin dashboard demo statistics seeded')
+
+  console.log('Seed complete!')
 }
 
 main()

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRequireAuth } from '@/lib/hooks/useAuth';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { apiClient } from '@/lib/api/client';
@@ -293,7 +293,111 @@ export default function ProfilePage() {
 
         <TwoFactorSection isTwoFactorEnabled={!!user.isTwoFactorEnabled} />
       </div>
+
+      <TestimonialSection />
     </div>
+  );
+}
+
+function TestimonialSection() {
+  const [message, setMessage] = useState('');
+  const [rating, setRating] = useState(5);
+  const [isApproved, setIsApproved] = useState(false);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  useEffect(() => {
+    apiClient.get('/testimonials/mine')
+      .then(({ data }) => {
+        if (data) {
+          setMessage(data.message);
+          setRating(data.rating);
+          setIsApproved(data.isApproved);
+          setHasSubmitted(true);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setMsg(null);
+    try {
+      const { data } = await apiClient.post('/testimonials', { message: message.trim(), rating });
+      setIsApproved(data.isApproved);
+      setHasSubmitted(true);
+      setMsg({ type: 'ok', text: 'Thanks for the feedback! Your testimonial will appear publicly after review.' });
+    } catch (err: any) {
+      setMsg({ type: 'err', text: err.response?.data?.message || 'Failed to submit feedback.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return null;
+
+  return (
+    <section className="card rounded-2xl p-5 border border-rim">
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-sm font-semibold text-white">Share Your Feedback</h2>
+        {hasSubmitted && (
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${isApproved ? 'bg-teal/10 text-teal' : 'bg-amber-500/10 text-amber-400'}`}>
+            {isApproved ? 'Published' : 'Pending review'}
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-[#6b6f82] mt-0.5 mb-4">
+        Tell us how Arsonus has helped your work — we may feature it as a testimonial.
+      </p>
+
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div>
+          <label className="block text-xs font-medium text-[#8b8fa8] mb-1.5">Rating</label>
+          <div className="flex gap-1">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setRating(n)}
+                aria-label={`${n} star`}
+                className="p-0.5"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill={n <= rating ? '#F7941D' : 'none'} stroke="#F7941D" strokeWidth="1.5">
+                  <polygon points="12,2 15,9 22,9.5 17,14.5 18.5,22 12,18 5.5,22 7,14.5 2,9.5 9,9" />
+                </svg>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-[#8b8fa8] mb-1">Your experience</label>
+          <textarea
+            value={message} onChange={(e) => setMessage(e.target.value)} rows={3} required
+            minLength={10} maxLength={1000}
+            placeholder="What do you like about Arsonus? What problem does it solve for you?"
+            className="w-full px-3 py-2.5 input-dark rounded-xl text-sm resize-none"
+          />
+        </div>
+
+        {msg && (
+          <p className={msg.type === 'ok' ? 'text-xs px-3 py-2 rounded-lg bg-teal/10 text-teal' : 'text-xs px-3 py-2 rounded-lg bg-red-500/10 text-red-400'}>
+            {msg.text}
+          </p>
+        )}
+
+        <button
+          type="submit" disabled={saving || message.trim().length < 10}
+          className="px-5 py-2.5 btn-accent text-sm font-medium rounded-xl disabled:opacity-50 transition-colors"
+        >
+          {saving ? 'Sending...' : hasSubmitted ? 'Update Feedback' : 'Send Feedback'}
+        </button>
+      </form>
+    </section>
   );
 }
 

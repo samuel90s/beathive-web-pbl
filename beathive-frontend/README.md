@@ -1,4 +1,4 @@
-# BeatHive Frontend
+# Arsonus Frontend
 
 Frontend Next.js 14 untuk aplikasi stock sound effect. App Router, TypeScript, Tailwind CSS.
 

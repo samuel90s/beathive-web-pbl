@@ -21,7 +21,21 @@ export class AdminService {
   // ─── Dashboard stats ─────────────────────────────────────
 
   async getStats() {
-    const [users, sounds, pendingSounds, orders, activeSubscriptions] =
+    const monthFormatter = new Intl.DateTimeFormat('id-ID', { month: 'short' });
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    startOfMonth.setMonth(startOfMonth.getMonth() - 5);
+
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const [
+      users, sounds, pendingSounds, orders, activeSubscriptions, revenueAgg, paidOrders,
+      orderStatus, reviewStatus, contentType, categories,
+      newUsers, activeUsers, retentionEligible, retainedUsers,
+      downloadCount, wishlistCount, ratingCount, playAgg,
+    ] =
       await Promise.all([
         this.prisma.user.count(),
         this.prisma.audioAsset.count(),
@@ -30,21 +44,168 @@ export class AdminService {
         this.prisma.subscription.count({
           where: { status: 'ACTIVE', plan: { slug: { not: 'free' } } },
         }),
+        this.prisma.order.aggregate({
+          where: { status: 'PAID' },
+          _sum: { totalAmount: true },
+        }),
+        this.prisma.order.findMany({
+          where: { status: 'PAID', paidAt: { gte: startOfMonth } },
+          select: { paidAt: true, totalAmount: true },
+          orderBy: { paidAt: 'asc' },
+        }),
+        this.prisma.order.groupBy({
+          by: ['status'],
+          _count: { _all: true },
+        }),
+        this.prisma.audioAsset.groupBy({
+          by: ['reviewStatus'],
+          _count: { _all: true },
+        }),
+        this.prisma.audioAsset.groupBy({
+          by: ['assetType'],
+          _count: { _all: true },
+        }),
+        this.prisma.category.findMany({
+          include: { _count: { select: { audioAssets: true } } },
+          orderBy: { name: 'asc' },
+        }),
+        // User growth: tanggal registrasi user dalam 6 bulan terakhir
+        this.prisma.user.findMany({
+          where: { createdAt: { gte: startOfMonth } },
+          select: { createdAt: true },
+        }),
+        // Active users: pernah login/refresh dalam 30 hari terakhir
+        this.prisma.user.count({ where: { lastLoginAt: { gte: thirtyDaysAgo } } }),
+        // Retensi: user yang daftar > 30 hari lalu (cukup "tua" utk dinilai retensinya)
+        this.prisma.user.count({ where: { createdAt: { lt: thirtyDaysAgo } } }),
+        // Dari user "tua" itu, berapa yang masih balik (login) dlm 30 hari terakhir
+        this.prisma.user.count({
+          where: { createdAt: { lt: thirtyDaysAgo }, lastLoginAt: { gte: thirtyDaysAgo } },
+        }),
+        this.prisma.download.count(),
+        this.prisma.wishlist.count(),
+        this.prisma.rating.count(),
+        this.prisma.audioAsset.aggregate({ _sum: { playCount: true } }),
       ]);
 
-    const revenueAgg = await this.prisma.order.aggregate({
-      where: { status: 'PAID' },
-      _sum: { totalAmount: true },
+    const revenueByMonth = Array.from({ length: 6 }, (_, index) => {
+      const date = new Date(startOfMonth);
+      date.setMonth(startOfMonth.getMonth() + index);
+      return {
+        key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+        label: monthFormatter.format(date),
+        revenue: 0,
+        orders: 0,
+      };
     });
+    const revenueMap = new Map(revenueByMonth.map((item) => [item.key, item]));
+
+    for (const order of paidOrders) {
+      if (!order.paidAt) continue;
+      const key = `${order.paidAt.getFullYear()}-${String(order.paidAt.getMonth() + 1).padStart(2, '0')}`;
+      const bucket = revenueMap.get(key);
+      if (!bucket) continue;
+      bucket.revenue += order.totalAmount;
+      bucket.orders += 1;
+    }
+
+    // User growth per bulan (registrasi baru)
+    const usersByMonth = Array.from({ length: 6 }, (_, index) => {
+      const date = new Date(startOfMonth);
+      date.setMonth(startOfMonth.getMonth() + index);
+      return {
+        key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+        label: monthFormatter.format(date),
+        users: 0,
+      };
+    });
+    const usersMap = new Map(usersByMonth.map((item) => [item.key, item]));
+    for (const u of newUsers) {
+      const key = `${u.createdAt.getFullYear()}-${String(u.createdAt.getMonth() + 1).padStart(2, '0')}`;
+      const bucket = usersMap.get(key);
+      if (bucket) bucket.users += 1;
+    }
+
+    const retentionRate = retentionEligible > 0
+      ? Math.round((retainedUsers / retentionEligible) * 1000) / 10
+      : 0;
 
     return {
       users,
+      activeUsers,
+      retentionRate,
       sounds,
       pendingSounds,
       orders,
       activeSubscriptions,
       totalRevenue: revenueAgg._sum.totalAmount ?? 0,
+      charts: {
+        revenueByMonth,
+        usersByMonth,
+        orderStatus: orderStatus.map((item) => ({
+          label: item.status,
+          value: item._count._all,
+        })),
+        reviewStatus: reviewStatus.map((item) => ({
+          label: item.reviewStatus,
+          value: item._count._all,
+        })),
+        contentType: contentType.map((item) => ({
+          label: item.assetType === 'MUSIC' ? 'Music' : 'SFX',
+          value: item._count._all,
+        })),
+        topCategories: categories
+          .map((category) => ({ label: category.name, value: category._count.audioAssets }))
+          .filter((category) => category.value > 0)
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 6),
+        featureUsage: [
+          { label: 'Plays', value: playAgg._sum.playCount ?? 0 },
+          { label: 'Downloads', value: downloadCount },
+          { label: 'Purchases', value: orders },
+          { label: 'Wishlist Adds', value: wishlistCount },
+          { label: 'Reviews', value: ratingCount },
+        ],
+      },
     };
+  }
+
+  // ─── Testimonials moderation ──────────────────────────────
+
+  async getTestimonials(status?: 'pending' | 'approved', page = 1, limit = 20) {
+    const where: any = {};
+    if (status === 'pending') where.isApproved = false;
+    if (status === 'approved') where.isApproved = true;
+
+    const skip = (page - 1) * limit;
+    const [total, items] = await Promise.all([
+      this.prisma.testimonial.count({ where }),
+      this.prisma.testimonial.findMany({
+        where,
+        include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      items,
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  async approveTestimonial(id: string) {
+    const testimonial = await this.prisma.testimonial.findUnique({ where: { id } });
+    if (!testimonial) throw new NotFoundException('Testimonial not found');
+    return this.prisma.testimonial.update({ where: { id }, data: { isApproved: true } });
+  }
+
+  async deleteTestimonial(id: string) {
+    const testimonial = await this.prisma.testimonial.findUnique({ where: { id } });
+    if (!testimonial) throw new NotFoundException('Testimonial not found');
+    await this.prisma.testimonial.delete({ where: { id } });
+    return { ok: true };
   }
 
   // ─── List sounds (semua, dengan filter status) ───────────

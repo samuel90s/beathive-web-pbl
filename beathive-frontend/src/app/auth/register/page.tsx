@@ -45,7 +45,7 @@ export default function RegisterPage() {
           <Link href="/" className="inline-flex">
             <BrandLogo frameClassName="h-10 w-10" textClassName="text-xl" />
           </Link>
-          <p className="text-[#6b6f6f82] text-sm mt-2">Create a free account</p>
+          <p className="text-[#6b6f82] text-sm mt-2">Create a free account</p>
         </div>
 
         <div className="card rounded-2xl p-6">

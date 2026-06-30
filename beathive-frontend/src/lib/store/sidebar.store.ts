@@ -14,6 +14,6 @@ export const useSidebarStore = create<SidebarStore>()(
       toggle: () => set((s) => ({ collapsed: !s.collapsed })),
       setCollapsed: (v) => set({ collapsed: v }),
     }),
-    { name: 'beathive-sidebar' },
+    { name: 'arsonus-sidebar' },
   ),
 );

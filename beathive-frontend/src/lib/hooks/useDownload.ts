@@ -71,7 +71,7 @@ export function useDownload() {
           token = sessionStorage.getItem('accessToken');
           if (!token) {
             try {
-              const raw = sessionStorage.getItem('beathive-auth');
+              const raw = sessionStorage.getItem('arsonus-auth');
               if (raw) token = JSON.parse(raw)?.state?.accessToken ?? null;
             } catch { /* ignore */ }
           }

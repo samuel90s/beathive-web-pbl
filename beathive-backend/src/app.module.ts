@@ -14,6 +14,7 @@ import { EmailModule } from './email/email.module';
 import { RatingsModule } from './ratings/ratings.module';
 import { HealthModule } from './health/health.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { TestimonialsModule } from './testimonials/testimonials.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     RatingsModule,
     HealthModule,
     NotificationsModule,
+    TestimonialsModule,
   ],
   providers: [
     PrismaService,

@@ -18,7 +18,7 @@ export default function BrandLogo({
     <span className={clsx('inline-flex items-center gap-2.5', className)}>
       <span
         className={clsx(
-          'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#111318] p-1',
+          'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-white/10 bg-slate-900 p-1',
           frameClassName,
         )}
       >
@@ -32,7 +32,7 @@ export default function BrandLogo({
       </span>
       {showText && (
         <span className={clsx('font-bold uppercase tracking-wide text-white', textClassName)}>
-          BeatHive
+          Arsonus
         </span>
       )}
     </span>

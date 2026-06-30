@@ -1,6 +1,6 @@
-# BeatHive Backend API
+# Arsonus Backend API
 
-Backend NestJS untuk platform BeatHive — stock sound effects. REST API dengan autentikasi JWT, sistem subscription, pembelian per item, dan integrasi Midtrans.
+Backend NestJS untuk platform Arsonus — stock sound effects. REST API dengan autentikasi JWT, sistem subscription, pembelian per item, dan integrasi Midtrans.
 
 ---
 

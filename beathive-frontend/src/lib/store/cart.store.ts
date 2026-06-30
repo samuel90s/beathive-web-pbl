@@ -55,7 +55,7 @@ export const useCartStore = create<CartState>()(
       hasItem: (soundId) => get().items.some((i) => i.sound.id === soundId),
     }),
     {
-      name: 'beathive-cart',
+      name: 'arsonus-cart',
       version: 1,
       migrate: (persistedState: unknown) => {
         const state = persistedState as Omit<Partial<CartState>, 'items'> & {

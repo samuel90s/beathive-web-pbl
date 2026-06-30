@@ -529,7 +529,12 @@ export class AuthService {
       }),
     ]);
 
-    await this.storeRefreshTokenHash(userId, refreshToken);
+    await Promise.all([
+      this.storeRefreshTokenHash(userId, refreshToken),
+      // lastLoginAt = "last seen" — diupdate di tiap login/register/refresh,
+      // dipakai utk hitung active users & retention rate di admin dashboard.
+      this.prisma.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } }),
+    ]);
     return { accessToken, refreshToken };
   }
 
